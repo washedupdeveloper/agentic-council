@@ -1,0 +1,27 @@
+__pycache__/
+*.pyc
+.venv/
+node_modules/
+*.log
+
+# Secrets — never commit credentials (HANDOFF §5 tells users to keep .env files).
+.env
+.env.*
+*.key
+*.pem
+credentials*
+
+# Raw council run scratch (gate inputs, per-round reviewer JSON, logs).
+# Curated, human-readable reports belong in runs/ and ARE committed.
+.review-council/
+
+# Nix build outputs. flake.nix and flake.lock ARE committed — the lock file is
+# what makes the toolchain deterministic, so it must never be ignored.
+result
+result-*
+.direnv/
+pre-commit-config.yaml
+
+# NOTE: `runs/` is intentionally NOT ignored — it holds curated council run reports
+# (the human-readable evidence of each review), which are deliverables, not scratch output.
+# Raw runtime scratch belongs under the Hermes profile cache, not here.

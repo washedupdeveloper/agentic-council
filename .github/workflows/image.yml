@@ -1,0 +1,112 @@
+name: image
+
+# Attaches the council image to a TAG's GitHub Release, so it can be downloaded
+# without a registry.
+#
+# WHY THIS FILE IS NOW SMALL. `.#container` used to be built only here, which meant
+# the image was verified by a workflow of its own and nothing else. It is now
+# `checks.container` in flake.nix, so the GATE builds it on every push and pull
+# request — on a clean runner, under the pinned toolchain, beside the tests. What
+# remains for this file is the one thing a check cannot do: publish.
+#
+# WHY A RELEASE ASSET AND NOT A REGISTRY. `.#container` is a dockerTools layered
+# image, so the build output is already one file: a gzipped `docker load` tarball
+# (measured at 333 MB, with a SINGLE-PATH closure, so nothing has to be fetched
+# beside it). A release asset is downloadable ANONYMOUSLY — verified that a public
+# repository's asset answers 200 with no token and no account, and that
+# `releases/latest/download/<asset>` resolves across versions, so the URL in the
+# docs never changes. Actions artifacts are NOT a substitute: the same probe
+# against a public repository's artifact answered 401 from the API and 404 from
+# the web path, so they need a signed-in GitHub user, and they expire. A registry
+# works too, but it is a service to run, a permission to hold (`packages: write`)
+# and a second place for the image to be wrong.
+#
+# SO: docker-only users get a durable URL and two commands. Nix users need no
+# distribution at all — `nix build github:<owner>/<repo>#container` is
+# deterministic from `flake.lock`, so it is the same image.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+# `contents: write` is what creating a release and uploading its asset need.
+# `packages: write` went away with the registry push.
+permissions:
+  contents: write
+
+jobs:
+  # Tags only. A branch push needs no image artifact — the gate already built it,
+  # and attaching a 333 MB asset per commit would put one on every release.
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: cachix/install-nix-action@v31
+
+      - name: build
+        run: |
+          image=$(nix build .#container --print-out-paths --no-link)
+          echo "image=$image" >> "$GITHUB_ENV"
+          ls -lh "$image"
+
+      - name: attach the image to the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # `gh` is preinstalled on the hosted runners, so this adds no third-party
+          # action and no dependency to keep current.
+          #
+          # The asset keeps a FIXED name, so `releases/latest/download/<name>` is a
+          # URL that survives every version. A versioned filename would make the
+          # reader know which version to ask for before they could download one.
+          #
+          # Failures are surfaced as annotations as well as in the log: job logs need
+          # admin rights to download, annotations are readable without a token, so a
+          # failed publish stays diagnosable from outside the org.
+          tag="${GITHUB_REF#refs/tags/}"
+          asset="review-council.tar.gz"
+          notes=$(mktemp)
+          # A quoted heredoc, so `$(id -u)` and `$PWD` reach the release notes
+          # verbatim. `${{ github.repository }}` is substituted by the runner before
+          # bash sees the script, so the URL still names the repository.
+          cat > "$notes" <<'NOTES'
+          The council image, as one `docker load` tarball.
+
+              curl -L -O https://github.com/${{ github.repository }}/releases/latest/download/review-council.tar.gz
+              docker load -i review-council.tar.gz
+              docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/repo" review-council /repo
+
+          Requires docker and a Hermes install. The repository, the pinned analyzers
+          and the `council` CLI are all inside the image. See docs/CONTAINER.md.
+          NOTES
+          log=$(mktemp)
+          # `&&` chaining, NOT `set -e`. Bash ignores `-e` inside a subshell that is
+          # part of a condition — `if ! ( ... )` — so with `set -e` a failed upload
+          # was masked by the next successful command (`rm`) and the job reported
+          # success. Chained, the subshell's status is the first failure.
+          if ! (
+            cp "$image" "$asset" &&
+            { gh release view "$tag" >/dev/null 2>&1 ||
+              gh release create "$tag" --title "$tag" --notes-file "$notes"; } &&
+            gh release upload "$tag" "$asset" --clobber
+          ) >"$log" 2>&1; then
+            tail -n 12 "$log" | while IFS= read -r line; do
+              echo "::error::release: $line"
+            done
+            cat "$log"
+            rm -f "$asset" "$notes"
+            exit 1
+          fi
+          rm -f "$asset" "$notes"
+          cat "$log"
+          # One block redirect rather than eight appends to the same file:
+          # actionlint reports SC2129 for the ungrouped form.
+          {
+            echo "### Image attached to $tag"
+            echo '```'
+            gh release view "$tag" --json assets \
+              --jq '.assets[] | "\(.name)  \(.size) bytes"'
+            echo '```'
+            echo "Download: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/latest/download/$asset"
+          } >> "$GITHUB_STEP_SUMMARY"

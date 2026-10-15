@@ -1,0 +1,16 @@
+# Normalize line endings across Windows / Unix / WSL2 contributors
+* text=auto eol=lf
+
+# Binary-ish artifacts that must never be line-ending-converted
+*.png binary
+*.jpg binary
+*.pdf binary
+*.db binary
+
+# Keep scripts LF so they run under bash/WSL2 without CRLF breakage
+*.sh text eol=lf
+*.py text eol=lf
+
+# Windows-native scripts may keep CRLF
+*.bat text eol=crlf
+*.ps1 text eol=crlf

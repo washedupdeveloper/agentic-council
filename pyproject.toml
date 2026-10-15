@@ -1,0 +1,35 @@
+# Tool configuration for the framework.
+#
+# There is deliberately NO [build-system]: `scripts/` is run in place, not
+# installed as a package. The only distributable artifacts are the Hermes skills
+# under `skills/`. A build backend here would imply a wheel nobody consumes.
+[project]
+name = "review-council"
+version = "1.0.0"
+description = "Hermes-native code review: a generalist reviewer sampled N times, a deterministic gate, and an autonomous loop."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "user" }]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+# Council run scratch is generated output, never linted. tests/golden is FIXTURE
+# DATA: the golden suite pins scores against it, and its line count is that
+# suite's `kloc`, so a lint-driven reformat would move every pinned number.
+extend-exclude = [".review-council", "tests/golden"]
+
+[tool.ruff.lint]
+# An EXPLICIT set, not ruff's default. The default `select` grows between
+# releases, so relying on it would turn a routine toolchain bump into a surprise
+# CI failure. These are the classic pycodestyle-error + pyflakes rules (which
+# catch real defects: unused names, undefined references, broken imports) plus
+# import sorting. Widen deliberately, with the fixes, never by accident.
+select = ["E4", "E7", "E9", "F", "I"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# No `addopts`: a bare `-q` here would combine with a call site's `-q` into
+# `-qq`, which silently drops the "N passed" summary line — exactly the line CI
+# logs need. Callers pass their own verbosity.

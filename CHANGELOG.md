@@ -1,0 +1,732 @@
+# Changelog
+
+All notable changes to this project. Format follows
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning is
+[Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+### Added
+
+- **`council setup` is a guided first-run wizard.** It detects Hermes, asks only
+  the questions that are actually the user's (the gate, the sample count, the
+  autonomy mode, whether any member pins a model), prints a summary of what it is
+  about to do, writes one editable file, and then installs. It never hangs: with
+  no terminal it takes every default and says so, so a container or CI cannot wedge
+  on a prompt. Re-running is "change one thing", not "answer everything again",
+  because existing values become the defaults.
+- **One editable config, `$HERMES_HOME/review-council.toml`, and nothing else
+  hardcodes it.** Which members exist, what each may do, the gate, the sample
+  count, the autonomy mode — all of it is read from that file, and
+  `council setup bots` applies an edit. It is TOML rather than YAML because the
+  framework is stdlib-only and the pinned toolchain's interpreter has no PyYAML;
+  `tomllib` is stdlib. The file is round-tripped through a real parser before it is
+  written, and a broken one is refused with the line and the reason rather than
+  half-applied. Validation reports every problem at once, and `delegation` in a
+  member's toolsets is refused outright — the harness is the only fan-out, and a
+  member that could delegate would bypass the rubrics.
+- **`council goal <repo>` expresses a run as a native Hermes `/goal`.** Hermes
+  ships completion contracts (`outcome`, `verification`, `constraints`,
+  `boundaries`, `stop_when`) and **quality gates** — deterministic shell commands
+  that must exit 0 before the goal can be judged done, run *before* the judge, with
+  a red gate skipping the judge entirely. The council's own gate is already such a
+  command, so its autonomous mode no longer needs a bespoke loop: `council gate
+  --latest --repo <repo>` scores the newest run and exits non-zero when it is not
+  satisfied, and the decision to stop becomes a command's exit code rather than a
+  model's opinion. `/goal status`, `/goal pause`, `/subgoal` and the turn budget
+  then apply for free. `--json` gives the fields.
+- **`council gate --latest`** resolves the newest run under a repo, so the quality
+  gate needs no run directory a user would have to know. With no run yet it exits 1
+  and says which directory it looked in: "not met" is a failed gate, not an error.
+- **`council setup` installs the skill too, and `setup skill` installs it alone.**
+  The first-run path used to create the profiles and stop, so a newcomer following
+  it got a working `council review` and **no `/council`** — the skill that makes the
+  agent command exist had no installer at all. `sync` did it, but it is a dev verb,
+  so the shipped surface could not reach it. `council setup` now installs the skill
+  and then the profiles, in that order: the skill is the half that needs no Hermes
+  profile to exist yet, and the half that carries the framework. Measured from a
+  fresh `HERMES_HOME`: 19 script modules, 6 rubrics, the bot definitions and the
+  pinned `flake.lock` land in the library, both profiles are created, and the
+  installed skill then runs itself with no clone and no nix.
+- **A `Dockerfile`, and it is nix-centric.** A host that can run docker but not nix
+  can now `docker build -t review-council .`; nix is installed only inside the
+  build, never on the machine. `nix build .#container` stays the primary path
+  because its layers are content-addressed, and the Dockerfile says so rather than
+  pretending to be equivalent. **The image is still defined once**: `mkContainer`
+  (dockerTools) and `mkImageRoot` (the tree the Dockerfile copies) share
+  `imagePrep`, the entrypoint and the nix config, so the two cannot drift into "the
+  image works and the Dockerfile does not" — the one failure a reader cannot debug.
+  Two things that only a real build teaches, both now handled: nix makes a store
+  path **read-only**, so the modes the flake sets do not survive into the copy
+  (`tmp` arrived `0555`, not `1777`) and the prep has to ship as a file and be
+  re-run; and GNU `cp -a` propagates the source directory's mode onto the
+  destination, leaving the rootfs read-only, so the copy is done with `tar`
+  (`--no-overwrite-dir`), which records modes without altering the extraction root.
+- **`council doctor` reports Hermes, in layers.** It answered "β 1.00" on a machine
+  with no Hermes at all, which says nothing about whether a review can run. The
+  council does **not** talk to a Hermes *gateway* — it shells out to the `hermes`
+  launcher — so the question is answered cheapest-and-most-certain first and a weak
+  signal is never promoted into a strong claim: **L0** the launcher (deterministic,
+  local), **L1** `--version`, which proves it *executes* rather than merely resolving,
+  **L2** the council profiles exist *and carry a provider*, **L3** a gateway port
+  (optimistic, a **hint**, never part of the verdict), **L4** one real turn, the only
+  authoritative layer and therefore opt-in behind `council doctor --probe`. The verdict
+  names the first thing that would stop a review, because that is the one worth fixing.
+- **`nix build .#vm-test`** — the council end-to-end inside a real NixOS VM: boot, a
+  target repo, the pinned probes, the fan-out, the bucketing, the gate, a verdict. The
+  agent is a stub honouring the real CLI contract, because what is under test is the
+  harness, not the model. It asserts the honest negatives too: no profiles reads
+  `no-profiles`, and one open **high** finding is refused **with every score still
+  100** — so the block is the finding, not the aggregate. Not in `nix flake check`: a
+  VM test needs KVM, and the fast gate must not require it.
+- **`scripts/hermes.py`** — the single launcher resolver. `council_loop.hermes_bin()`
+  and `doctor` now share it, because two copies would drift into "doctor finds it and
+  the loop does not", which reads as a flaky agent.
+- **Nothing under `scripts/` is a program any more.** Every module refuses a direct
+  invocation — `python3 scripts/inject_defects.py` — unless the dispatcher set
+  `REVIEW_COUNCIL_DISPATCHED`, and only `scripts/council.py` sets it. Several of
+  these files *act*: `setup bots` writes into `HERMES_HOME`, `sync` prunes a skill
+  deployment, `corpus` plants defects in a repository it is pointed at, and
+  `review`, `sample` and `ablate` spend real agent turns. The refusal names the verb
+  to run instead. Child processes inherit the variable, which is how the harness
+  still runs `probes.py` and `score_reviews.py`. Enforced twice: `test_modules.py`
+  fails if a verb's module has no guard or names a verb the CLI does not expose, and
+  `checks.commands` fails if a direct invocation *succeeds* or the same verb through
+  the CLI *does not*.
+- **A shipping manifest in the flake.** `runtimeModules` is what a review needs;
+  `devModules` (`ablate`, `calibrate`, `golden`, `corpus`, `sync`) is development
+  tooling. `checks.commands` reads the verb table back from the built app and fails
+  if a user verb's module is missing from the shipped tree or a dev verb's is present
+  in it — so the list cannot rot into a comment.
+
+- **Every tool the gate expects is now a harness probe, so beta is a property of
+  the pinned toolchain rather than of the reviewer's diligence.** `ruff`, `mypy`,
+  `bandit`, a dependency scanner and `pytest` were *expected* by the gate and run
+  by nobody: the reviewer had to both choose to invoke each one and report it
+  accurately, so a reviewer who skipped `ruff` cost the readability dimension 40%
+  of its determinism while `ruff` sat pinned on PATH the whole time. That is the
+  asymmetry — deterministic on the Nix side, hostage to diligence on the Python
+  side — and it is closed. Measured with `doctor` on this repository: security
+  **0.50 → 1.00**, and all five dimensions now report **1.00**.
+- **A `--python-executable` mypy probe** resolves imports against the pinned
+  interpreter. Without it every third-party import is reported as a missing stub,
+  which says more about mypy's search path than about the code.
+- **`tests/test_probes.py` and `tests/test_score_reviews.py` grew 9 tests** covering
+  the degradation path (a probe that cannot run must never invent a result), the
+  JSON-array parser, the two distinct `osv-scanner` outcomes, the `det[c]` leak and
+  the density fallback.
+
+
+### Changed
+
+
+- **The shipped tree carries only what a review runs.** `mkFramework` now takes the
+  audience, exactly as the verb surface does: the app and the image get the runtime
+  modules, `bots/` and `skills/`, and the devshell gets those plus the dev verbs and
+  the suite. `packages.framework` is the shipped tree; `packages.dev-framework` is
+  the devshell's. Dropped from the shipped tree: `tests/`, `pyproject.toml`,
+  `README.md`, `flake.nix` and `flake.lock` — nothing at review time reads any of
+  them, and the image no longer carries a suite or a flake it never builds.
+- **The dispatcher bakes `REVIEW_COUNCIL_TOOLCHAIN`.** `toolchain.py` used to fall
+  back to `nix build <tree>#toolchain`, which is why the framework copy had to carry
+  the flake. The launcher exports the store path the build already fixed, so no
+  runtime path needs a writable store or a flake to find it — and the two agree by
+  construction rather than by coincidence.
+- **`docs/ARCHITECTURE.md` §8 is now the real inventory** — every top-level entry
+  with what it is and whether it ships, plus the per-module table. The old section
+  still listed `protocol/` and `src/review_council/` from M1, which was never built.
+- **`docs/EXTENDING.md` gained "Add a verb"** — the three things a new verb must
+  satisfy, all of them enforced by the gate. And the probe section now states that
+  `signal` is a density (`score_from_density(findings, root)`), not a count.
+
+- **`det[c]` is now computed from category `c`'s tools alone.** FRAMEWORK §6 says
+  `det[c] = geometric_mean(normalize(tool_signals_c))`; the code averaged *every*
+  tool into *every* category, so readability depended on bandit and security
+  depended on mypy. That was invisible while beta < 1 let the reviewer's score
+  dominate the result. At beta = 1 `det` **is** the score, so the leak would decide
+  verdicts rather than colour them.
+- **Probe signals are findings *densities*, which is what §6 defines.** The Hill
+  curve takes `findings / KLOC`; the probes were feeding it a raw count, scoring a
+  14 KLOC repository's 16 findings as 16 *per KLOC* — about 14× the harshness the
+  spec defines. Measured on this repository: `bandit` 20 → 86, `mypy` 9 → 70,
+  `complexity` 19 → 85. Before the fix the aggregate fell to 84.36 against a
+  87.1141 threshold; after it, 93.26 and satisfied. A large repository is no longer
+  penalised for being large.
+- **`pip-audit` is replaced by `osv-scanner`, because `pip-audit` cannot run in this
+  toolchain at all.** Its nixpkgs wrapper execs `sys.executable -m pip --version`
+  before it will audit anything, and the interpreter it runs under ships no pip — so
+  the dependency scanner was on PATH and unable to execute. Adding `pip` to the
+  toolchain's Python env did not help, because the wrapper uses a different
+  interpreter. `osv-scanner` is one static binary with no runtime dependency of its
+  own, and it reads the lockfiles of every ecosystem this framework covers, so it
+  also replaces `npm-audit` and `cargo-audit`: **one dependency scanner instead of
+  three.** Where a repository declares dependencies in a manifest it cannot read
+  (`pyproject.toml` is not a lockfile) the probe reports `ran=False` with that
+  reason rather than a clean bill of health.
+- **CI builds and publishes the container image.** `.github/workflows/image.yml`
+  builds it on every pull request (so a broken image fails the PR) and pushes it to
+  GHCR on `master`, tagged `latest` and `sha-<12>`. Using the council now needs
+  docker and nothing else from this repository — no nix, no clone.
+- **The container carries the `council` CLI, not only the review entry point.** The
+  entrypoint now hands anything that is not a review straight to the CLI, so the
+  image is useful before a Hermes is mounted: `docker run <image>` prints the verbs,
+  and `doctor` / `gate` / `probes` / `--verbs-json` all work. The verb table is
+  asked of the CLI rather than copied, so a new verb is reachable in the image the
+  moment it exists. Previously the entrypoint resolved Hermes *before* looking at
+  its arguments, so `docker run <image>` — whose `Cmd` is `--help` — printed a
+  credential error where the help should have been, and no CLI verb was reachable
+  at all.
+
+### Fixed
+
+- **The documented image size was the download, not the image.** "99 layers,
+  333 MiB" is the *tarball*. The layers are gzipped, so `docker load` followed by
+  `docker images` reports **2.33 GB** (2,331,098,089 bytes). Measured by loading
+  the built image in a VM and asking docker, rather than restating the tarball.
+  Both figures are now stated wherever the size appears, and the two stale
+  variants of the number (324 MiB in two files, 333 in one) are reconciled.
+- **The Dockerfile could not build.** Its last step piped through `sed`, and the
+  `nixos/nix` base image has no `sed` (nor `awk`; `/bin` holds only `sh`). Every
+  check up to now had stopped at "the Dockerfile parses", which is not the same
+  claim, so `docker build` died at `[builder 9/9]` with `/bin/sh: line 1: sed:
+  command not found` — the whole path existed for a host with docker and no nix,
+  and it had never once completed. The step now takes `coreutils`, `gnused`,
+  `gnugrep`, `gnutar` and `findutils` from nixpkgs via a new `.#image-prep-tools`
+  output, so it depends on the pin rather than on what a base image happens to
+  carry. Proven by running the build to completion in a VM with network.
+- **The deployed skill pointed the agent at three files that do not ship.** The
+  sync copies `scripts/`, `tests/`, `assets/`, `SKILL.md` and `flake.*` — not
+  `docs/` or `runs/` — while `SKILL.md` told the agent to consult
+  `docs/BASELINE.md`, `docs/MILESTONES.md` and `runs/ablation-22-defect-2026-10-11.md`.
+  Verified dangling in the deployment and present in the repo. The references now
+  name the repository, which is where those files are.
+- **`.pytest_cache` was deployed into the skill tree.** A cache, not content, and
+  host-specific. Added to the sync's cleanup beside `__pycache__`.
+- **A member's capabilities were declared in a file nothing read.** The toolsets
+  were hardcoded in `install_bots.py` while `bots/*/bot.yaml` declared them again —
+  so the file was decorative, and a user editing either saw no effect. That is the
+  worst kind of configurable: it looks configurable. Capabilities now come from
+  `review-council.toml`, which the installer reads, and the config module is the
+  only place the defaults live. Verified end to end: editing a member's `toolsets`
+  to `["file", "terminal"]` and re-running `council setup bots` leaves the profile
+  running exactly those two.
+- **`bots/council-orchestrator/bot.yaml` shipped one machine's private provider and
+  model.** A file that ships publicly named a provider and a model that belong to
+  the author, in a repository about to become public. Removed; a member's
+  model/provider is the user's choice and defaults to inherit. A test now fails if
+  any shipped file names a provider, a model or a key.
+- **The orchestrator installed with NO rubric, silently.** The rubric is
+  `review-council-orchestrator` while the member is `council-orchestrator`, and the
+  installer globbed `f"{name}*"` — which matched nothing. A member with zero skills
+  installs cleanly and simply cannot read its own instructions, so nothing reported
+  it. The glob is now a suffix match, and an orchestrator with no rubric is a hard
+  error rather than a quiet success.
+- **`profile.yaml` described a design that no longer exists.** It still said the
+  orchestrator "fans out one delegate_task batch to the five specialist reviewers" —
+  the five were measured worse at equal cost and deleted at M8.5, and the
+  orchestrator has no delegation toolset at all. `install_bots.py` copies that file
+  into every profile, so every user was shown the stale description.
+- **`probes.score_from_density` claimed to match the scorer's curve and did not.**
+  Its docstring said "matching score_reviews.hill_curve", but its half-point is a
+  hardcoded `k=5.0` while the scorer applies the calibrated `d*=1.8921`. Measured,
+  the two disagree by up to **26 points** over the density range, and 19 points on a
+  probe reporting one finding per KLOC — and at β=1 the probe signal is 0.7 of the
+  score. The docstring now states the difference, the constant is named so the
+  assumption is greppable, and `docs/CALIBRATION.md` records it as the open
+  calibration question it is: unifying the two would make every probe signal
+  stricter and require re-deriving the shipped threshold, which is a calibration
+  decision rather than a bug fix.
+- **`council setup skill` skipped the flake silently, so a deployment's `flake.nix`
+  went stale forever.** The copy loop was `if os.path.isfile(src): place(...)` with
+  no else. The shipped framework tree carries no `flake.nix` by design, so a sync run
+  from the nix app, the devshell or the container found nothing to install and said
+  nothing — and the installed skill could no longer `nix build` its own toolchain.
+  Found on a real deployment: 489 lines and two major changes behind, with the
+  drift check reporting only `flake.nix` and no explanation. The flake now stages the
+  two files as their own store path and both launchers export
+  `REVIEW_COUNCIL_FLAKE_DIR`, so the source reaches the sync from every entry point;
+  and a sync that cannot find them **refuses** (exit 2) with the reason rather than
+  skipping. Verified from all four entry points: checkout, a tree without the
+  variable (refuses), the nix launcher (installs), and a tree with the variable set.
+- **A prune was silent.** `prune_tree` deleted a file the source did not have and
+  printed nothing, so a sync run from an audience-limited tree removed the dev verbs
+  from a deployment with no evidence but their absence. Removals now print
+  (`REMOVED <path> (not in the source)`), matching what `--check` already reported.
+- **The skill's Bootstrap documented two commands that refuse to run.** It told a
+  reader to run `python3 <skill_dir>/scripts/install_bots.py` and
+  `python3 <skill_dir>/scripts/doctor.py`, and both exit 1 with "this is a module of
+  the council CLI, not a program" — the dispatch guard refuses a hand-run module, and
+  the two documented lines were never updated when it was added. Verified in a fresh
+  `HERMES_HOME`. They also used a bare `python3`, which the skill's own path-resolution
+  section tells you not to, and which does not exist on a NixOS host or as a name on
+  Windows. Both now go through `council.py` with `"$PY"`, and the section states the
+  rule rather than leaving the next editor to rediscover it.
+- **The documented `docker run` could not write its own output.** The image runs as
+  uid 1000, so a repository mounted from an account with any other uid was
+  read-only to it and the run died with `PermissionError: '/repo/.review-council'`.
+  Measured on a fresh account (uid 1001) in a real docker daemon. Both the README
+  and `docs/CONTAINER.md` now pass `--user "$(id -u):$(id -g)"`, the image makes
+  `/home/council` and `/repo` writable by the runtime uid so that flag is
+  sufficient on its own, and the harness reports the situation with the flag to
+  pass instead of a traceback.
+- **There is no implicit `/repo`.** `docker run <image>` used to start a review of
+  `/repo` when given no argument, which meant it needed Hermes to print anything.
+  A review now always names its target.
+- **`council corpus` deleted its output before validating anything.** `--out` was
+  `rmtree`'d before `apply_and_locate` ran on the copy, so `--base B --out B`
+  destroyed the base and then died in `copytree`, and `--base B --out V` — V an
+  unrelated populated directory — emptied V and only then reported that B was the
+  wrong base. An `--out` that is the base, contains it, or sits inside it is now
+  refused, and the injection targets are validated against the base **read-only**
+  before anything is deleted. *Found by the council reviewing this repository
+  inside the container, with both reproductions.*
+- **An agent turn inherited the module guard's variable.** `council_loop.py` passed
+  `env=dict(os.environ)` to every reviewer and orchestrator turn, so a turn spawned
+  by the harness had `REVIEW_COUNCIL_DISPATCHED=1` and a module run from inside a run
+  was **not** refused. The council demonstrated it in its own session: inside a
+  council-spawned turn the variable read `1`, and `python3 scripts/inject_defects.py
+  --base B --out V` executed and destroyed V, where the identical command from a
+  clean shell was refused. The variable is now removed from the agent environment —
+  the copy the framework hands over, which is the part it controls.
+- **The dispatch guard is documented as what it is.** It stops an *accidental*
+  `python3 scripts/x.py` and names the verb to run instead. It is **not** a security
+  boundary: any caller who sets one environment variable passes, and so can an agent
+  with a terminal toolset. `docs/ARCHITECTURE.md` §8.2 and `scripts/council.py` now
+  say so, because a guard that claims more than it can hold invites trust it cannot
+  earn.
+
+### Changed
+
+- **What it runs on is now stated, not implied.** The README says which platforms the
+  flake covers (`x86_64-linux`, `aarch64-linux`, `aarch64-darwin`), that the image is
+  any Linux docker host on either architecture, and that the CLI is standard-library
+  Python with Windows a supported target for the modules — only the image is Linux.
+  A tool that claims to work anywhere should name where it does.
+- **Nothing describes one machine's setup any more.** The rubrics' knowledge base
+  was anchored to a specific private infrastructure flake and named its users,
+  hosts and secret paths. It now describes the *shape* those rubrics assume —
+  which is what a reader needs, and what the checks actually test — because a
+  username in an example snippet and a repository name in a validation record are
+  leaks with no upside, and they made a general tool read as one person's
+  configuration. The validation records keep their findings; only the identifiers
+  changed.
+- **The container's verification notes no longer describe the machine they were
+  written on.** "No container runtime on the build host" was true of one author's
+  machine and irrelevant to a reader, and it had gone stale anyway — a scored
+  review does run in the image. The section now says what is verified, how, and the
+  one command that verifies it on *your* machine.
+- **A `127.0.0.1` inside a guest is the guest.** Measured in a NixOS VM test rather
+  than assumed, with a control listener to prove the probe works: `127.0.0.1` reaches
+  the guest in every configuration. The host is at `10.0.2.2` (QEMU's SLIRP gateway) —
+  but only with `--option sandbox false --rebuild`, because the Nix build sandbox gives
+  the build its own network namespace, so by default that gateway is the sandbox's
+  loopback and the host's services are invisible. WSL's mirrored networking *does* let
+  `127.0.0.1` reach the Windows host, which is why the assumption is easy to make — it
+  is a property of that setup, not of guests in general. `docs/AUTONOMY.md` records the
+  full table.
+- **The image is layered.** `buildLayeredImage`, no nix database: **99 layers,
+  324 MiB**, against the previous single-layer 365 MiB. A store path's layer is
+  content-addressed, so an unchanged toolchain produces byte-identical layer
+  digests and a pull fetches only what the local copy lacks. That is the whole
+  caching story; there is no build cache to configure.
+- **The nix database is gone, and it cost nothing to drop.** It existed for
+  `nix path-info` / `nix-store -q`, which nothing calls, and it was the *only*
+  thing forcing a single layer — its gcroots point into a layer that is not there
+  while it is being generated (`ln: ... Permission denied`). Measured without it:
+  `nix --version`, `nix-instantiate --parse` (what the nix-eval probe actually
+  runs), all 14 analyzers, and `doctor` reporting beta 1.00 all still work.
+- **The README leads with the image, 280 → 102 lines.** The build-it-yourself
+  instructions are gone; `nix build .#container` is one line in the container
+  README.
+- **The entrypoint finds a mounted Hermes at `/opt/hermes/bin/hermes`** without
+  being told, so mounting an install needs no `-e HERMES_BIN`. `HERMES_BIN` still
+  wins when set.
+- **`docs/MILESTONES.md`** no longer calls M7 "in progress" — it shipped, and the
+  plan it linked is gone.
+- **No shell scripts.** Every operation is a `council <verb>` subcommand, and every
+  verb is a Python module under `scripts/`. The verb table, the usage text and the
+  dispatch moved out of a generated shell `case` into `scripts/council.py`, where
+  the test suite can assert them. Measured: `find . -name '*.sh'` → **0**, and the
+  container image carries none either.
+- **The WSL bridge is gone.** nix does not run on Windows, so on Windows the council
+  runs in the container image; there is no Windows-native path to keep working.
+  `doctor` now says so instead of reporting an unresolvable toolchain.
+- **Module docstrings cut to a statement of what the module is.** They had grown
+  into documents — `council_loop.py`'s was 61 lines — and the reasoning belongs in
+  `docs/`, where a reader can find it. `flake.nix` lost the same way, 909 → 682
+  lines, most of it long block comments.
+- **`docs/` rewritten for the above and cut hard.** Every number and measured
+  result survives; the framing and the restatements do not.
+
+### Removed
+
+- **`start`** — a third interface over the flake and the image, and one more thing
+  to keep in step. The flake and the published image cover both routes.
+- **`scripts/install-ci-runner.sh`** — it registered a *self-hosted* runner, and CI
+  is GitHub-hosted. `docs/CI.md` still describes the alternative; there is
+  deliberately no script for the path this repository does not exercise.
+- **`scripts/export-handoff.sh`** — bundled the project for moving it between the
+  author's own machines.
+- **`docs/M7-PLAN.md`, `docs/TESTING.md`, `docs/HANDOFF.md`** — a plan for a
+  milestone that shipped, a self-declared historical log, and an author's machine
+  migration procedure.
+
+- **The five shell scripts, replaced by Python modules.** `nix-toolchain.sh` and
+  `nix-toolchain-inner.sh` → `scripts/toolchain.py`, which `doctor.py` and
+  `probes.py` now import instead of shelling out to; `install-bots.sh` →
+  `install_bots.py`; `install-dispatcher.sh` → `install_dispatcher.py`;
+  `sync-to-skill.sh` → `sync_to_skill.py`; `inject-defects.py` →
+  `inject_defects.py` (a hyphen is not a valid identifier, so it could not be
+  imported); `containers/entrypoint.sh` → `scripts/entrypoint.py`.
+- **`scripts/test_ablate.py`** — a stale copy of `tests/test_ablate.py` holding 29
+  of its 45 tests, imported by nothing and collected by nothing
+  (`testpaths = ["tests"]`).
+
+`scripts/sync-to-skill.sh` was cut with the above and **restored**: it is how this
+repository's scripts reach the deployed skill a Hermes session loads, not author
+tooling. Its absence would have left `/council` undeployable. It is now
+`scripts/sync_to_skill.py` — the same job, in the repository's one language.
+
+
+### Fixed
+
+- **`beta` could not see a tool whose command had a path in its arguments, so three
+  of five dimensions were scored partly on judgement when they were fully
+  deterministic.** `tool_name_candidates` stripped everything before the last `/`
+  in the WHOLE command string, which for a command containing a path takes the tail
+  of the last argument instead of the executable:
+
+  ```
+  PATH=$TC/bin:$PATH python3 -m pytest tests/ -q   ->  candidates {-q, -q-(308}
+  PATH=$TC/bin:$PATH ruff check scripts/ tests/    ->  {(all, (all-checks}
+  python3 -m py_compile scripts/*.py               ->  {*.py}
+  ```
+
+  On the run that found it, the reviewers HAD run pytest, ruff and mypy and the
+  pinned toolchain provides them, but `correctness` measured beta **0.75** and
+  `readability` **0.60**. Only the executable is path-stripped now, and leading
+  `NAME=value` prefixes are skipped, so both measure **1.00**. The remaining
+  `security` beta of 0.50 is honest: those reviewers genuinely never ran bandit or
+  pip-audit.
+
+  `council golden --check` reproduces exactly (no pinned score moved) and the
+  fixture suite is unchanged — the fixtures' commands have no path arguments, which
+  is why the regression was invisible to them.
+- **The beta advice said "install", which was the wrong fact.** `tools_missing`
+  means "expected, not reported as run"; whether a tool is installed is the
+  environment's answer, which `council doctor` gives. The wording sent a reader to
+  install ruff, mypy, bandit and pip-audit that were already pinned in the toolchain
+  and, for ruff and mypy, already run. It now reads `ruff, mypy not run`.
+
+- **The council reviewed this refactor and found three defects, each reproduced
+  before it was fixed.** Run advisory, 3 samples, 1 round: aggregate **91.49 >=
+  87.1141, satisfied**, no open high or critical.
+  - **`sync_to_skill.py` interpolated the repo path into a `glob` pattern**, so a
+    checkout under a directory named `a[b]` shipped 34 files instead of 62 — no
+    scripts, no tests, exit 0, no warning. The shell version quoted the prefix, so
+    this was a port regression. `glob.escape()` now.
+  - **`DEST_SKILL` was trusted verbatim and feeds `prune_tree()`**, which deletes
+    whatever the repo does not have. Pointed at a skills-library root instead of the
+    council directory, it removed two files belonging to another skill, exit 0. A
+    non-empty destination must now hold a `SKILL.md` naming the council.
+  - **The verb table existed twice** — in `flake.nix` and `scripts/council.py` — and
+    had already drifted: `baseline` was a user verb in the CLI and absent from the
+    flake's copy, so nothing checked that `baseline.py` shipped or that its `--help`
+    worked. The flake's copy is gone; `checks.commands` asks the built app
+    (`council --verbs-json`), and a table that exists once cannot drift.
+- **`toolchain.py` raised `IndexError`** on a value-taking option with no value,
+  while its sibling arg parser handled the same case. `--interval` was written into
+  the systemd unit unvalidated, so `--interval foo` produced a service that fails at
+  start rather than at install. `council setup --help` printed "expected one of" and
+  exited 2 instead of answering.
+- **`doctor.py`'s only `shell=True`** (nothing needs a shell there, and
+  `sys.executable` can contain a space), **`entrypoint.py`'s hardcoded `python3`**
+  where every other call site uses `sys.executable`, a dead `extra_cfg` parameter no
+  caller passed, and `resolve_hermes_home` duplicated verbatim in two modules — now
+  one `scripts/hermes_home.py`.
+- **The fixed-PATH portability guard was deleted with the shell scripts while a
+  fixed PATH list still existed** — in the dispatcher's systemd unit, where it
+  matters more than it did in a shell script, because a unit does not inherit the
+  caller's PATH. Restored as `tests/test_portability.py`, and `tests/test_modules.py`
+  now covers the modules the port introduced, none of which had a test.
+- **The CRLF test failed on a stale `.mypy_cache`** in a dev clone while the flake's
+  gate stayed green (it checks a git-filtered tree). It skips tool caches now.
+
+- **CI actions moved off Node 20** (`actions/checkout@v4` → `@v7`,
+  `actions/setup-python@v5` → `@v7`). Node 20 was removed from GitHub's runners on
+  2026-09-23, so the old majors were force-run on Node 24 with a warning on every job.
+  `cachix/install-nix-action@v31` is a composite action with no node runtime and is
+  correctly unaffected. `docs/CI.md` records how to check an action's runtime, and why
+  these are pinned to major tags rather than SHAs.
+
+- **Three `PATH` lists named only NixOS's `/run/current-system/sw/bin`**, so `nix` was not
+  found on a native install on another distribution or inside the container image.
+  `scripts/nix-toolchain-inner.sh`, `scripts/install-dispatcher.sh` and
+  `scripts/install-ci-runner.sh` now list every place `nix` lives, in precedence order. The
+  failure was the quiet kind: the helper that resolves the pinned toolchain reported
+  "could not resolve", every nix probe returned `ran: false`, and beta dropped with nothing
+  in the output to explain why.
+
+- **The container image had no `nix.conf`, so its nix probes could not run.** A minimal
+  image has no `/etc/nix/nix.conf`, which leaves the experimental features off — and
+  `nix eval` and `nix flake check`, which is what the nix probes actually run, then fail
+  with `experimental feature 'nix-command' is disabled`. Measured on the extracted image:
+  without a conf `nix eval` and `nix path-info` both refuse; with one, `nix eval` evaluates
+  and `nix-instantiate --parse` parses the flake. The conf is staged at `/opt/nix/nix.conf`
+  — it cannot live in `/etc`, which arrives from the toolchain as a mode-555 directory —
+  and `NIX_CONF_DIR` points at it. It also clears `build-users-group`, because a minimal
+  image has no `nixbld` group and nix warns about that on every invocation.
+
+- **The container image had no `/etc/passwd`, so every `nix` invocation failed** with
+  `error: cannot determine user's home directory`. Nix resolves `$HOME` through
+  `getpwuid()` rather than trusting the environment, so a numeric `config.User` — which is
+  all the kernel needs — is not enough for it. `extraCommands` now writes the entry after
+  `chmod u+w etc`, since `etc` is mode 555.
+
+- **An unanchored session asks for the project instead of only refusing.** The session
+  route is still preferred and unchanged: the loop walks up from the session's cwd looking
+  for a git root or a project marker. But when there is no anchor and a terminal is
+  attached, it now prompts for the path rather than exiting — which is the "first time"
+  case. With no terminal (a scheduled job, a spawned worker, an agent turn) it still
+  refuses with exit 2, because nobody is there to answer and blocking would hang instead
+  of failing.
+
+- **The author's own paths are out of everything that ships** — `research/` and `runs/`
+  records, the `C:/path/to/project` placeholders in the usage text, `docs/AUTONOMY.md` and
+  `skills/council/SKILL.md`. The fact each record carries survives; the incidental
+  directory does not, and a reader who sees the author's home learns nothing from it.
+
+### Added
+
+- **`./start` — one command, and it works out the rest.** A newcomer should not
+  have to know whether they want the nix deployment or the container, and the
+  README previously opened with `nix run .#council`, which is only the right
+  answer for someone who already has nix. `./start` is bash-only, needs nothing
+  installed, and:
+
+  - reports what the machine has (hermes, nix, docker/podman) before doing anything;
+  - picks the route and says why — nix native when nix is present, because the
+    flake pins the analyzer set and the Nix probes can run; the container otherwise;
+  - checks Hermes first, because that is the one requirement it cannot supply, and
+    answers it with the single install command rather than failing later;
+  - refuses rather than guessing: an unknown option, an invalid `--route`, a
+    missing path, or a directory with no `.git` and no project marker. The last
+    one matters — an explicit path was previously taken on trust, so `./start /tmp`
+    would have reviewed `/tmp` and written `.review-council/` into it, undoing the
+    refusal the loop already makes for an unanchored session;
+  - warns before the run that a review spends LLM calls, and names `-- --dry-run`,
+    `-- --max-rounds 1` and `-- --mode advisory` as the cheap ways to look first;
+  - warns when a Nix repository is being reviewed through the container, and about
+    the threshold, before a score is read rather than after.
+
+  It is also `nix run .#start`, and it ships in the framework tree so the container
+  has it at `/opt/review-council/start`.
+
+- **`council doctor` now prints the score caveat.** `calibration.json` has always
+  carried its caveats and nobody reads them; `doctor` is where someone asks "is
+  this machine ready?" and it answered only about tooling. It now says whether the
+  shipped threshold was calibrated for *the repository in front of you* — it was
+  not, unless that repository is this one — and what to do instead. A newcomer who
+  runs a review, gets FAIL and concludes the tool is broken is the failure this
+  prevents.
+
+- **`checks.start-script`** — shellchecks `./start`, runs it with an empty `PATH`
+  (the machine it is written for), and asserts every refusal: an unknown option,
+  an invalid `--route`, a nonexistent path and a non-project directory must all
+  exit non-zero. The refusals are the contract, so they are a gate.
+
+- **`tests/test_portability.py` — the audit is now a gate.** It scans every shipped file
+  for a personal home directory and every fixed `PATH` list for the places `nix` is
+  installed, so neither can come back. Two of its assertions guard the guard: that the
+  detector still matches the lines it claims to, and that the allowlist is still
+  exercised — a regex that silently matches nothing passes forever, and a list of
+  permitted names that no longer appears anywhere cannot be reasoned about. It skips
+  lines that *prepend* to `$PATH` (they inherit it), `Environment=PATH=$VAR` (a use, not
+  a definition) and a `*_PATH` holding a single file rather than a list.
+
+- **`--baseline` — incremental review that carries a whole-repo baseline's findings.**
+  `council review <repo> --baseline auto` reads only what changed since the last
+  qualifying whole-repo run, carrying that run's findings for the files that did not
+  change. The carried findings go back into the numerator before the gate reads the
+  files, so `carried + new` still covers the whole repository and the aggregate stays
+  comparable to the baseline.
+
+  This is deliberately **not** `--scope diff`. That narrows what is read and puts
+  nothing back, so the score rises because less was reviewed — measured on a real
+  repository with the scorer's own functions, 69.71 → 89.61 on identical code, clearing
+  a threshold of 87.11. `--scope` is a prompt hint and always was; this is a scoring
+  change, which is why it carries.
+
+  Three invariants keep the number meaningful, and `docs/BASELINE.md` records why each
+  one exists: the denominator is always the whole repo, the probes always re-run
+  whole-repo (the deterministic half of beta is never stale), and the LLM self-score is
+  carried rather than re-derived, because a reviewer that saw six files cannot honestly
+  score a fifty-file repository. An incremental run records `mode: "incremental"` so it
+  cannot itself become a baseline.
+
+  A finding is invalidated when its own file changed (`self`) or when a file-like token
+  in its claim changed (`reference`) — the cross-cutting class, a doc or comment that
+  asserts something about a file that has since moved. Both are conservative on
+  purpose: dropping a live finding is worse than keeping a stale one, because the
+  reviewer is no longer reading that file.
+
+  A baseline must be complete: whole-repo scope, a pinned sha, all five dimension files,
+  and `dropped == 0` **recorded**. `merge_generalist_samples` now writes that count (and
+  the probe results, as `probes.json`) into the round, so a run can be validated as a
+  baseline at all. Runs made before those fields existed are rejected with the reason,
+  not assumed complete.
+
+  The saving scales with the fraction of the repository that did not change, so this is
+  worth little on a small repo: 50 files with 16 changed saves almost nothing, while
+  2000 files with 5 changed saves most of the sampling cost.
+
+- **`council setup dispatcher` — the durable dispatcher (M7).** Installs
+  `hermes-kanban-dispatch.service` as a systemd **user** unit so a swarm advances without
+  anyone running `hermes kanban dispatch` by hand, and resumes after a reboot. Resolves
+  `hermes` at install time rather than hardcoding a path, and refuses to install if the
+  standalone daemon is absent from the build.
+- **`council merge <run-dir>`** — buckets a round's generalist samples into the per-dimension
+  files the gate reads. The loop did this in-process; in a swarm the samples are written by
+  separate cards, so nothing did, and the gate found no reviewer output at all.
+- **`council sample <repo> --index N`** — runs ONE reviewer sample and writes
+  `generalist-N.json`. It imports the prompt from `council_loop.py`, so a swarm sample and a
+  loop sample are the same code and cannot drift.
+
+- **`council swarm <repo>` — the durable council (M7, increment A).** `council review`
+  spawns the reviewer as a subprocess and dies with it; the swarm builds the same round
+  as a durable kanban board the gateway's dispatcher can reclaim. One worker card per
+  sample, all `council-generalist`, with `council-orchestrator` as verifier and
+  synthesizer — no third profile.
+
+  The verifier's card instruction is to **run `council gate`** and report its exit code
+  and aggregate, not to judge. A model asked to verify a score produces a plausible
+  number; the gate produces the actual one. That is the same distinction the β defect
+  violated. `docs/M7-PLAN.md` records the design, the increments and the open choices.
+
+- **The golden end-to-end regression suite (M8).** `scripts/golden.py` +
+  `tests/golden/`, wired as `checks.golden` and the `council golden` dev verb. It
+  replays fixed inputs through the real scoring pipeline and diffs against pinned
+  values, so a change to a weight, a tool table, the calibration or the threshold fails
+  with the number that moved instead of passing quietly.
+
+  This closes M8's last deliverable, and its acceptance criterion is *demonstrated*:
+  `tests/test_golden.py` breaks one scoring input at a time and requires the suite to
+  notice.
+
+  It exists because the β defect shipped with 210 green tests — every merge test
+  supplied its own fixture, so nothing asserted a score end to end. Two things learned
+  while writing it are recorded in the tests themselves: `HILL_K` is dead on a
+  calibrated checkout (`hill_density` reads the manifest instead), and `d*` is pooled
+  over the non-floored tools only, so mutating a floored tool's `d*` is inert by design.
+
+  The repo's own linters now skip `tests/golden/`: the fixture's line count *is* the
+  suite's `kloc`, so a formatter bump that reformatted it would move every pinned score.
+
+### Changed
+
+- **CI runs the gate on GitHub-hosted runners, and no custom cache is used.** Two
+  corrections to the 1.0.0 CI setup, both from measurement:
+  - The `gate` job was self-hosted. That was wrong: `nix flake check` already runs
+    locally against the same store, so a runner on the author's own machine could only
+    repeat an answer already held. A hosted runner is the one thing that shares none of
+    that state, and it always runs rather than queuing while a box is down.
+  - The Cachix step was removed. Of the toolchain's 238-path closure, **236 are already
+    in `cache.nixos.org`**, which nix uses by default; the two it cannot fetch are our
+    own symlinkJoins, which hold almost no bytes. The claim that CI built "24 packages
+    from scratch" was false — they are prebuilt and publicly served. A private cache
+    would have added an account, a secret and a failure mode for no gain.
+
+  `docs/CI.md` records both, with the numbers, plus how to add substituters or a private
+  cache if the closure ever stops being fully substitutable.
+
+## [1.0.0] — 2026-10-11
+
+First release. The framework reviews a git diff, scores it with a hybrid of
+deterministic analyzer signals and LLM rubric judgement, and iterates until that
+score clears a threshold or the run stalls.
+
+### Added
+
+- **The scored loop** (`scripts/council_loop.py`). Each round: the orchestrator sets
+  one goal per dimension, the harness convenes the reviewer, the gate recomputes the
+  score from the reviewer files, and the orchestrator judges the round against the
+  goals it set. Termination is adaptive — threshold **and** no-improvement detection,
+  with a budget and a round cap.
+- **The deterministic gate** (`scripts/score_reviews.py`). Reads one JSON file per
+  dimension, recomputes the hybrid score itself, and never trusts a number an agent
+  asserted. Exit 0 satisfied, 1 not satisfied, 2 error. The pass threshold is read from
+  `scripts/calibration.json`, so the number the loop enforces and the number the
+  calibration recommends cannot drift.
+- **Twelve built-in probes** (`scripts/probes.py`) — stdlib-only and cross-platform, so
+  a review has real deterministic signal on a machine where nothing is installed. Each
+  third-party analyzer layers on top when present.
+- **A pinned toolchain** (`flake.nix`, `flake.lock`) — 24 analyzers from one nixpkgs
+  revision, so the whole set moves atomically with a single lock bump.
+- **One command** (`nix run .#council`) with verbs for review, gate, doctor, probes,
+  inventory and setup; five further verbs for working on the framework are devshell-only.
+  `nix shell .#review-council` puts the command and the analyzers on one PATH.
+- **Five dimension rubrics** (`skills/reviewer-*/SKILL.md`) — security, correctness,
+  readability, architecture, performance — plus the orchestrator rubric.
+- **The ablation harness** (`scripts/ablate.py`) and two defect corpora with independent
+  ground truth (`council corpus`).
+- **Calibration** (`scripts/calibrate.py`) over a graded defect ladder.
+- **CI** (`.github/workflows/ci.yml`): a three-OS test matrix on GitHub-hosted runners,
+  and the real gate on a self-hosted runner with optional Cachix.
+
+### Changed
+
+- **One reviewer, not five.** The architecture originally called for five isolated
+  specialist reviewers, one per dimension. The ablation measured that arrangement
+  against one generalist sampled five times, at equal cost, and the specialists lost
+  twice — 13/22 and 16/22 injected defects against 22/22 both times, against a
+  pre-registered 1.5× rule. The five per-dimension profiles were deleted; their rubrics
+  remain and are loaded together by one `council-generalist` profile. See
+  `docs/MILESTONES.md` M8.5 and `runs/ablation-22-defect-2026-10-11.md`.
+- **`delegation` removed from every profile.** The council originally fanned out with
+  `delegate_task`. A delegated child inherits the parent's `HERMES_HOME` and so cannot
+  load another profile's rubric, which silently produced five generic subagents wearing
+  dimension labels. The harness now spawns the reviewer profile itself.
+- **Thirteen apps collapsed to one command.** `council-gate`, `council-doctor`,
+  `council-ablate` and the rest are now verbs: `council gate`, `council doctor`, ….
+  `audience` decides which surface sees a verb, and a check enforces that dev-only verbs
+  stay out of the shipped app.
+
+### Fixed
+
+- **A total reviewer failure scored a clean 100 and passed.** The merge wrote five empty
+  dimension files when no sample was readable. It now leaves the dimensions missing, which
+  the gate treats as an error.
+- **The deployment sync never pruned.** A file deleted in the repo lived on in the skill
+  deployment, and `install-bots.sh` run from the skill would have reinstalled deleted
+  profiles. The sync now mirrors and reports extras.
+- **`--help` was a trap on verbs that act.** `council handoff --help` would have exported
+  a bundle rather than explaining itself. The dispatcher answers `--help` for verbs whose
+  scripts do not parse arguments.
+- **Two scoring bugs that inverted the ablation result**: exclusive nearest-match recall
+  split one finding between two adjacent defects and reported one as missed, and a
+  distance check that ignored paths let a finding match a defect in a different file —
+  which reported zero false positives for every arm. Both are pinned by tests.
+
+### Not built, deliberately
+
+- **M1's Pydantic protocol package and M2's `src/review_council/` adapter tree.** The
+  framework works as `scripts/`; those layers would be a rewrite, not an improvement.
+  Findings travel as one JSON file per dimension, not the uniform YAML envelope the plan
+  drew.
+- **M7 durability surfaces** — kanban, cron, GitHub PR integration.
+- **The golden end-to-end regression suite**, and the `α_t` weights stay uncalibrated
+  until evidence justifies reweighting.
+- **The `/goal` binding.** The loop's own goal phase runs; the binding to Hermes' `/goal`
+  feature is documented in `docs/AUTONOMY.md` but not wired.
+
+### Known limitations
+
+- The `gate` CI job has never executed: no self-hosted runner is registered yet, so a
+  push leaves it queued.
+- The ablation rests on **one corpus, run twice**, with the corpus and the scorer written
+  by the same author as the rule they test. Recall is location-based, so the
+  false-positive counts are a floor.
+- A reviewer cannot re-run the pinned probes from inside a run, so β can fall below 1.0
+  and pull the LLM score in.
+
+[1.0.0]: https://github.com/washedupdeveloper/agentic-council/releases/tag/v1.0

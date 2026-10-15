@@ -1,0 +1,16 @@
+# Keep the build context to what the Dockerfile actually copies. The flake is
+# evaluated inside the builder, so nothing else needs to travel.
+.git
+.github
+docs
+research
+runs
+tests
+result
+result-*
+.review-council
+__pycache__
+*.pyc
+.pytest_cache
+.ruff_cache
+.mypy_cache
