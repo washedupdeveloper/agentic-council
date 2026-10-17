@@ -6,6 +6,29 @@ All notable changes to this project. Format follows
 
 ## [Unreleased]
 
+## [1.3.2] — 2026-10-17
+
+### Added
+
+- **`council calibrate --sensitivity <round-dir>`** measures how much the aggregate
+  weights (`α_t`) could move a verdict, which is the question M8 left open by recording
+  them as uncalibrated. It sweeps each weight from **0 to 3×** its shipped value,
+  redistributes the others proportionally so the total stays 1, and recomputes the
+  aggregate with the gate's own `renormalized_aggregate` — so the measurement cannot
+  disagree with the score it is measuring.
+
+  The result reframes the item rather than closing it with a guess. On every input
+  available, **no single weight change flips a verdict**: the defects fixture moves at
+  most 8.63 points and stays between 74.29 and 82.92 against an 87.11 threshold, and
+  zeroing security — deleting the dimension from the aggregate entirely — still leaves it
+  below the line. The `clean` fixture is uniform at 100, so it is weight-invariant by
+  construction and cannot test the weights at all.
+
+  So `α_t` is not a parameter waiting for calibration data; it encodes **consequence
+  cost** per dimension, which needs incident data rather than defect labels. The working
+  defaults now stand as a documented policy choice, with the caveat recorded that a score
+  near the threshold with a large spread could still be weight-sensitive — which the tool
+  reports (`any_verdict_flips`) instead of assuming away.
 ## [1.3.1] — 2026-10-17
 
 ### Added

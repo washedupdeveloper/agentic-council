@@ -49,7 +49,9 @@ rate) sits beside recall, and `council metrics` computes acceptance rate, addres
 and iterations per run from the `status` field. What that verb cannot supply is the
 judgement itself — a human or the forge must set `status`, and until one does it reports
 `no data` rather than a number. The `α_t` weights stay
-uncalibrated until evidence justifies reweighting; the M4
+uncalibrated until evidence justifies reweighting — and `council calibrate --sensitivity`
+now measures that the evidence would change no verdict on any available input, so the
+defaults stand as a stated policy choice. The M4
 *evidence matrix* and *SNR term* are rubric-level, not code.
 
 **How to read.** Each milestone has a *Goal*, *Research inputs*, *Deliverables* and *Acceptance
@@ -234,7 +236,16 @@ criteria* checkable by a command or an observable artifact. `Size` is relative e
   the metrics are `no data` by construction.
 - ✅ **A/B harness** — built as M8.5 (`scripts/ablate.py`): four arms at equal cost against a pre-registered rule; the answer was **collapse** (M8.5).
 - ✅ **Golden end-to-end regression suite** — `scripts/golden.py` + `tests/golden/`, run by `council golden --check` and by `pytest`. Two layers, because the pipeline fails differently in each: a **round** layer (reviewer files → hybrid verdict, pinning det, β, the Hill density, the aggregate and pass/fail) and a **merge** layer (samples + probes → per-dimension files, pinning the `tools_run` union and the probe seed). `tests/test_golden.py` is the criterion executed: each test mutates one scoring input, asserts the check fails, restores it, asserts it passes. Built because the β defect shipped with **210 green tests** — every merge test supplied its own fixture and nothing asserted a number end to end, so two halves could both drop `tools_run` while the suite stayed green and the score quietly became the LLM's judgement (see M8.5).
-- ❌ **`α_t` weights remain uncalibrated** by design: §7 says reweight only with evidence, and none exists yet.
+- ⚠️ **`α_t` weights are uncalibrated, and measured to be immaterial.** §7 says reweight
+  only with evidence. The evidence does not exist — a weight encodes *consequence cost*
+  per dimension, which needs incident data, not defect labels — and
+  `council calibrate --sensitivity` shows it would change nothing on any input
+  available: sweeping each weight from 0 to 3× moves the defects fixture at most 8.63
+  points and flips **no verdict**, and zeroing security entirely still leaves it at 82.92
+  against an 87.11 threshold. So the working defaults stand as a documented policy
+  choice rather than an uncalibrated guess. Recorded in `docs/CALIBRATION.md`, with the
+  caveat that a score near the threshold with a large spread could still be
+  weight-sensitive — which the tool reports rather than assumes away.
 **Size** M · **Depends** M5, M6
 
 ---

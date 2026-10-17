@@ -100,8 +100,9 @@ with no evidence behind it.
   *is* that sample's score. Add more known-good repos and re-run before treating 87.11 as settled.
 - **The LLM half is not calibrated.** This measures the deterministic half only; that needs labelled
   real council runs at roughly 9 minutes each.
-- **Weights `α_t` are still the working defaults.** §7 says reweight only with evidence, and none
-  exists yet that any dimension's findings track real defects better than another's.
+- **Weights `α_t` are still the working defaults.** §7 says reweight only with evidence.
+  That evidence does not exist, and the measurement below shows it would buy little
+  anyway — see "How much `α_t` could move the verdict".
 - **`x_bad`/`x_good` metric curves** (coverage, mutation, max-CC) are not yet wired — the probes emit
   findings densities, not scalar metrics.
 - **The probe signal's half-point is not calibrated, and differs from the scorer's.** Two curves in
@@ -121,6 +122,53 @@ with no evidence behind it.
   them would make every probe signal stricter and lower every score, so the shipped threshold would
   need re-deriving. That is a calibration decision, not a bug fix — recorded rather than made
   silently. `PROBE_HALF_POINT` is named so the assumption is greppable.
+
+## How much `α_t` could move the verdict
+
+§7 says reweight only with evidence. Before hunting for that evidence, measure the
+leverage — because a weighted mean of **equal** values cannot move at all, so the spread
+across dimensions is a hard ceiling on anything a reweighting can achieve.
+
+`council calibrate --sensitivity <round-dir>` sweeps each weight from **0 to 3×** its
+shipped value, redistributes the others proportionally so the total stays 1, and
+recomputes the aggregate with the gate's own `renormalized_aggregate`.
+
+| input | spread | aggregate | threshold | max move from one weight | flips |
+|---|---:|---:|---:|---:|---|
+| `tests/golden/rounds/defects` | 19.74 | 80.04 | 87.11 | **8.63** | **no** |
+| `tests/golden/rounds/clean` | 0.00 | 100.00 | 87.11 | 0.00 | no |
+| a real run (`20261015-215950/round-1`) | 10.33 | 96.42 | 87.11 | 5.07 | no |
+
+Per dimension on the defects fixture — the worst case for any weight:
+
+| dimension | weight | aggregate at 0 | aggregate at 3× | range |
+|---|---:|---:|---:|---:|
+| security | 0.30 | 82.92 | 74.29 | 8.63 |
+| readability | 0.20 | 78.05 | 84.03 | 5.98 |
+| architecture | 0.15 | 81.46 | 77.20 | 4.26 |
+| performance | 0.10 | 78.74 | 82.64 | 3.90 |
+| correctness | 0.25 | 79.43 | 81.26 | 1.83 |
+
+**Setting security's weight to zero — deleting the dimension from the aggregate entirely
+— still leaves the defects fixture at 82.92, below the 87.11 threshold.** No single
+weight, at any value from 0 to 3×, changes a verdict on any input measured here.
+
+Three consequences, stated rather than implied:
+
+1. **Calibrating `α_t` is not currently worth doing.** On every input available, the
+   verdict is weight-invariant, so a "better" weight vector would change no outcome.
+   This is a measurement of *these* inputs, not a proof about all inputs — a score sitting
+   near 87.11 with a large spread could still be weight-sensitive, and the tool reports
+   that case (`any_verdict_flips`) rather than assuming it away.
+2. **`α_t` encodes importance, not accuracy.** A weight says security matters more than
+   performance; that is a cost judgement about consequences, and no amount of defect
+   labelling settles it. Evidence of the kind §7 asks for would have to be *incident cost
+   per dimension*, which this project does not have.
+3. **The golden fixtures cannot test `α_t` on their own.** `clean` is uniform at 100, so
+   it is weight-invariant by construction — a reweighting is invisible there. `defects`
+   is the only fixture with spread, and it is not near the threshold. A regression that
+   changed the weights *and* moved a score would be caught; a change that only altered
+   the weights would not be.
 
 ## A finding that reframes the question
 
