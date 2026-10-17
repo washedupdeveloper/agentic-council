@@ -65,6 +65,7 @@ A verb whose module parses arguments passes `--help` through to that module's ow
 | The installable | `packages.review-council` | What `home.packages` takes. Its `bin/` carries the dispatcher **and** the toolchain, so one path is enough. `packages.default` is **not** this — it is the toolchain. |
 | The deployable skill | `packages.skill` | `council-skill`, ready to drop into a skills directory without running the module. |
 | The home-manager module | `homeManagerModules.default` | `programs.council.*`; deploys the skill and puts the package on PATH. |
+| The starter templates | `templates.{default,flake-parts,home-manager}` | `nix flake init -t` writes a working consumer, so onboarding is one command instead of reading this page. `checks.templates` asserts they still reference the **published** flake and still import the module, because a template that rots fails in someone else's repository. |
 | The container image | `packages.container` | An OCI image, so Windows and docker-only users need nothing else. |
 | The gates | `checks.*` | `nix flake check` is the one command a contributor runs before pushing. Three tiers: eval (`module`, `flake` — a value in the configuration), build (`skill-layout`, `tests`, `golden`, `probes`, `commands`, … — the artifact a builder produced), and e2e (`.#vm-test` — a running machine). |
 | The formatter | `formatter` | `nix fmt` uses the pinned `nixfmt`, so a caller never needs their own. |
@@ -118,7 +119,28 @@ The modules resolve their own root as `dirname(__file__)/..`, so the framework t
 
 - **No `council-test` / `council-lint` verbs.** `nix flake check` already runs the suite, statix, deadnix and the formatter check, and `nix develop -c pytest` runs the suite against *your* working tree.
 - **No Python package.** `pyproject.toml` has no `[build-system]` on purpose: `scripts/` is run in place, and the only distributable artifacts are the Hermes skills.
-- **No cache configuration.** The toolchain's closure is 236/238 paths already in `cache.nixos.org`, so there is nothing for a private cache to save. `docs/CI.md` has the measurement and the recipe for adding one.
+- **No cache configuration.** The toolchain's closure is 179/181 paths already in `cache.nixos.org`, so there is nothing for a private cache to save. `docs/CI.md` has the measurement and the recipe for adding one.
+
+## Conventions taken from other Nix projects
+
+Six repositories were read for this: `ipetkov/crane`, `numtide/flake-utils`,
+`numtide/treefmt-nix`, `numtide/devshell`, `DeterminateSystems/zero-to-nix` and
+`clan-infra`. What was adopted, and what was not:
+
+| convention | where it comes from | here |
+|---|---|---|
+| `templates` + `nix flake init -t` | crane (10 templates), devshell (3) | **adopted** — `templates.{default,flake-parts,home-manager}`, guarded by `checks.templates` |
+| a consumer test against the **published** flake | crane's `test/flake.nix` | **adopted** — `runs/downstream-consumption-2026-10-17.md` |
+| `zizmor` over `.github/` | crane's `ci/` | **adopted** — it found 5 high findings in this repo's own workflows |
+| `concurrency` with `cancel-in-progress` | crane's `ci.yml` | **adopted** |
+| `renovate.json` for `flake.lock` | treefmt-nix, devshell | **adopted** — a pinned flake with no update path rots |
+| `.envrc` with `use flake` | 4 of the 6 | **adopted** — one line, and the devshell becomes ambient |
+| `CONTRIBUTING.md` | zero-to-nix | **adopted** — GitHub links it from the new-issue page; `AGENTS.md` is for agents |
+| `ci/fast-flake-check.sh` (`nix-eval-jobs`, build only what is uncached) | crane | **rejected on measurement** — eval of every check is **3 s** and a cached full gate **15 s**, so there is nothing to parallelise. crane needs it because its check set is far larger |
+| `default.nix` / `shell.nix` back-compat | 4 of the 6 | **rejected** — crane's is `pkgs.callPackage ./lib`, a *library* entry point; treefmt-nix's is `import ./lib.nix`. This project is not a library, and a flake-compat shim is a fourth style to maintain for a consumer the templates now serve |
+| `nixConfig` substituter | crane (`crane.cachix.org`) | **rejected on measurement** — 179 of 181 toolchain paths are already on `cache.nixos.org`; a private cache would carry two `symlinkJoin`s and add a CI secret |
+| testing against two nixpkgs channels | crane's `extra-tests/` | **not adopted** — it doubles CI cost for a project whose toolchain is one pinned revision by design. `docs/CI.md` records the tradeoff |
+| `lychee` link checking | zero-to-nix | **not adopted** — needs network in the gate; the docs are short enough to read |
 
 ## Before you run the checks
 

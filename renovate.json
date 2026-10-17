@@ -1,0 +1,31 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+
+  "//": [
+    "The convention treefmt-nix and devshell use, with one addition that matters here.",
+    "Nothing in this repository auto-merges: the toolchain is what the score is computed",
+    "from, so a flake.lock bump can move a pinned fixture and needs a human to read the",
+    "diff. docs/VERSIONING.md makes that explicit -- a release that moves the score must",
+    "record the movement and show the shipped threshold still yields the same verdicts."
+  ],
+
+  "automerge": false,
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": ["before 6am on the first day of the month"]
+  },
+  "packageRules": [
+    {
+      "//": "One PR for the flake inputs. Splitting them means the toolchain moves in pieces, which is exactly the non-atomic case flake.nix's determinism comment forbids.",
+      "matchManagers": ["nix"],
+      "groupName": "nix flake inputs",
+      "labels": ["dependencies", "nix"]
+    },
+    {
+      "//": "The pinned GitHub Actions in .github/workflows are SHA-pinned with the version in a trailing comment; renovate keeps that pair in step.",
+      "matchManagers": ["github-actions"],
+      "labels": ["dependencies", "ci"]
+    }
+  ]
+}

@@ -22,7 +22,7 @@ Everything below is this question applied to a specific surface.
 |---|---|
 | user verbs and their flags | `council <verb>`; `scripts/council.py` `VERBS` where audience is `user` |
 | setup verbs | `council setup {init,skill,bots,toolchain,dispatcher}` |
-| flake outputs | `packages.*`, `apps.*`, `devShells.*`, `formatter`, `homeManagerModules.default`, `checks.*` |
+| flake outputs | `packages.*`, `apps.*`, `devShells.*`, `formatter`, `homeManagerModules.default`, `flakeModules.default`, `templates.*`, `checks.*` |
 | module options | `programs.council.{enable,package,skill,mode,hermesHome}` |
 | run artifacts | `<dimension>.json`, `scores.json`, `goals.json`, `calibration.json` |
 | finding fields | `review.msg/v1`: `dimension`, `file`, `line_range`, `evidence_span`, `claim`, `claim_type`, `severity`, `confidence`, `falsifiable_check`, `suggested_fix` |

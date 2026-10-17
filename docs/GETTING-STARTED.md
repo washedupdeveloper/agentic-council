@@ -27,6 +27,15 @@ docker load -i review-council.tar.gz
 The repository is published as **`agentic-council`**; the flake and the directory are
 **`review-council`**. Same project, two names.
 
+To put the council in **your own** flake rather than run it from ours:
+
+```bash
+nix flake init -t github:washedupdeveloper/agentic-council
+```
+
+That writes a `flake.nix` importing the council's packages, formatter and app;
+`#home-manager` writes a module instead. `docs/NIX.md` lists what each output is.
+
 The third row is the non-Nix path: every module under `scripts/` is stdlib-only, so the
 CLI itself runs on any Python ≥ 3.11. On a Hermes host use `$HERMES_PYTHON` — never
 assume the interpreter is named `python3`, because NixOS has none and Windows does not

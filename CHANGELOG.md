@@ -6,6 +6,56 @@ All notable changes to this project. Format follows
 
 ## [Unreleased]
 
+## [1.5.0] — 2026-10-17
+
+### Added
+
+- **`templates`, so onboarding is one command.** Six repositories were read for their Nix
+  conventions; the clearest thing crane and devshell do that this project did not is
+  `nix flake init -t`. Now:
+
+  ```bash
+  nix flake init -t github:washedupdeveloper/agentic-council          # a consumer flake
+  nix flake init -t github:washedupdeveloper/agentic-council#home-manager   # a module
+  ```
+
+  The first writes a flake-parts flake importing `flakeModules.default` — the same
+  packages, formatter and app this repository builds for itself. The second writes a
+  home-manager module enabling `programs.council`.
+
+- **`checks.templates`, because a rotted template fails in someone else's repository.**
+  Templates reference a URL, not this tree, so nothing else in the gate would notice them
+  drifting. The check asserts each still points at the **published** repository (not a
+  path), still imports the module, and declares **the same systems as `flake.nix`** —
+  derived from `flake.nix`, so adding a system here and forgetting the template fails.
+  Verified with teeth: a local-path URL, a removed import, an extra system and a broken
+  home-manager import each make it fail.
+
+- **`renovate.json`.** The flake pins nixpkgs and flake-parts and nothing updated them.
+  `automerge` is off, deliberately: the toolchain is what the score is computed from, so a
+  `flake.lock` bump can move a pinned fixture and needs a human — `docs/VERSIONING.md`
+  requires a release that moves the score to record the movement and show the threshold
+  still yields the same verdicts.
+
+- **`.envrc`** (`use flake`) and **`CONTRIBUTING.md`**. The first makes the devshell
+  ambient for anyone with direnv, which four of the six reference repositories do. The
+  second is the file GitHub links from its new-issue page; `AGENTS.md` is written for an
+  agent and stays the fuller statement.
+
+### Changed
+
+- **`docs/NIX.md` records the conventions adopted and the ones rejected, with the reason.**
+  Rejections are measurements, not preferences: crane's `nix-eval-jobs` fast-check was
+  dropped because evaluating every check takes **3 s** and a cached full gate **15 s**, so
+  there is nothing to parallelise; `default.nix`/`shell.nix` back-compat was dropped
+  because crane's and treefmt-nix's are *library* entry points and this is not a library.
+  `templates.*` and `flakeModules.default` are now named as public outputs in
+  `docs/VERSIONING.md`, which they already were in fact.
+
+### Fixed
+
+- **`docs/NIX.md` said 236/238 toolchain paths were on `cache.nixos.org`.** The measured
+  figure is **179 of 181**, corrected alongside the other stale counts.
 ## [1.4.4] — 2026-10-17
 
 ### Fixed
