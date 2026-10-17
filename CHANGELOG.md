@@ -6,6 +6,28 @@ All notable changes to this project. Format follows
 
 ## [Unreleased]
 
+## [1.4.3] — 2026-10-17
+
+### Added
+
+- **`docs/NIX.md` now names the outputs a consumer actually needs.** It listed
+  `apps.council` but not `packages.review-council`, `packages.skill` or
+  `homeManagerModules.default`, so anyone integrating this flake had to discover the
+  names by trial. Two of them are traps: **`packages.council` does not exist** (the app is
+  `apps.council`) and **`packages.default` is the toolchain, not the council**. Both are
+  now stated in the table rather than left to be found.
+
+  The names themselves are unchanged — `packages.*` is public interface, so renaming is a
+  major version, and documenting costs nothing.
+
+### Fixed
+
+- **Nothing verified the published flake, only the working tree.** Every test built from a
+  local path. A throwaway consumer flake whose only input was
+  `github:washedupdeveloper/agentic-council` now proves the published artifact resolves,
+  builds `packages.review-council`, runs the binary, and evaluates
+  `homeManagerModules.default` in a consumer configuration with 0 failing assertions
+  (`runs/downstream-consumption-2026-10-17.md`).
 ## [1.4.2] — 2026-10-17
 
 ### Changed
