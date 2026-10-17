@@ -8,12 +8,11 @@ run stalls) — using as few moving parts as the job needs.
 **M3**, **M4**'s deterministic gate (`scripts/score_reviews.py`), **M5** (the orchestrator sets each
 round's goals and judges the round against them; the harness convenes the reviewer), **M6**
 (`runs/fixture-fixround-2026-10-06.md`), **M7** (durable swarm, dispatcher, cron, PR path), **M8**,
-**M8.5** (the ablation that decided the architecture), **M9**. One parameter is recorded as ⚠️ with
-the measurement that justifies the state: the **threshold** is *consistent* with every measurement
-but not *derived* from them — at the shipped default five of six well-regarded repositories fail on
-real blocking findings, leaving one clean repository, which gives an upper bound and no floor.
-The **`α_t` weights** are closed: a policy choice measured to flip no verdict. Current release
-**v1.6.2**. The pass threshold
+**M8.5** (the ablation that decided the architecture), **M9**. Both parameters that were once ⚠️
+are closed by measurement rather than by assertion: the **threshold** is a regression detector
+because nine well-regarded repositories produced **one** clean sample — the absolute-bar framing
+had no class to calibrate against — and the **`α_t` weights** are a policy choice measured to flip
+no verdict. Current release **v1.7.1**. The pass threshold
 is read from `scripts/calibration.json` (see `docs/CALIBRATION.md`), so the number the loop enforces
 and the number the calibration recommends cannot drift.
 
@@ -240,19 +239,24 @@ is a policy choice because a weight encodes consequence cost rather than accurac
   the metrics are `no data` by construction.
 - ✅ **A/B harness** — built as M8.5 (`scripts/ablate.py`): four arms at equal cost against a pre-registered rule; the answer was **collapse** (M8.5).
 - ✅ **Golden end-to-end regression suite** — `scripts/golden.py` + `tests/golden/`, run by `council golden --check` and by `pytest`. Two layers, because the pipeline fails differently in each: a **round** layer (reviewer files → hybrid verdict, pinning det, β, the Hill density, the aggregate and pass/fail) and a **merge** layer (samples + probes → per-dimension files, pinning the `tools_run` union and the probe seed). `tests/test_golden.py` is the criterion executed: each test mutates one scoring input, asserts the check fails, restores it, asserts it passes. Built because the β defect shipped with **210 green tests** — every merge test supplied its own fixture and nothing asserted a number end to end, so two halves could both drop `tools_run` while the suite stayed green and the score quietly became the LLM's judgement (see M8.5).
-- ⚠️ **The threshold is consistent with the data, and that is all that can be said.** At
-  the shipped default (`--samples 5`), five of six well-regarded repositories have **real
-  blocking findings** — unpinned actions in write-capable jobs, a Gitea workflow pinned to
-  `@pull/119`, four tracked encrypted `terraform.tfstate` files — and fail on the
-  blocking gate at **every** threshold, so their aggregates never decide their verdicts.
-  Only **treefmt-nix** is clean (0 blocking, 90.22) and it is the only one that passes.
-  That gives an **upper bound and no lower bound**: treefmt-nix passes at `90.22` and fails
-  at `90.23`, so any threshold `<= 90.22` is consistent; a floor would need a
-  clean-of-blocking repository that should fail on aggregate, and none exists in the
-  sample. The band is `(-inf, 90.22]` — unbounded below, so not a calibration. **87.1141
-  is consistent with the data; it is not derived from it.** What would close it is a
-  second and third repository with no blocking findings. Recorded in
-  `docs/CALIBRATION.md` and `runs/clean-baseline-5-samples-2026-10-18.md`.
+- ✅ **The threshold's role is defined and evidenced; it is a regression detector, not an
+  absolute bar.** Nine well-regarded Nix repositories were reviewed at the shipped default
+  and **one is clean** (`runs/clean-class-is-empty-2026-10-18.md`): treefmt-nix 90.22 with
+  zero blocking findings; the other eight have 3–54 blocking findings each, **every one
+  read and confirmed** — six mutable-tag actions including one receiving
+  `CACHIX_AUTH_TOKEN`, `pull_request_target` with a write token and no author guard, and
+  `fetchTarball` binding `sha256` only `if info ? narHash`. Not a false positive among
+  them. Since unpinned actions and `pull_request_target` are normal practice in respected
+  projects, the known-good class is **empty at this depth of review** and no amount of
+  further sampling produces one. The framework therefore has two gates of different
+  character: the **blocking gate is absolute** (it found a real defect in 7 of 8 respected
+  repositories) and the **aggregate threshold cannot be absolute**. It is a regression
+  detector — which is what `--baseline auto` already implements and what the docs already
+  said in one line, *"the findings are the portable output; the score is a local
+  yardstick"*. **87.1141 stays**; its stated role is the default bar for a repository's
+  first run and a regression line thereafter. Verified bound: treefmt-nix passes at `90.22`
+  and fails at `90.23`, so `(-inf, 90.22]` is consistent — no floor exists, and that is now
+  explained rather than pending.
 - ✅ **§7's `d*` rule is a discrimination rule, not an absolute-scale rule.** The density
   term scores the reviewer's findings while `d*` is calibrated from probe densities, so
   adding a reviewer-side anchor that applies `d* = known-good density` looked like the

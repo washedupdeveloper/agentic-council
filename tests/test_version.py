@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import importlib.util
 import os
-import re
 import sys
 import tempfile
 import types
@@ -123,32 +122,18 @@ def test_the_real_repository_is_consistent():
 
 # "Current release **v1.5.0**" is a checkable claim, and it is the one nobody
 # was checking: pyproject, CHANGELOG and tags all agreed at 1.5.2 while
-# docs/MILESTONES.md still advertised v1.5.0. The policy in docs/VERSIONING.md
-# says a claim that can be measured must be measured; this is that measurement.
-_PROSE_VERSION = re.compile(r"[Cc]urrent release\s+\*{0,2}v(\d+\.\d+\.\d+)\*{0,2}")
-
-# Files that speak about the release to a reader. Excluded: CHANGELOG.md (it is
-# the history, not a claim about now) and runs/ (records of a past moment).
-_PROSE_FILES = ("README.md", "docs")
+# docs/MILESTONES.md still advertised v1.5.0. The pattern and the file list now live
+# in version.py, because `bump` rewrites those claims and `check` validates them;
+# a copy here would be a third definition to keep in step.
 
 
 def _prose_version_claims(root: Path = REPO) -> list[tuple[str, str]]:
     """(where, version) for every "current release" claim in the prose."""
-    claims: list[tuple[str, str]] = []
-    for name in _PROSE_FILES:
-        target = root / name
-        paths = sorted(target.rglob("*.md")) if target.is_dir() else [target]
-        for path in paths:
-            if not path.is_file():
-                continue
-            text = path.read_text(encoding="utf-8", errors="replace")
-            for match in _PROSE_VERSION.finditer(text):
-                # as_posix(), not str(): these paths are compared against POSIX
-                # literals and printed, so a Windows checkout must not report
-                # `docs\MILESTONES.md` where every other platform says
-                # `docs/MILESTONES.md`.
-                claims.append((path.relative_to(root).as_posix(), match.group(1)))
-    return claims
+    # Delegates to version.py. `check` validates these claims and `bump` now rewrites
+    # them, so a second copy of the pattern here would let the test and the tool drift
+    # apart -- which is the exact failure this check exists to catch.
+    return [(path.relative_to(root).as_posix(), claimed)
+            for path, claimed in version.prose_version_claims(root)]
 
 
 def _wrong_claims(root: Path = REPO) -> list[tuple[str, str]]:

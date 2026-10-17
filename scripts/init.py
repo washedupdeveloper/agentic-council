@@ -139,9 +139,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     _banner("2. The gate")
     review = existing.get("review", {})
     print("  A run is SATISFIED when it scores at least this. Lower is stricter.")
-    print("  The shipped value is PROVISIONAL — consistent with every measurement")
-    print("  but not derived from them: at the default only one of six well-regarded")
-    print("  repos is clean of blocking findings. Recalibrate with `council calibrate`.")
+    print("  The shipped value is PROVISIONAL — a REGRESSION DETECTOR, not an")
+    print("  absolute bar: nine well-regarded repos were reviewed and one is clean,")
+    print("  so there is no known-good class to calibrate against.")
     raw = _ask("threshold", str(review.get("threshold", 87.1141)), assume_yes)
     try:
         threshold = float(raw)

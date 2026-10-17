@@ -173,14 +173,14 @@ re-sync. The copier remains for hosts without Nix.
 
 ## Before you trust a score
 
-The shipped threshold (**87.1141**) was calibrated on *this* repository from **one**
-known-good sample, and `scripts/calibration.json` calls it `PROVISIONAL`. At the shipped
-default (`--samples 5`), five of six well-regarded repositories have **real blocking
-findings** and fail on those at *every* threshold — only treefmt-nix is clean (90.22), and
-it passes. That bounds the threshold above and leaves no floor, so 87.1141 is
-**consistent** with the measurements rather than **derived** from them
-(`runs/clean-baseline-5-samples-2026-10-18.md`). On your repository it is not a pass mark —
-read the score as a relative signal, or set your own with `--threshold`.
+The shipped threshold (**87.1141**) is a **regression detector, not an absolute quality bar**.
+Nine well-regarded Nix repositories were reviewed at the shipped default and **one is
+clean** — treefmt-nix at 90.22; the other eight each have 3–54 **confirmed** blocking
+findings, so the known-good class is empty at this depth of review
+(`runs/clean-class-is-empty-2026-10-18.md`). The **blocking gate** is the absolute control:
+it found a real defect in 7 of 8 respected projects. Use this number as the bar for a
+repository's first run and a regression line thereafter (`--baseline auto`), or set your own
+with `--threshold`.
 
 **The findings are the portable output; the score is a local yardstick.**
 

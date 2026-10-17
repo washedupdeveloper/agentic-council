@@ -289,10 +289,47 @@ and exactly one such repository exists in the sample.
 gate: treefmt-nix passes at `90.22` and fails at `90.23`, so any threshold `<= 90.22`
 passes it. A floor would need a clean-of-blocking repository that should fail on
 aggregate, and none exists. The band is `(-inf, 90.22]` — unbounded below, so not a
-calibration. **87.1141 is consistent with the data; it is not derived from it.**
+calibration.
 
-That is a weaker claim than "the threshold is calibrated", and it is the true one. What
-would close it: a second and third repository with no blocking findings.
+### The clean class is empty, and that settles what the threshold is for
+
+Nine well-regarded Nix repositories were examined at the shipped default. **One is clean**
+(`runs/clean-class-is-empty-2026-10-18.md`):
+
+| repo | aggregate | blocking |
+|---|---:|---:|
+| treefmt-nix | **90.22** | **0** |
+| clan-infra | 75.06 | 22 |
+| devshell | 61.41 | 28 |
+| zero-to-nix | 53.55 | 54 |
+| flake-utils | 48.89 | 20 |
+| naersk | 48.89 | 12 |
+| nix-direnv | 39.80 | 11 |
+| flake-compat | 34.50 | 3 |
+
+**Every blocking finding was read and confirmed** — six mutable-tag actions including one
+that receives `CACHIX_AUTH_TOKEN` (naersk); `pull_request_target` with a write token and no
+author guard (nix-direnv); `fetchTarball` with `sha256` bound only `if info ? narHash`
+(flake-compat, three sites). Not one is a false positive.
+
+This is **not** a sampling problem that more repositories would fix: unpinned actions and
+`pull_request_target` are normal practice in respected projects. The known-good class is
+empty at this depth of review.
+
+**So the premise of the calibration was wrong, and the decision follows from that.** The
+framework has two gates of different character:
+
+| gate | character | evidence |
+|---|---|---|
+| blocking findings | binary, absolute | finds a real defect in 7 of 8 respected repos |
+| aggregate threshold | numeric, absolute | cannot be calibrated — no clean class exists |
+
+**The aggregate threshold is a regression detector, not an absolute quality bar.** That is
+what `--baseline auto` already implements (compare a repository against its own previous
+whole-repo score) and what the docs already say in one line — *"the findings are the
+portable output; the score is a local yardstick"*. **87.1141 stays**, and its stated role
+changes: the default bar for a repository's first run, and a regression line thereafter.
+The blocking gate is what enforces absolute quality.
 
 ### A rule I tried, and why it is wrong
 

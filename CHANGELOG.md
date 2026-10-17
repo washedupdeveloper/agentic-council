@@ -6,6 +6,60 @@ All notable changes to this project. Format follows
 
 ## [Unreleased]
 
+## [1.7.1] — 2026-10-18
+
+### Fixed
+
+- **`council version bump` now rewrites the prose that quotes the release, and
+  `council version check` validates it.** Prose claiming a "current release" is a
+  checkable claim (`docs/VERSIONING.md`), but the pattern lived only in
+  `tests/test_version.py` — so the test caught the drift while the verb that causes it
+  could not see it. Three consecutive releases needed a manual prose edit after the bump:
+  the enforcing check could not have prevented any of them.
+
+  The pattern, the file list and the two operations now live in `scripts/version.py`
+  once: `check` reports a doc naming a superseded release, and `bump` rewrites those
+  claims in the same command that writes `pyproject.toml` and the CHANGELOG. The test
+  delegates to the production function rather than keeping a second copy, because a
+  third definition of the same regex is how the drift starts.
+## [1.7.0] — 2026-10-18
+
+### Changed
+
+- **The clean class is empty, and that settles what the threshold is for.** Nine
+  well-regarded Nix repositories were reviewed at the shipped default (`--samples 5`).
+  **One is clean** (`runs/clean-class-is-empty-2026-10-18.md`):
+
+  | repo | aggregate | blocking |
+  |---|---:|---:|
+  | treefmt-nix | **90.22** | **0** |
+  | clan-infra | 75.06 | 22 |
+  | devshell | 61.41 | 28 |
+  | zero-to-nix | 53.55 | 54 |
+  | flake-utils | 48.89 | 20 |
+  | naersk | 48.89 | 12 |
+  | nix-direnv | 39.80 | 11 |
+  | flake-compat | 34.50 | 3 |
+
+  **Every blocking finding was read and confirmed** — six mutable-tag actions including
+  one receiving `CACHIX_AUTH_TOKEN` (naersk); `pull_request_target` with a write token and
+  no author guard (nix-direnv); `fetchTarball` binding `sha256` only `if info ? narHash`
+  at three sites (flake-compat). Not one is a false positive.
+
+  Since unpinned actions and `pull_request_target` are normal practice in respected
+  projects, this is **not** a sampling gap that more repositories would close: the
+  known-good class is empty at this depth of review.
+
+- **The threshold is documented as a regression detector, not an absolute quality bar.**
+  The framework has two gates of different character: the **blocking gate is absolute** (it
+  found a real defect in 7 of 8 respected repositories), and the **aggregate threshold
+  cannot be** — there is no clean class to calibrate it against. That is what
+  `--baseline auto` already implements (compare a repository against its own previous
+  whole-repo score) and what the docs already said in one line. **87.1141 is unchanged**;
+  its stated role is the bar for a repository's first run and a regression line thereafter.
+  Every place that described it now says this, including `council doctor`,
+  `council setup init`, the generated `review-council.toml` and `calibration.json`'s first
+  caveat.
 ## [1.6.2] — 2026-10-18
 
 ### Changed

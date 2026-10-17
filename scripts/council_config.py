@@ -95,10 +95,9 @@ CORE_SKILLS: Dict[str, tuple] = {
 DEFAULTS: Dict[str, Any] = {
     "schema_version": SCHEMA_VERSION,
     "review": {
-        # The gate. Lower is stricter. PROVISIONAL — consistent with every
-        # measurement but not derived from them: at --samples 5 only one of six
-        # well-regarded repos is clean of blocking findings, which bounds this
-        # above rather than below. docs/CALIBRATION.md.
+        # The gate. Lower is stricter. A REGRESSION DETECTOR, not an absolute bar:
+        # of nine well-regarded repos reviewed at --samples 5, one is clean, so
+        # there is no known-good class to calibrate against. docs/CALIBRATION.md.
         "threshold": 87.1141,
         # How many reviewer samples per round. More is more recall, more time.
         "samples": 5,
@@ -286,10 +285,10 @@ def render(cfg: Dict[str, Any]) -> str:
         "",
         "[review]",
         "# The gate. A run must score at least this to be SATISFIED.",
-        "# Lower is stricter. PROVISIONAL: consistent with every measurement but",
-        "# not derived from them -- at --samples 5 only one of six well-regarded",
-        "# repos is clean of blocking findings, which bounds this above, not below.",
-        "# docs/CALIBRATION.md.",
+        "# Lower is stricter. A REGRESSION DETECTOR, not an absolute bar: of nine",
+        "# well-regarded repos reviewed at --samples 5, one is clean, so there is no",
+        "# known-good class to calibrate against. --baseline auto compares a repo",
+        "# against its own previous run. docs/CALIBRATION.md.",
         f"threshold = {review.get('threshold')}",
         "# Reviewer samples per round. More samples find more, and cost more time.",
         f"samples = {review.get('samples')}",
