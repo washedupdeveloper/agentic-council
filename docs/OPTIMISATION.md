@@ -52,7 +52,7 @@ so each row below is one rebuild with that single entry dropped
 overlap: the `formatter` output already execs `pkgs.nixfmt-tree`, which *is* a
 treefmt, so the standalone entry shares every dependency it has.
 
-### 1.2 `vulnix` is 62% of the entire saving, and the project distrusts it
+### 1.2 `vulnix` is 62% of the entire saving — shipped on demand, never probed
 
 Measured by rebuild, with the edit verified before the build:
 
@@ -62,7 +62,8 @@ container           333 M     ->  307 M        (-26 MB compressed)
                     1.1 G     ->  867 M        (-233 MB uncompressed)
 ```
 
-Five independent reasons it is safe to remove, each checked:
+Five facts about it, each checked. Together they are why the answer is to **ship it
+and never probe it** (§8) rather than either extreme:
 
 1. **It is the single largest member of the closure.** Ranking every path in the
    toolchain by closure size, `vulnix-1.12.5` is first at **555 MiB** — ahead of
@@ -473,7 +474,53 @@ That second failure was also *evidence*: the suite ran from `${src}` and found
 `tests/`, which is what proves `${../.}` resolves to the repo root and not to
 `nix/`.
 
-### 7.3 Integrating it into another flake
+### 7.3 The split broke the deployed skill, and the check could not see it
+
+Found after the conversion was already committed, by asking what the deployed skill's
+`flake.nix` would do with the modules absent. It failed outright:
+
+```
+error: path '.../nix/flake-module.nix' does not exist
+```
+
+A flake's `imports` are **eager**: they are resolved before any output is chosen, so
+the deployed skill could not evaluate *anything* — `.#toolchain` included, which is the
+one thing shipping the flake there exists to provide. Verified as a regression rather
+than pre-existing, by running the pre-split `flake.nix` (from `b9b6472`) in the same
+deployed layout: **that evaluates fine**, because everything was inline.
+
+`checks.skill-layout` could not catch it because it asserted file *existence* only, and
+every file it listed did exist. A flake that references files which are not shipped
+satisfies that check and evaluates to nothing.
+
+**Three copiers ship those two files, and all three needed the modules:**
+
+| copier | what it is for |
+|---|---|
+| `mkSkill` (nix) | `.#skill`, the read-only store path Hermes loads |
+| `flakeFiles` (nix) | `REVIEW_COUNCIL_FLAKE_DIR` — what the launcher and `setup skill` read |
+| `sync_to_skill.py` (python) | the repo → mount mirror |
+
+The third is the interesting one: its `flake_dir` *is* the `flakeFiles` derivation, so
+fixing `sync_to_skill.py` first did nothing until `flakeFiles` staged the modules too.
+Making the missing-modules case **fatal** rather than a silent skip is what surfaced
+that — the same defect its own comment already described one level up ("skipped BOTH
+files silently ... nothing anywhere said so").
+
+**The check now derives the requirement** instead of trusting a hand-written list: it
+strips comments from the deployed `flake.nix`, extracts every `./nix/...` reference, and
+fails if any is absent — with a guard that fails if the extraction itself matches
+nothing, so it cannot pass vacuously.
+
+All three now verify: `.#skill` evaluates, the mirror evaluates, and the gate is green.
+
+One more real failure came out of this, and it is the same class: the portability test
+asserted `REVIEW_COUNCIL_FLAKE_DIR` appeared exactly **twice** across all Nix sources. A
+comment explaining what the staged tree is for mentions the name, so a doc line failed
+the test. It now counts **assignments** (`NAME=`), which is the property the test
+actually cares about.
+
+### 7.4 Integrating it into another flake
 
 `flake.flakeModules.default` is the integration point:
 
@@ -490,7 +537,7 @@ Cost: `flake-parts` plus its `nixpkgs-lib` would appear in a consumer's
 `flake.lock`; the flake sets `flake-parts.inputs.nixpkgs-lib.follows = "nixpkgs"`
 so only one entry is added.
 
-### 7.4 Clan: not adopted, and why that is the right call for priority 1
+### 7.5 Clan: not adopted, and why that is the right call for priority 1
 
 Clan prescribes nothing for a flake that deploys no machines, and importing its
 flake module forces a required `clan.meta.name` for a clan this repo is not. The
@@ -555,28 +602,53 @@ store paths no manifest mentions.
   closure you would first have to build its NixOS configuration, which the council
   does not do and should not start doing to justify a rubric line.
 
-### Verdict: removed, and the line replaced — APPLIED
+### Verdict: available on demand, never probed — APPLIED
 
-Removed. The rubric's own line already annotated it `# CVE count (unmaintained,
-high FP)`, the research already names the replacement, and the same rubric table
-already lists the tools that answer the closure-hygiene question at seconds and
-zero false positives: `nix store verify --recursive --sigs-needed 1` and
-`nix why-depends --all`. For advisory-level CVEs affecting the pinned nixpkgs, the
-Nixpkgs security tracker (`https://tracker.security.nixos.org/`) is the replacement
-the research names — it answers "does my pin have known CVEs" without a 555 MiB
-closure, a mandatory whitelist, or a network fetch at review time.
+Removing it was measured first and then reverted, deliberately. The user's call splits
+the decision in two rather than taking either extreme: **ship it, do not run it.**
+`vulnix` is back in `toolNames`, so it is on the toolchain PATH (devshell, container,
+`nix shell .#review-council`), and it stays out of `probes.py`, so no routine review
+pays for it.
 
-**Measured after the removal:**
+The removal was real and its numbers stand — they are now the price of *availability*
+rather than a saving:
 
 ```
 toolchain closure   983.3 MB -> 790.0 MB   (-193.3 MB, -19.7%)
 toolchain paths     212      -> 156        (-56)
 ```
 
-Five sites were edited so nothing promises the tool any more: the `toolNames` entry
-in `nix/builders.nix`, the rubric line in `skills/reviewer-security/SKILL.md`, the
-tool inventory in `docs/AUTONOMY.md` (24 → 23, with the reason), and the §0
-inventory and §4.1 table in `research/nix-tooling.md`.
+Both halves of the final decision are verified, not asserted:
+
+```
+vulnix on the toolchain PATH     yes   ($toolchain/bin/vulnix, version 1.12.5)
+'vulnix' in the probe set        False (17 probes: bandit, bash-n, complexity,
+                                        deadnix, declared-rules, dep-graph,
+                                        flake-check, mypy, nix-eval, nix-eval-time,
+                                        nixfmt, osv-scanner, py-compile, pytest,
+                                        ruff, secret-grep, statix)
+'vulnix' executed on a real run  False
+'vulnix' named in probes.py      False
+toolchain closure                983.3 MB / 212 paths
+```
+
+`tests/test_probes.py::test_an_on_demand_tool_ships_but_is_not_probed` pins both
+halves — shipped, and not probed — so neither can drift alone. It has teeth: wiring a
+stub `vulnix` probe into `PROBES` makes it fail, and restoring the file makes it pass.
+
+The rubric line in `skills/reviewer-security/SKILL.md` is restored as an explicit
+**on-demand** step with its caveats attached (unmaintained; name+version matching hides
+backports, so a whitelist is mandatory and none ships; `--system` scans the machine
+running it, not the repo). The cheap routine answer sits beside it: the Nixpkgs
+security tracker, which answers "does my pin have known CVEs" without a 555 MiB closure,
+a mandatory whitelist, or a network fetch at review time. `docs/AUTONOMY.md` is back to
+24 tools with the on-demand note, and both `research/nix-tooling.md` rows say "ships,
+but is never probed".
+
+Why not a Nix list of on-demand tools? Because nothing would read it, and a declared key
+nothing reads is a dead key — the same defect §6.1 reports elsewhere. The distinction is
+documented in the comment where a reader looks, and enforced by the test that reads both
+sides.
 
 ---
 
@@ -658,8 +730,8 @@ Five clusters were reported in §6.2. What each turned into:
 
 | cluster | outcome |
 |---|---|
-| `norm_path` ×2 | **one** — `baseline.norm_path` and `ablate._norm_path` were byte-identical; both now delegate |
-| `fingerprint` ×3 | **one** — `baseline.fingerprint` and `ablate._fingerprint` were identical modulo the path helper; both delegate |
+| module loader ×8 | **kept** — §10.2 gives the reason, and it is not laziness |
+| `fingerprint` ×3 | **one** — and `norm_path` ×2 with it: `baseline`'s and `ablate`'s copies were byte-identical, so all four delegate |
 | `kloc` + `SOURCE_SUFFIXES` ×2 | **one** — and the divergence is now an explicit parameter, not an accident |
 | `hermes` subprocess wrapper ×2 | **one** — `hermes_output` is `hermes_run(args)[1]` |
 | loose-JSON reader ×2 | **NOT** consolidated — see §10.2 |
@@ -685,7 +757,7 @@ to raw counts, and the calibration wants a density that is always defined — bu
 difference existed only as a coincidence of two copies. It is now a keyword
 argument, `kloc(root, *, floor=0.0)`, and each caller states its own.
 
-### 10.2 Two things I deliberately did NOT consolidate
+### 10.2 Three things I deliberately did NOT consolidate
 
 **The module loader.** Eight sites look like duplication, and replacing them with a
 plain `import` is the obvious fix. It is the wrong one here. `council` **execs** each
@@ -748,10 +820,12 @@ exist to Nix, which is the repo's own standing rule and cost one extra cycle her
 - **The condensed-probe prompt** (§4) — no round has been run with it.
 - **darwin execution** — unchanged from `docs/NIX.md`: declared and evaluated, not
   built.
-- **The container saving after `vulnix` removal.** The 790.0 MB toolchain is
-  measured; the container was not rebuilt from it.
-- **`council_loop._finding_key`'s divergence** (§11.3) — left alone deliberately,
+- **The container size with `vulnix` restored.** The 983.3 MB toolchain closure is
+  measured; the container was not rebuilt from it (it was 333 M at that size before).
+- **`council_loop._finding_key`'s divergence** (§10.2) — left alone deliberately,
   because unifying it moves which findings merge.
+- **The module-loader idiom** (§10.2) — kept, and the reason is recorded there rather
+  than left as an unexplained duplication.
 - **`baseline.carried_llm_scores`' contract.** Deleting the function removes the
   only statement of it: "a reviewer that saw only the changed files cannot honestly
   score the whole repository, so the baseline's score is carried for those

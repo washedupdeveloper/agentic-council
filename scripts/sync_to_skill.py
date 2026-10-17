@@ -319,6 +319,24 @@ def main(argv: list[str] | None = None) -> int:
     for name in FLAKE_FILES:
         place(os.path.join(flake_dir, name), f"{DEST}/{name}")
 
+    # The flake MODULES, which the flake.nix just installed IMPORTS. A flake's
+    # `imports` are eager, so without these the deployed flake evaluates to NOTHING --
+    # `.#toolchain` included, which is the one thing this install exists to provide.
+    # The same silent-skip trap as the two files above, one level down: the file
+    # installs, the flake looks complete, and nothing resolves.
+    nix_dir = Path(flake_dir, "nix")
+    if not nix_dir.is_dir():
+        print(f"council setup skill: cannot install nix/ -- not found in\n"
+              f"  {flake_dir}\n"
+              f"  The flake.nix it installs imports these modules, so without them the\n"
+              f"  installed flake evaluates to nothing. Run this from a checkout of the\n"
+              f"  repository, or through the council's own launcher.", file=sys.stderr)
+        return 2
+    for entry in sort_names([n for n in os.listdir(nix_dir) if not n.startswith(".")]):
+        src = nix_dir / entry
+        if src.is_file():
+            place(str(src), f"{DEST}/nix/{entry}")
+
     # Without these the gate falls back to the uncalibrated count-based curve.
     for name in ("calibration.json", "eval-baseline.json"):
         src = f"{root}/scripts/{name}"

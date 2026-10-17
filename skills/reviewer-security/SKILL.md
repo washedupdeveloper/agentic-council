@@ -91,12 +91,24 @@ Store/closure hygiene (needs a Linux host with Nix):
 nix store verify --recursive --sigs-needed 1 <toplevel>   # unsigned path count
 nix why-depends --all <pkg> <dep>                         # reachability of a sensitive path
 nix flake archive --json .                                # all inputs locked
-# Advisory CVEs for the PINNED nixpkgs (the question a repo review can answer):
+# Advisory CVEs for the PINNED nixpkgs — the cheap, routine answer:
 #   https://tracker.security.nixos.org/
-# `vulnix` is deliberately NOT shipped. It is unmaintained, it needs a maintained
-# whitelist the repo does not carry, and `--system` scans the closure of the
-# machine RUNNING it rather than the repository under review. See docs/NIX.md.
 ```
+
+**`vulnix` — on demand only, never as part of a review.** It ships in the toolchain so
+the question can be asked when closure CVEs actually are the question, and it is
+deliberately NOT probed, because running it is the expensive half: it fetches NVD data
+over the network (minutes, and the answer moves with the date), it is unmaintained, and
+it matches name+version against NVD so upstream backports are invisible — whitelisting
+is mandatory to make the output usable, and this repo ships no whitelist. When it is
+wanted:
+
+```bash
+vulnix --system -w <whitelist.toml> --json
+```
+
+`--system` scans the closure of the machine RUNNING it, not the repository under
+review. See docs/NIX.md.
 
 **Multiplicative gates (not averaged):**
 - any `builtins.readFile`-on-secret hit → **security category = 0**

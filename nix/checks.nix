@@ -55,6 +55,22 @@ in
                      tests/golden/expect.json; do
               test -f "$s/$f" || { echo "missing from .#skill: $f" >&2; exit 1; }
             done
+            # Every path the deployed flake.nix IMPORTS must be shipped with it. The
+            # list above is written by hand and asserts existence; this derives the
+            # requirement, because a flake whose `imports` are missing evaluates to
+            # nothing at all and existence checks cannot see that. Comments are
+            # stripped first so a doc reference is not mistaken for an import.
+            sed 's/#.*$//' "$s/flake.nix" \
+              | grep -oE '\./nix/[A-Za-z0-9_./-]+' | sort -u > refs.txt
+            # A check that cannot fail verifies nothing: if the pattern above ever
+            # stops matching, this fails instead of silently passing.
+            test -s refs.txt \
+              || { echo "found no nix/ imports in the deployed flake.nix -- the extraction broke" >&2; exit 1; }
+            while IFS= read -r rel; do
+              test -f "$s/''${rel#./}" \
+                || { echo "the deployed flake imports $rel, which is not shipped" >&2; exit 1; }
+            done < refs.txt
+
             # The copier never ships. Shipping it is how the deployed suite came
             # to import a file that is not there and run zero tests.
             test ! -e "$s/scripts/sync_to_skill.py" \

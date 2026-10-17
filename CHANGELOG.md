@@ -648,6 +648,17 @@ tooling. Its absence would have left `/council` undeployable. It is now
   moved as text rather than retyped, and the proof is derivation path: six outputs are
   byte-identical to their pre-conversion paths, including `packages.toolchain`,
   `packages.framework` and `checks.module-evaluates`.
+- **`vulnix` ships, but is never probed — on demand only.** It is in the toolchain so
+  closure CVEs can be asked when that is the question, and absent from `probes.py` so no
+  routine review pays for it. Running it is the expensive half: it fetches NVD data over
+  the network (minutes, and the answer moves with the date), it is unmaintained, and it
+  matches name+version against NVD so upstream backports are invisible — whitelisting is
+  mandatory and no whitelist ships. Its own closure is 193.3 MB, 19.7% of the toolchain
+  and 26 MB of the container, which is the price of having it available. The rubric line
+  is restored as an explicit on-demand step, `docs/AUTONOMY.md` is back to 24 tools, and
+  both `research/nix-tooling.md` rows say "ships, but is never probed".
+  `tests/test_probes.py` pins both halves — shipped, and not probed — and the test has
+  teeth: wiring a stub `vulnix` probe into `PROBES` makes it fail.
 - **`flake.flakeModules.default` is the integration point for another flake.**
   `imports = [ inputs.review-council.flakeModules.default ];` yields the packages, the
   formatter and the app — the same definitions this repo builds for itself, not a copy.
@@ -658,14 +669,6 @@ tooling. Its absence would have left `/council` undeployable. It is now
 
 ### Removed
 
-- **`vulnix` is out of the toolchain.** Measured: the toolchain closure drops from
-  983.3 MB to 790.0 MB (−193.3 MB, −19.7%; 212 → 156 store paths), and its own closure
-  was the single largest member at 555 MiB. It is unmaintained upstream; it needs a
-  maintained whitelist this repo does not ship, so its own rubric line could not run as
-  written; and `vulnix --system` scans the closure of the machine RUNNING it rather than
-  the repository under review. Advisory CVEs for the pinned nixpkgs come from the Nixpkgs
-  security tracker instead. The rubric line, the `docs/AUTONOMY.md` inventory (24 → 23)
-  and both `research/nix-tooling.md` tables are updated to match.
 - **Three unreachable functions and one unused binding.** `calibrate.pick_threshold`
   (provably unreachable — `sweep_threshold` returns `[]` under exactly the condition that
   makes `choose_threshold` return `None`, so a sweep-based fallback could only ever
@@ -675,6 +678,14 @@ tooling. Its absence would have left `/council` undeployable. It is now
 
 ### Fixed
 
+- **The deployed skill can evaluate its flake again.** Splitting `flake.nix` into
+  modules under `nix/` broke the deployed copies: a flake's `imports` are eager, so a
+  `flake.nix` whose modules are not shipped alongside it evaluates to *nothing* —
+  `.#toolchain` included. All three copiers now ship `nix/` (`mkSkill`, `flakeFiles` for
+  `REVIEW_COUNCIL_FLAKE_DIR`, and `sync_to_skill.py` for the mirror), and
+  `checks.skill-layout` derives the requirement from the deployed `flake.nix` instead of
+  asserting a hand-written file list, which is why existence checks passed while the
+  flake was inert. Verified: `.#skill` and the mirror both evaluate.
 - **`council calibrate --ladder` and `--recalibrate` exist and work.** The verb's own
   description promised "recalibrate the threshold and curves" and `docs/CALIBRATION.md`
   documented `calibrate.recalibrate(...)`, but `main()` never called it. `--ladder`

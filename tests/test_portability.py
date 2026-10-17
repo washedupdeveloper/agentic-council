@@ -297,8 +297,11 @@ def test_the_launchers_pass_the_flake_location():
         and ".git" not in p.parts
         and "golden" not in p.parts
     )
-    assert nix.count("REVIEW_COUNCIL_FLAKE_DIR") == 2, (
-        "expected REVIEW_COUNCIL_FLAKE_DIR in both mkDispatcher and "
+    # Counts ASSIGNMENTS (`NAME=`), not mentions: the variable is also named in
+    # comments explaining what the staged tree is for, and a bare substring count
+    # fails on prose rather than on a launcher that stopped setting it.
+    assert nix.count("REVIEW_COUNCIL_FLAKE_DIR=") == 2, (
+        "expected REVIEW_COUNCIL_FLAKE_DIR to be SET in both mkDispatcher and "
         "mkContainerEntrypoint"
     )
     assert "flakeFiles" in nix, (

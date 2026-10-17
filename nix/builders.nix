@@ -30,10 +30,14 @@ let
     "nix-diff" # derivation-level diff
     "nix-fast-build" # parallel eval+build of `checks`
     "nix-du" # GC-root disk attribution
-    # `vulnix` is deliberately absent: unmaintained, needs a whitelist this repo does
-    # not ship, and `--system` scans the closure of the machine RUNNING it rather than
-    # the repo under review. Advisory CVEs for the pinned nixpkgs come from the tracker
-    # instead. See docs/NIX.md.
+    # SHIPPED BUT NOT PROBED — on demand only. `vulnix` is here so closure CVEs can be
+    # asked when that is the question, and it is absent from scripts/probes.py so a
+    # routine review never pays for it: it fetches NVD data over the network (minutes,
+    # and the answer moves with the date), it is unmaintained, and it matches
+    # name+version so backported fixes are invisible. Advisory CVEs for the pinned
+    # nixpkgs have a cheap routine answer instead — the tracker in
+    # skills/reviewer-security/SKILL.md. tests/test_probes.py pins both halves.
+    "vulnix" # store / CVE scanner — on demand, never probed
 
     # --- secret + supply chain ---
     "gitleaks" # secret scanning (wired as a pre-commit hook upstream)
@@ -266,6 +270,11 @@ let
       for r in ${../skills}/reviewer-* ${../skills}/review-council-orchestrator; do
         cp -r "$r" "$out/assets/rubrics/$(basename "$r")"
       done
+      # The flake MODULES, not just the flake. `imports` are eager, so a flake.nix
+      # that names nix/*.nix without them shipped cannot evaluate ANY output -- the
+      # deployed skill's `.#toolchain` included. checks.skill-layout derives this
+      # requirement from the deployed flake.nix so it cannot be forgotten again.
+      cp -r ${../nix} $out/nix
       cp ${../flake.nix} $out/flake.nix
       cp ${../flake.lock} $out/flake.lock
       chmod -R u+w $out
@@ -288,6 +297,12 @@ let
       mkdir -p $out
       cp ${../flake.nix} $out/flake.nix
       cp ${../flake.lock} $out/flake.lock
+      # The modules flake.nix imports. `imports` are eager, so a flake.nix without
+      # them evaluates to nothing -- and this tree is what REVIEW_COUNCIL_FLAKE_DIR
+      # points the launcher and `setup skill` at. Three copiers ship these files
+      # (here, mkSkill, sync_to_skill.py); all three need the modules or the flake
+      # they install is inert.
+      cp -r ${../nix} $out/nix
     '';
 
   # The verb table lives in scripts/council.py, and checks.commands asks the

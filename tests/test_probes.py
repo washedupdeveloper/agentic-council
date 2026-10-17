@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import re
 import sys
 import tempfile
 from pathlib import Path
@@ -206,6 +207,39 @@ def test_every_expected_tool_has_a_probe():
     }
     missing = sorted(expected - set(probes.PROBES))
     assert missing == [], f"the gate expects tools that no probe runs: {missing}"
+
+
+#: Tools that SHIP in the toolchain but must NOT be probed.
+#:
+#: `vulnix` is the case, and both halves of the decision matter. It is available on
+#: demand, because closure CVEs are a real question for a Nix reviewer. It is not
+#: probed, because running it is the expensive half — it fetches NVD data over the
+#: network (minutes, and the answer varies with the date) — and it is unmaintained
+#: with a high false-positive rate, so a routine review would pay a large cost for an
+#: unusable signal.
+ON_DEMAND_TOOLS = {"vulnix"}
+
+
+def _toolchain_tool_names() -> set[str]:
+    """The names in nix/builders.nix's `toolNames` — the toolchain closure."""
+    text = (REPO / "nix" / "builders.nix").read_text(encoding="utf-8")
+    block = text.split("toolNames = [", 1)[1].split("];", 1)[0]
+    return set(re.findall(r'^\s*"([^"]+)"', block, re.M))
+
+
+def test_an_on_demand_tool_ships_but_is_not_probed():
+    """Both halves, so neither can drift: available, and never run by a review.
+
+    A tool that ships but is not probed is invisible to `council probes`; a tool that
+    is probed but not shipped fails on PATH. This asserts the deliberate state rather
+    than letting either half move alone.
+    """
+    names = _toolchain_tool_names()
+    assert names, "could not read toolNames from nix/builders.nix"
+    missing = sorted(ON_DEMAND_TOOLS - names)
+    assert missing == [], f"declared on demand but not shipped: {missing}"
+    probed = sorted(ON_DEMAND_TOOLS & set(probes.PROBES))
+    assert probed == [], f"on-demand tools are being probed on every run: {probed}"
 
 
 def test_parser_accepts_a_top_level_json_array():
