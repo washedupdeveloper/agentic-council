@@ -960,12 +960,18 @@ let
             "grep -c /tmp/fw/scripts/council.py /usr/local/bin/council-mod"
         ).strip() == "1", "the wrapper does not point at the modified tree"
 
-        # step 4: reinstall, so the reviewer profile carries the new rubric. The
-        # installer globs reviewer-*/SKILL.md, so it must pick the new one up with
-        # no edit of its own -- that is the claim.
+        # step 4: reinstall, so the reviewer profile carries the new rubric. The doc
+        # used to say the installer globbed reviewer-*/SKILL.md and needed no edit;
+        # it does not -- CORE_SKILLS is an explicit list -- so the editor above adds
+        # the rubric there and this asserts the profile actually received it.
         installed = machine.succeed("/usr/local/bin/council-mod setup bots 2>&1")
         machine.log(installed)
-        assert "reviewer-accessibility" in installed, installed
+        # The count, and the file itself: a profile that says six but is missing the
+        # rubric would still answer with no criteria for that dimension.
+        assert "6 skill(s)" in installed, installed
+        machine.succeed(
+            "test -f /root/.hermes/profiles/council-generalist/skills/"
+            "reviewer-accessibility/SKILL.md")
 
         # 9. the round must carry the dimension, and the dimension must MOVE THE
         #    NUMBER. Step 4's five-dimension run scored exactly [100.0]; a dimension
