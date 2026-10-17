@@ -6,6 +6,45 @@ All notable changes to this project. Format follows
 
 ## [Unreleased]
 
+## [1.2.0] — 2026-10-17
+
+### Added
+
+- **`AGENTS.md`** — the project context an agent loads in this workdir. It states the
+  rules that are easy to break by accident (tracked files only, because Nix cannot see an
+  untracked one; no shell scripts; a new verb touches three places; user verbs ship and dev
+  verbs do not; prompts travel in a file; a review is a read) and points at `docs/` rather
+  than repeating it. It was an M0 deliverable that had never landed.
+- **`council metrics`** — the interactive half of M8, computed from the `status` field
+  every finding already carries. Reports acceptance rate, addressed rate, coverage and
+  iterations per run, and reports **`null` with a named reason** when nobody has judged a
+  finding, because no data is not a zero rate. Two corrections to what M8 assumed:
+  iterations never needed an operator (`outcome.json` records one score per round, so its
+  length *is* the count), and the record the other two need was already in the schema — the
+  gap was a missing computation, not a missing signal.
+- **`council cron <repo>`** — prints (or `--install`s) a `hermes cron create` job for an
+  unattended review. The prompt tells the agent to RUN the council and report the gate's
+  numbers verbatim, never to review the code itself: a cron agent reviewing on its own
+  would be a reviewer outside the framework. It prints by default because a schedule
+  outlives the session that made it.
+
+### Changed
+
+- **The `status` vocabulary gained `rejected`.** It was `open|fixed|wontfix|accepted`,
+  which could express "real and fixed", "real and declined" and "not judged", but not
+  "judged not real" — the false positive that SNR measures on the ladder. `council metrics`
+  treats `accepted|fixed|wontfix` as judged real, `fixed` alone as addressed, and reports
+  any value outside the set as a mistake rather than guessing at it.
+- **`docs/MILESTONES.md` M7 is complete except the PR path.** The re-claim branch was
+  exercised end to end on a throwaway board — claim → reclaim → `ready` → re-claim as
+  `run 2`, bounded by `max-retries: 2` — and the council-side guard verified: a repeat
+  `council swarm` returns the *same* root card id, so a reclaimed dispatch cannot fork a
+  second round (`runs/reclaim-verification-2026-10-17.md`). Cron is built. The GitHub PR
+  path stays unbuilt rather than built and unverified.
+- **`docs/MILESTONES.md` §3 is no longer a list of open questions.** All six were answered
+  by building or measuring; the section now records each answer beside the question it
+  closed.
+
 ## [1.1.0] — 2026-10-17
 
 ### Added

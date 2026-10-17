@@ -78,7 +78,7 @@ The canonical unit of exchange; the orchestrator validates every one.
     <the smallest fix that removes the harm>
   rule_id: "<tool rule, if a tool produced it>"
   references: [CWE-89, ...]
-  status: open | fixed | wontfix | accepted
+  status: open | accepted | fixed | wontfix | rejected
 ```
 
 **Rules that bind the contract:**
@@ -86,6 +86,11 @@ The canonical unit of exchange; the orchestrator validates every one.
 - A `FACT` with no `falsifiable_check` is invalid — reject it.
 - `RECOMMENDATION` claims may omit `falsifiable_check` but must carry `consequence`.
 - `severity` is derived from **impact × reachability × calibrated confidence**, never from a label.
+- `status` is the **operator's** field, not the reviewer's: the reviewer writes `open`,
+  and a human or the forge sets the rest. `council metrics` reads it and nothing else —
+  `accepted|fixed|wontfix` mean the claim was judged real, `fixed` alone means the code
+  changed, `rejected` means it was judged not real, and `open` is never counted as a
+  rejection. A value outside that set is reported as a mistake rather than guessed at.
 
 ## 5. The severity taxonomy (shared, non-negotiable)
 

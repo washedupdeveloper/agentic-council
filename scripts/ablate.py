@@ -115,7 +115,7 @@ in this shape:
     "tools_run": [{{"name": "<tool>", "cmd": "<cmd>", "ran": <bool>,
                     "parsed": <bool>, "signal": <0-100 or null>}}],
     "findings": [{{"id": "{dim_prefix}-0001", "severity": "critical|high|medium|low|info",
-                   "status": "open|fixed|wontfix|accepted",
+                   "status": "open|accepted|fixed|wontfix|rejected",
                    "location": {{"path": "<p>", "line_range": "<a-b>"}},
                    "claim": "<verbatim-grounded claim>",
                    "falsifiable_check": "<how to verify>"}}],

@@ -32,7 +32,9 @@ nix shell .#review-council               # the command + the analyzers on PATH
 | `merge <run-dir>` | Bucket a round's samples into the per-dimension files |
 | `swarm [<repo>]` | Build the durable council as a kanban graph |
 | `baseline --repo DIR` | Report the baseline, or what changed since it |
+| `metrics [<run-dir>...]` | Acceptance rate, addressed rate and iterations from judged findings |
 | `goal <repo> [--json]` | Express a run as a native Hermes `/goal` + quality gate |
+| `cron <repo> [--install]` | Print or install a scheduled unattended review |
 | `setup init` | Guided first-run setup: write the config, then install |
 | `setup skill` | Install the council skill into the Hermes skill library |
 | `setup bots` | Install the reviewer and orchestrator profiles |

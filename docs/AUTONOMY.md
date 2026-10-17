@@ -15,6 +15,22 @@ or through the container image; every command below is one of its verbs.
 
 Both run on the same deterministic gate, so "pass" means the same either way.
 
+## Unattended runs
+
+`council cron <repo>` emits the `hermes cron create` job for a scheduled review;
+`--install` creates it. The job's prompt tells the agent to **run** the council and report
+the gate's numbers verbatim, never to review the code itself — a cron agent reviewing on
+its own would be a reviewer outside the framework, and its score would not be the score
+the gate enforces.
+
+It prints rather than installs by default: a schedule outlives the session that made it,
+so it is something a person opts into. `cron.allow_agent_scheduling` is false, so a
+reviewer cannot schedule its own follow-ups.
+
+Durability for a long run is separate: `council swarm` puts the round on the kanban board,
+where a dispatcher can reclaim it (`council setup dispatcher`). A cron job starts a run; a
+swarm survives one.
+
 ## Resolving the target project
 
 The repo argument is **optional**: the run starts from a live session (the desktop

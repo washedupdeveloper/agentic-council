@@ -44,9 +44,11 @@ still describe the original intent):
 
 **M9 is delivered, with one gap.** Cross-platform CI runs green on Linux, macOS and Windows for the *framework*, and the nix gate runs on Linux — checking the **darwin declaration** by *evaluation* (`nix flake check --all-systems --no-build`, proven to catch a darwin-only error) rather than by a macOS runner, which is a deliberate cost decision recorded in `docs/CI.md` and, from the user's side, in `docs/NIX.md`. The **analyzer matrix** (`checks.probes`) and the **image build** (`checks.container`) are checks rather than separate workflows, so `nix flake check` verifies both on every push, and `v1.0.0` is tagged and published in both repositories. The gap: the **analyzers are not executed on darwin or Windows** — the pinned toolchain is a nix closure, CI builds Linux only, and darwin execution is left to whoever runs the flake on a Mac (`nix flake check`, the same command). The container is attached to the release as a `docker load` tarball rather than pushed to a registry (`docs/CONTAINER.md`). **M8 remains partial**: calibration, a
 labeled eval set and the golden end-to-end regression suite all exist, the A/B harness was
-built as M8.5, and the finding-level metrics (SNR, usefulness rate) are now reported beside
-recall; acceptance rate, % comments addressed and avg iterations/PR stay unbuilt because
-they need an interactive signal the ladder cannot supply. The `α_t` weights stay
+built as M8.5, and the metrics are complete: the finding-level pair (SNR, usefulness
+rate) sits beside recall, and `council metrics` computes acceptance rate, addressed rate
+and iterations per run from the `status` field. What that verb cannot supply is the
+judgement itself — a human or the forge must set `status`, and until one does it reports
+`no data` rather than a number. The `α_t` weights stay
 uncalibrated until evidence justifies reweighting; the M4
 *evidence matrix* and *SNR term* are rubric-level, not code.
 
@@ -174,7 +176,22 @@ criteria* checkable by a command or an observable artifact. `Size` is relative e
 - ✅ A real swarm run, end to end: root → worker → verifier → synthesizer; the root wrote `goals.json`, the worker wrote `generalist-1.json` via `council sample`, and the verifier ran `merge` then `gate` and reported the gate's own numbers.
 - ✅ A durable dispatcher (`council setup dispatcher`) — a systemd user unit, enabled with linger, so dispatch survives logout and reboot.
 - ✅ Restart survival — M7's stated criterion: the dispatcher restarted mid-run and the round completed with a verified score (94.4 ≥ 87.1141, satisfied, β live per dimension); the in-flight worker was undisturbed (it detaches from the dispatcher's cgroup).
-- ⬜ Cron, the GitHub PR path, and the **re-claim** path (a worker that genuinely dies and is retried) — the one durability branch not yet exercised.
+- ✅ **Cron** — `council cron <repo>` prints (or `--install`s) a `hermes cron create`
+  job whose prompt tells the agent to **run** the council and report the gate's numbers
+  verbatim, never to review the code itself: a cron agent that reviewed on its own would
+  be a reviewer outside the framework, and its score would not be the score the gate
+  enforces. It prints rather than installs by default, because a schedule outlives the
+  session that made it; `--install` creates it and then confirms it appears in
+  `hermes cron list`. `cron.allow_agent_scheduling` is false, so a reviewer cannot
+  schedule its own follow-ups — only a person can. Verified: installed, listed, removed.
+- ✅ **Re-claim** — the last durability branch, exercised end to end on a throwaway
+  board: claim → reclaim → `ready` → re-claim as `run 2`, with `max-retries: 2` bounding
+  it. The council-side half was verified too — the root card's idempotency key returns
+  the *same* card id on a repeat `council swarm`, so a reclaimed dispatch cannot fork a
+  second round. Record: `runs/reclaim-verification-2026-10-17.md`. Not exercised: a claim
+  left to expire on its own, and a worker dying mid-`council sample`.
+- ⬜ The **GitHub PR path** — local CLI only. Building it needs a forge credential and a
+  live PR, so it is left unbuilt rather than built and unverified.
 **Note.** M7 adds moving parts back after M8.5's collapse, defensible only because it buys **survival**, not quality — the swarm runs the same profile and rubrics, so a swarm run scoring *better* than the plain loop would be a bug, not a result.
 **Size** L · **Depends** M6
 
@@ -189,7 +206,17 @@ criteria* checkable by a command or an observable artifact. `Size` is relative e
 - ✅ **Labeled eval set** — a graded defect ladder (rungs 0/1/2/4/8/16) built deterministically from a seed, so ground truth is known by construction.
 - ✅ **Metrics harness, finding-level half** — `score_arm` now reports the signal-quality pair beside recall: `signal`, `noise`, **`snr`** (signal/noise over *findings*) and **`usefulness_rate`** (share of findings that describe something real), for every arm, persisted in the run's `scores.json` and printed in the `council ablate report` table. This is the reading M8.5 could not make: its rule compares `true` (distinct planted defects found), which recall can be bought for with volume — and the research names that a trust hazard (CR-Bench measured recall 27.01% → 32.76% while SNR fell 5.11 → 1.95, `sota` §3.6). Both are **floors**, not point estimates: the matcher is location-based, so a true finding pointing where the manifest names nothing counts as noise, and CR-Bench's second signal class (a valid suggestion that is not a bug) has no representation in a planted-defect manifest.
   **The rule is unchanged, deliberately.** `MARGIN` is pre-registered and editing it after a run invalidates the run, so the pair is *reported* rather than folded into the verdict. A future reader can now see whether a recall win was volume-driven; the 22-defect outcome was not re-decided.
-- ⬜ **Metrics harness, the interactive half** — **acceptance rate**, **% comments addressed** and **avg iterations/PR** need a signal the ladder cannot supply: a human acting on a comment, or a PR's comment-resolution state. They are not computed, and not estimated — a number invented for them would be the kind of unproven claim this repository refuses. What they need, precisely: a per-finding outcome record (`accepted`, `addressed`) from the operator or the forge's API, and a run's iteration count, which the run directory already holds.
+- ✅ **Metrics harness, the interactive half** — `council metrics` computes
+  **acceptance rate**, **% comments addressed** and **iterations per run** from the
+  `status` field every finding already carries (`open|accepted|fixed|wontfix|rejected`).
+  It reports `null` and names what is missing whenever nobody has judged a finding,
+  because no data is not a zero rate. Two corrections to what this milestone assumed:
+  **iterations never needed an operator** — `outcome.json` already records one score per
+  round, so its length *is* the iteration count, and that half was available all along;
+  and the record the other two need was **already in the schema**, so the gap was a
+  missing computation rather than a missing signal. What remains genuinely absent is the
+  *source* of the judgements: a human or the forge must set `status`, and until one does
+  the metrics are `no data` by construction.
 - ✅ **A/B harness** — built as M8.5 (`scripts/ablate.py`): four arms at equal cost against a pre-registered rule; the answer was **collapse** (M8.5).
 - ✅ **Golden end-to-end regression suite** — `scripts/golden.py` + `tests/golden/`, run by `council golden --check` and by `pytest`. Two layers, because the pipeline fails differently in each: a **round** layer (reviewer files → hybrid verdict, pinning det, β, the Hill density, the aggregate and pass/fail) and a **merge** layer (samples + probes → per-dimension files, pinning the `tools_run` union and the probe seed). `tests/test_golden.py` is the criterion executed: each test mutates one scoring input, asserts the check fails, restores it, asserts it passes. Built because the β defect shipped with **210 green tests** — every merge test supplied its own fixture and nothing asserted a number end to end, so two halves could both drop `tools_run` while the suite stayed green and the score quietly became the LLM's judgement (see M8.5).
 - ❌ **`α_t` weights remain uncalibrated** by design: §7 says reweight only with evidence, and none exists yet.
@@ -283,11 +310,16 @@ M0 ─▶ M1 ─▶ M2 ─┐
 | Pydantic → JSON Schema single source of truth (`protocol` §3) | M1 |
 | Delegate children non-durable → kanban for restart-safety (§4.6) | M7 |
 
-## 3. Open decisions (to confirm before/at the relevant milestone)
+## 3. Decisions that were open, and how they closed
 
-1. **Iteration engine** — confirm `/goal`+gate as primary (recommended) with `/loop --until` as the documented alternate, or insist `/loop` is primary.
-2. **Integration target** (M7) — local first (default), or GitHub PR bot / CI from day one?
-3. **Model tiers** (M3) — default: cheap model for tool-running + aggregation, strong model for specialist judgment + judge. Confirm providers/models.
-4. **Budget guardrails** (M5) — per-run token/cost ceiling value; `goals.max_turns` value.
-5. **Threshold + weights** (M5, M8) — initial `SCORE` threshold and per-category weights (calibrated in M8; need a starting point).
-6. **Bot transport** (M4/M7) — file bus (default, deterministic, git-versioned) vs Bot group chat vs orchestrator-mediated; recommend file bus primary, group chat as a demo surface.
+Each was answered by building or measuring, not by a later conversation. The original
+question is kept so a reader can see what was asked.
+
+| # | question | resolved to |
+|---|---|---|
+| 1 | **Iteration engine** — `/goal`+gate, or `/loop --until`? | The loop's **own goal phase** runs: the orchestrator writes one goal per dimension, the harness hands them to the reviewer, and the orchestrator judges the round against them. `/goal` is documented, not wired (M5); `/loop --until` stays the documented alternate with its fail-open caveat. |
+| 2 | **Integration target** — local, PR bot, or CI? | **Local CLI first**, and it is the only surface built. The GitHub PR path is left unbuilt rather than built and unverified (`docs/MILESTONES.md` M7). |
+| 3 | **Model tiers** — cheap for tooling, strong for judgement? | Expressed as **config, not a hardcoded choice**: every member carries `model`/`provider` and `None` inherits the profile's, so a user pins tiers in `$HERMES_HOME/review-council.toml` rather than this repository picking models for them. |
+| 4 | **Budget guardrails** — per-run ceiling? | `max_rounds` (default **3**), `min_rounds`, and `budget_seconds`; `council_loop.out_of_budget` enforces the wall clock and `decide_stop` the round count. |
+| 5 | **Threshold + weights** | Threshold **87.1141** from `scripts/calibration.json`, weights in `score_reviews.WEIGHTS` (security .30, correctness .25, readability .20, architecture .15, performance .10). Both calibrated in M8, not guessed (`docs/CALIBRATION.md`). |
+| 6 | **Bot transport** | The **file bus**: reviewers write one JSON file per dimension and the gate reads them. No group chat, no orchestrator-mediated message passing — a file is deterministic, git-versionable, and readable after the fact. |

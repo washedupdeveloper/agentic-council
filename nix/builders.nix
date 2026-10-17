@@ -106,6 +106,7 @@ let
     "sample.py" # sample
     "merge.py" # merge
     "baseline.py" # baseline
+    "metrics.py" # metrics — acceptance/address/iterations from judged findings
     "toolchain.py" # setup toolchain
     "install_bots.py" # setup bots
     "install_dispatcher.py" # setup dispatcher
@@ -115,6 +116,7 @@ let
     # and a module reachable from the shipped surface has to be in it.
     "sync_to_skill.py"
     "goal.py" # goal — the /goal contract and quality-gate emitter
+    "cron.py" # cron — print or install a scheduled unattended review
     "council_config.py" # shared: the one place configuration lives
     "entrypoint.py" # the container ENTRYPOINT
     "hermes_home.py" # shared: where HERMES_HOME is
