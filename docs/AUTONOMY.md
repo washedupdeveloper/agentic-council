@@ -31,6 +31,28 @@ Durability for a long run is separate: `council swarm` puts the round on the kan
 where a dispatcher can reclaim it (`council setup dispatcher`). A cron job starts a run; a
 swarm survives one.
 
+## Posting to a pull request
+
+`council pr <run-dir> --repo owner/name --pr N` posts the run's verdict as a PR review.
+The numbers come from `score_reviews.evaluate` — the gate's own function — so the comment
+and `council gate` cannot disagree about the same run.
+
+It prints the request and posts only with `--post`. The default event is `COMMENT`, which
+cannot block a merge; `--event auto` sends `REQUEST_CHANGES` when the gate fails, for a
+team that wants the gate enforced on the PR.
+
+Two things it does for you rather than leaving them to the operator:
+
+- **It will not post the same run twice.** GitHub has no idempotency key for reviews, so
+  the body carries an HTML-comment marker naming the run and the PR, and an existing
+  review carrying it is skipped.
+- **It pins `commit_id`** from the run's `meta.json`, so the review attaches to the commit
+  the council scored, not the PR's latest one.
+
+The token comes from `GITHUB_TOKEN` or `GH_TOKEN`, never from the command line — argv is
+visible in `ps` and in shell history. `--api` (or `GITHUB_API_URL`) points it at GitHub
+Enterprise.
+
 ## Resolving the target project
 
 The repo argument is **optional**: the run starts from a live session (the desktop

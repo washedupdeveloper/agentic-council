@@ -6,6 +6,27 @@ All notable changes to this project. Format follows
 
 ## [Unreleased]
 
+## [1.3.0] — 2026-10-17
+
+### Added
+
+- **`council pr`** — posts a run's verdict to a GitHub pull request, closing M7's last
+  gap. The body's numbers come from `score_reviews.evaluate`, the gate's own function, so
+  a PR comment cannot disagree with `council gate` about the same run. It prints the
+  request and posts only with `--post`; the default event is `COMMENT`, which cannot block
+  a merge, and `--event auto` sends `REQUEST_CHANGES` when the gate fails.
+
+  Three hazards are handled rather than documented away. GitHub has **no idempotency key
+  for reviews**, so the body carries an HTML-comment marker naming the run and the PR, and
+  an existing review carrying it is skipped — a re-run cannot leave a second copy of the
+  same verdict. The review is **pinned to `commit_id`** from the run's `meta.json`, so it
+  attaches to the commit the council actually scored rather than the PR's latest one. And
+  the token is read from `GITHUB_TOKEN`/`GH_TOKEN`, **never from argv**, where it would be
+  visible in `ps` and in shell history.
+
+  `--api` (or `GITHUB_API_URL`) addresses GitHub Enterprise, and is what let the request
+  shape be exercised against a stub server that records what is actually sent: endpoint,
+  `Bearer` header, payload, and that the token appears in none of it.
 ## [1.2.0] — 2026-10-17
 
 ### Added

@@ -190,8 +190,23 @@ criteria* checkable by a command or an observable artifact. `Size` is relative e
   the *same* card id on a repeat `council swarm`, so a reclaimed dispatch cannot fork a
   second round. Record: `runs/reclaim-verification-2026-10-17.md`. Not exercised: a claim
   left to expire on its own, and a worker dying mid-`council sample`.
-- ⬜ The **GitHub PR path** — local CLI only. Building it needs a forge credential and a
-  live PR, so it is left unbuilt rather than built and unverified.
+- ✅ **The GitHub PR path** — `council pr <run-dir> --repo owner/name --pr N` posts the
+  run's verdict as a pull-request review. Every number in the body comes from
+  `score_reviews.evaluate`, the same function the gate runs, so a PR comment cannot
+  disagree with `council gate` about the same run. It prints the request by default and
+  posts only with `--post`; the default event is `COMMENT`, which cannot block a merge,
+  and `--event auto` maps a failing gate to `REQUEST_CHANGES` for teams that want the
+  gate enforced on the PR. Two hazards are handled rather than left to the operator: a
+  run is **never posted twice** (the body carries an HTML-comment marker naming the run
+  and the PR, checked against the existing reviews first, because GitHub has no
+  idempotency key), and the review is **pinned to `commit_id`** from the run's
+  `meta.json` so it attaches to the commit the council actually scored rather than the
+  PR's latest. The token is read from `GITHUB_TOKEN`/`GH_TOKEN` and never accepted on
+  the command line. Proven: 24 tests against a stub GitHub API that records the request
+  (endpoint, `Bearer` header, payload, no token in the body), the idempotency skip, the
+  401/404/422 messages, and — through the real CLI — print, post, skip and refuse. Not
+  proven: that github.com *accepts* the payload, which needs a token and a live PR; the
+  read half was exercised against the real API unauthenticated.
 **Note.** M7 adds moving parts back after M8.5's collapse, defensible only because it buys **survival**, not quality — the swarm runs the same profile and rubrics, so a swarm run scoring *better* than the plain loop would be a bug, not a result.
 **Size** L · **Depends** M6
 

@@ -35,6 +35,7 @@ nix shell .#review-council               # the command + the analyzers on PATH
 | `metrics [<run-dir>...]` | Acceptance rate, addressed rate and iterations from judged findings |
 | `goal <repo> [--json]` | Express a run as a native Hermes `/goal` + quality gate |
 | `cron <repo> [--install]` | Print or install a scheduled unattended review |
+| `pr <run-dir> --repo OWNER/NAME --pr N [--post]` | Post a run's verdict to a pull request |
 | `setup init` | Guided first-run setup: write the config, then install |
 | `setup skill` | Install the council skill into the Hermes skill library |
 | `setup bots` | Install the reviewer and orchestrator profiles |
