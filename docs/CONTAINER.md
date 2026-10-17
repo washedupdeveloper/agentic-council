@@ -70,18 +70,19 @@ credential error where the help should have been.
 
 ## Why it is layered
 
-`buildLayeredImage`, no nix database: **99 layers**. The tarball is **333 MiB**
-(348,761,461 bytes) and the loaded image is **2.33 GB** (2,331,098,089) — the
-layers are gzipped, so the download is not the image. A store path's layer
-is content-addressed, so an unchanged toolchain produces byte-identical layer
-digests — a push uploads only what changed and a pull fetches only what the local
-copy lacks. That is the whole caching story; there is no build cache to configure.
+`buildLayeredImage`, no nix database: **99 layers**. Measured on the current build, the
+tarball is **313 MiB** (328,344,703 bytes) and its layers hold **1.06 GB**
+(1,064,611,840) uncompressed. The layers are gzipped, so the download is not the image.
+A store path's layer is content-addressed, so an unchanged toolchain produces
+byte-identical layer digests — a push uploads only what changed and a pull fetches only
+what the local copy lacks. That is the whole caching story; there is no build cache to
+configure.
 
 The earlier build used `buildImageWithNixDb` and one layer (**365 MiB** as a
 tarball) to register the copied store paths in a nix database. Measured, the
 database bought nothing: `nix --version`, `nix-instantiate --parse` (what the nix-eval
-probe actually runs), all 14 analyzers and `doctor` reporting beta 1.00 all work
-without it. It was also the **only** thing forcing a single layer, because its
+probe actually runs), all 14 analyzers that then shipped, and `doctor` reporting beta
+1.00 all work without it. It was also the **only** thing forcing a single layer, because its
 gcroots point into a layer that is not there while it is being generated:
 
 ```
@@ -144,11 +145,16 @@ takes `coreutils`, `gnused`, `gnugrep`, `gnutar` and `findutils` from nixpkgs vi
 `.#image-prep-tools`, so it depends on the pin rather than on what a base image
 happens to carry.
 
-**The two paths carry the same content**, measured rather than assumed: the layered
-image holds **261** store paths and **1,060,252,742** bytes under `/nix/store`; the
-Dockerfile image holds **260** and **1,060,259,347** — 0.04% apart. Their reported
-*image sizes* differ far more (2.33 GB layered, 1.53 GB single-layer), and that is
-docker's layer accounting, not missing content.
+**The two paths carry the same content**, measured rather than assumed. On the build
+this was taken from, the layered image held **261** store paths and **1,060,252,742**
+bytes under `/nix/store`; the Dockerfile image held **260** and **1,060,259,347** —
+0.04% apart. Their reported *image sizes* differ far more, and that is docker's layer
+accounting, not missing content.
+
+Both halves are a measurement of one earlier build, and the Dockerfile half cannot be
+re-checked without a docker daemon. The store-path counts move with the toolchain, so
+re-measure rather than trusting them; the *conclusion* does not depend on the numbers —
+it follows from the two images being built from the same attrs.
 
 The counts are not identical because the same three artifacts are built from
 different inputs — the flake from the git tree, the Dockerfile from the staged build

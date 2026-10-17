@@ -74,3 +74,7 @@ per-dimension profile any more. M8.5 measured five of them against this and they
 
 Emit a `control` message carrying `termination`, `reason`, `iterations`, and
 `final_scores`. `termination` ∈ `satisfied | continue | blocked | escalate`.
+
+That message is for the log. The loop writes it and does not parse it — the gate decides
+the verdict, from the reviewer files, and its own vocabulary is
+`satisfied | not_satisfied`.

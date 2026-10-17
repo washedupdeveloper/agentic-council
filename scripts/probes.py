@@ -342,7 +342,21 @@ def _bridge(root: Path, args: List[str], timeout: int = 600,
 
     (127, reason) when the toolchain is unavailable, so the probe reports
     ran=False rather than fabricating a result.
+
+    `nix flake check` and `nix eval` WRITE `flake.lock` into the repository they
+    run against when it is missing or stale. Probing must not modify the repo
+    under review — a review is a read — so both get `--no-write-lock-file`.
+
+    The flag must follow the SUBCOMMAND: `nix flake --no-write-lock-file check`
+    is "unrecognised flag", `nix flake check --no-write-lock-file` is accepted.
+    Found the hard way: probing `tests/golden/target` created a `flake.lock`
+    there, which then appeared in the fixture's own hashes.
     """
+    if len(args) >= 3 and args[0] == "nix" and "--no-write-lock-file" not in args:
+        if args[1] == "eval":
+            args = [args[0], args[1], "--no-write-lock-file", *args[2:]]
+        elif args[1] == "flake":
+            args = [*args[:3], "--no-write-lock-file", *args[3:]]
     return toolchain.run(args, repo=root, timeout=timeout, env_extra=env_extra)
 
 

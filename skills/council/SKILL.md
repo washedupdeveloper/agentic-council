@@ -127,32 +127,27 @@ skills      = ["web-app-security"]         # optional, on demand
 Adding an optional skill is a config edit, not a code change: name it in `skills`;
 `setup bots` reports whether it resolves.
 
-### Measured: the prose instruction is the small lever
+### Measured: `probe_json` dominates the prompt
 
-One generalist sample, two-file Python fixture, whole-repo scope:
+Rendered on the SHIPPED fixture (`tests/golden/target`), whole-repo scope, so these are
+reproducible: render `generalist_prompt` for that fixture and compare
+`json.dumps(probes, indent=2)` with `json.dumps(probes, separators=(",", ":"))`.
 
 | | value |
 |---|---|
-| findings file | 6562 B, 7 findings |
-| prose (`claim` + `falsifiable_check`) | 2515 B — **38%** |
-| structural (keys, ids, locations, `tools_run`, indentation) | 4047 B — **62%** |
-| mean `claim` | 182 chars |
+| rendered reviewer prompt | 7,650 B |
+| `probe_json`, indented | 4,575 B — **60%** |
+| `probe_json`, compact | 2,498 B |
+| saving from compacting | **805 B per sample**, 4,025 B per round at N=5 |
 
-A one-sample A/B against the pre-change prompt (7800 B, 8 findings) gives **937 vs 975
-bytes per finding, −3.9%** — inside sample variance at n=1 per arm, so **not evidence
-of a saving**. The prose instruction costs +401 B per sample (+2005 B per round at
-N=5). Most of the file is schema, not filler: `rationale` and `beta_note` are **not
-written by the reviewer** — `merge_generalist_samples` emits fixed short strings.
+It is **not applied**: an agent may read indented JSON more reliably, and a token saving
+that costs defect recall is a loss. `council ablate` exists to settle it — run it on the
+22-defect corpus before changing serialisation.
 
-### The dominant measured lever is structural, and untested
-
-`probe_json` is **57% of the rendered reviewer prompt**, injected pretty-printed
-(`json.dumps(probes, indent=2)`) into every sample. Serialising it compactly saves
-**1006 B per sample — 5030 B per round** at N=5, with no information lost: 2.5× the
-prose instruction's cost. It is **not applied** — an agent may read indented JSON more
-reliably, and a token saving that costs defect recall is a loss. `council ablate`
-exists to settle it: run it on the 22-defect corpus before changing serialization or
-extending the terse contract.
+Compressing the FINDINGS is not a lever. One archived sample measured 38% prose against
+62% schema, and a one-sample A/B came out −3.9% — inside variance at n=1 per arm, so not
+evidence of a saving. `rationale` and `beta_note` are not reviewer-written at all:
+`merge_generalist_samples` emits fixed short strings.
 
 **What is never compressed.** Negations, paths, symbols, numbers, rule ids, commands
 and error strings are the payload. Compress the prose, never the evidence. Security

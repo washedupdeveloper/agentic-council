@@ -787,6 +787,38 @@ tooling. Its absence would have left `/council` undeployable. It is now
 - **`docs/RESEARCH.md` indexed 4 of the 6 reports** in `research/`. The two Nix reports
   are listed now, so the index covers the directory.
 
+### Fixed
+
+- **Three measurements could not be reproduced, so they were replaced.** They were
+  flagged rather than left: a number nobody can re-derive is not evidence.
+  - `skills/council/SKILL.md` quoted prompt figures measured on "a two-file Python
+    fixture" that is not in the repository, against a probe set that has since changed
+    (`gitleaks` and `shellcheck` added; `treefmt`, `yamllint`, `tokei` and others
+    removed). Re-measured on the shipped `tests/golden/target`: `probe_json` is **60%**
+    of a 7,650 B prompt, and compacting it saves **805 B per sample**. The unreproducible
+    findings-file breakdown and the n=1 A/B byte counts are gone; the conclusions they
+    supported are kept, including that the saving is untested and therefore not applied.
+  - `docs/CONTAINER.md` and `docs/OPTIMISATION.md` carried container figures from the
+    pre-split toolchain: 333 MiB and a 2.33 GB "loaded image". Measured now: **99
+    layers**, tarball **313 MiB** (328,344,703 B), layer content **1.06 GB**
+    (1,064,611,840 B). The 2.33 GB figure is gone — it was docker's layer accounting
+    quoted from a comment, not a measurement, and the layer content is what can be
+    checked without a daemon.
+- **Probing a repository MODIFIED it.** `nix flake check` and `nix eval` write
+  `flake.lock` into the tree they run against, so a review left a new file in the
+  user's working copy. A review is a read. Both now pass `--no-write-lock-file`, and the
+  flag must follow the subcommand — `nix flake --no-write-lock-file check` is
+  "unrecognised flag", which the first attempt shipped. Caught because probing
+  `tests/golden/target` created a `flake.lock` there and the fixture's own hashes
+  picked it up; the fixture was restored and the guard is pinned by two tests.
+
+- **`review-council-orchestrator`'s `termination` enum implied a machine contract that
+  does not exist.** The rubric asked for `termination ∈ satisfied | continue | blocked |
+  escalate`; the loop writes the aggregate reply to the log and **discards it**, and the
+  gate decides the verdict with its own vocabulary (`satisfied | not_satisfied`). The
+  rubric now says the message is for the log, so a reader is not left assuming something
+  parses it.
+
 ### Removed
 
 - **`treefmt`** — the `formatter` execs `${nixfmt-tree}/bin/treefmt`, so the standalone

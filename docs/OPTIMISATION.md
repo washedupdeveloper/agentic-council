@@ -172,9 +172,8 @@ The NixOS VM test's `testScript` is 608 lines of shell inside a Nix string, in t
 file as everything else. That is 45% of `flake.nix` for one output, and it is the main
 argument for splitting the file.
 
-Container facts, measured: **99 layers**, tarball 333 MiB, and per the comment in
-`mkContainer` the image `docker load` reports is 2.33 GB — the layers are gzipped, so
-the download is not the image.
+Container facts, measured: **99 layers**, tarball 313 MiB, and its layers hold 1.06 GB
+uncompressed — the layers are gzipped, so the download is not the image.
 
 `flake.nix` has no flake-parts and no clan. Whether that should change, and in which
 order of the clan → flake-parts → nix priority the user asked for, is the subject of

@@ -441,6 +441,59 @@ def test_density_falls_back_to_a_count_with_no_measurable_size():
     assert probes.score_from_density(0, None) == 100.0
 
 
+# --- probing must not modify the repo under review --------------------------
+#
+# `nix flake check` and `nix eval` write `flake.lock` into the repo they run
+# against. A review is a read: probing `tests/golden/target` created a
+# `flake.lock` there, and the fixture's own hashes picked it up. `_bridge`
+# injects `--no-write-lock-file` so it cannot happen again.
+
+def test_bridge_forbids_writing_a_lock_file():
+    """Every `nix flake` / `nix eval` call carries `--no-write-lock-file`."""
+    seen = []
+
+    def fake_run(args, repo=None, timeout=None, env_extra=None):
+        seen.append(list(args))
+        return (0, "")
+
+    original = probes.toolchain.run
+    probes.toolchain.run = fake_run
+    try:
+        probes._bridge(Path("."), ["nix", "flake", "check", "--no-build"])
+        probes._bridge(Path("."), ["nix", "eval", "--raw", ".#x"])
+    finally:
+        probes.toolchain.run = original
+
+    assert len(seen) == 2, seen
+    for args in seen:
+        assert "--no-write-lock-file" in args, f"lock write not forbidden: {args}"
+    # the flag must follow the SUBCOMMAND, or nix calls it unrecognised
+    assert seen[0][:4] == ["nix", "flake", "check", "--no-write-lock-file"], seen[0]
+    assert seen[1][:3] == ["nix", "eval", "--no-write-lock-file"], seen[1]
+
+
+def test_bridge_leaves_other_commands_alone():
+    """Non-nix commands are passed through untouched."""
+    seen = []
+
+    def fake_run(args, repo=None, timeout=None, env_extra=None):
+        seen.append(list(args))
+        return (0, "")
+
+    original = probes.toolchain.run
+    probes.toolchain.run = fake_run
+    try:
+        probes._bridge(Path("."), ["statix", "check", ".", "-o", "json"])
+        probes._bridge(Path("."), ["nix-instantiate", "--parse", "a.nix"])
+    finally:
+        probes.toolchain.run = original
+
+    assert seen[0] == ["statix", "check", ".", "-o", "json"], seen[0]
+    assert seen[1] == ["nix-instantiate", "--parse", "a.nix"], seen[1]
+    for args in seen:
+        assert "--no-write-lock-file" not in args, args
+
+
 def main() -> int:
     tests = [(n, f) for n, f in sorted(globals().items())
              if n.startswith("test_") and callable(f)]
