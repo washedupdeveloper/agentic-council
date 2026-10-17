@@ -18,6 +18,18 @@ All notable changes to this project. Format follows
   history, the other a record of a moment, and both are supposed to name versions that are
   no longer current.
 
+### Fixed
+
+- **`council setup skill --check` no longer reports bytecode as drift.** The copier deletes
+  `__pycache__` and `.pytest_cache` after a write, so those files can never be "in sync" —
+  yet in check mode the cleanup was skipped and every one of them was printed as `EXTRA` and
+  set the drift flag. The consequence was that a deployment went permanently red the moment
+  anyone verified it the documented way, by running its suite in place: 40 `.pyc` files from
+  one pytest run were enough to make the gate fail on a tree that was byte-for-byte correct.
+  `find_files` now skips host caches in both modes, which covers the comparison and the
+  golden copy. A genuinely stray file is still reported, and both behaviours are pinned by
+  tests.
+
 ## [1.5.2] — 2026-10-17
 
 ### Changed

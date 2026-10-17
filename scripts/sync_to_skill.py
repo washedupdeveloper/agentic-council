@@ -121,14 +121,28 @@ def lf_bytes(data: bytes) -> bytes:
                     for line in lines)
 
 
+# Host-specific caches, never content. The copier deletes these after a write, so
+# they can never be "in sync": in CHECK mode every one of them was reported EXTRA
+# and set DRIFT, which made `--check` permanently red after the documented way of
+# verifying a deployment -- running its suite in place. 40 `.pyc` files from one
+# pytest run were enough. Filtering here covers both the comparison and the golden
+# copy, because both walk through find_files.
+_CACHE_DIRS = {"__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache"}
+_CACHE_SUFFIXES = (".pyc", ".pyo")
+
+
 def find_files(root: str) -> list[str]:
-    """Every file under root, like `find root -type f`: readdir order, pre-order."""
+    """Every content file under root: readdir order, pre-order, caches excluded."""
     found: list[str] = []
     with os.scandir(root) as entries:
         for entry in entries:
             if entry.is_dir(follow_symlinks=False):
+                if entry.name in _CACHE_DIRS:
+                    continue
                 found.extend(find_files(entry.path))
             elif entry.is_file(follow_symlinks=False):
+                if entry.name.endswith(_CACHE_SUFFIXES):
+                    continue
                 found.append(entry.path)
     return found
 
