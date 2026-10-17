@@ -62,6 +62,9 @@ A verb whose module parses arguments passes `--help` through to that module's ow
 | The framework tree | `packages.framework` | The **shipped** tree — runtime modules, `bots/`, `skills/` — and nothing else. `packages.dev-framework` is the same tree plus the dev verbs and the suite. |
 | What ships | `runtimeModules` / `devModules` (`nix/builders.nix`) | The shipping manifest, asserted against the CLI's own verb table by `checks.commands`. |
 | The command surface | `apps.council` | The pinned toolchain is on PATH at exec time, so no devshell and no PATH setup. |
+| The installable | `packages.review-council` | What `home.packages` takes. Its `bin/` carries the dispatcher **and** the toolchain, so one path is enough. `packages.default` is **not** this — it is the toolchain. |
+| The deployable skill | `packages.skill` | `council-skill`, ready to drop into a skills directory without running the module. |
+| The home-manager module | `homeManagerModules.default` | `programs.council.*`; deploys the skill and puts the package on PATH. |
 | The container image | `packages.container` | An OCI image, so Windows and docker-only users need nothing else. |
 | The gates | `checks.*` | `nix flake check` is the one command a contributor runs before pushing. Three tiers: eval (`module`, `flake` — a value in the configuration), build (`skill-layout`, `tests`, `golden`, `probes`, `commands`, … — the artifact a builder produced), and e2e (`.#vm-test` — a running machine). |
 | The formatter | `formatter` | `nix fmt` uses the pinned `nixfmt`, so a caller never needs their own. |
