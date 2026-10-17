@@ -286,23 +286,27 @@ def test_bump_is_devshell_only():
 # `pyproject.toml` instead of the repository the user was standing in.
 
 def test_find_root_prefers_the_directory_you_stand_in():
-    with tempfile.TemporaryDirectory() as td:
-        root = Path(td)
-        _tree(root, changelog=GOOD)
-        (root / "sub").mkdir()
-        saved = Path.cwd()
-        os.chdir(root / "sub")
-        try:
-            assert version.find_root() == root
-        finally:
-            os.chdir(saved)
+    """No argument means the repository the command was run in."""
+    assert os.path.samefile(version.find_root(), REPO)
+
+
+def test_find_root_walks_up_from_a_subdirectory():
+    """A command run in `docs/` is still about the repository."""
+    saved = Path.cwd()
+    os.chdir(REPO / "docs")
+    try:
+        assert os.path.samefile(version.find_root(), REPO)
+    finally:
+        os.chdir(saved)
 
 
 def test_find_root_honours_an_explicit_repo():
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)
         _tree(root, changelog=GOOD)
-        assert version.find_root(str(root)) == root
+        # samefile, not ==: macOS resolves /var to /private/var and Windows can
+        # return a short path, so two names for one directory must compare equal.
+        assert os.path.samefile(version.find_root(str(root)), root)
 
 
 def test_find_root_refuses_a_directory_that_is_not_a_repository():
