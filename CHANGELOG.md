@@ -6,6 +6,18 @@ All notable changes to this project. Format follows
 
 ## [Unreleased]
 
+### Added
+
+- **A check for prose that names a superseded release.** `docs/MILESTONES.md` advertised
+  `Current release **v1.5.0**` while `pyproject.toml`, `CHANGELOG.md` and the tags all agreed
+  on `1.5.2`. Nothing caught it: `council version check` compares `pyproject.toml` against
+  the changelog and against tags — every source of truth except the prose that repeats the
+  answer to a reader. That is the failure this repository's own rule predicts, so the rule is
+  now measured: any `Current release vX.Y.Z` in `README.md` or `docs/**/*.md` must equal
+  `pyproject.toml`'s version. `CHANGELOG.md` and `runs/` are out of scope by design — one is
+  history, the other a record of a moment, and both are supposed to name versions that are
+  no longer current.
+
 ## [1.5.2] — 2026-10-17
 
 ### Changed

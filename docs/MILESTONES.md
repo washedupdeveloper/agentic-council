@@ -11,7 +11,7 @@ round's goals and judges the round against them; the harness convenes the review
 **M8.5** (the ablation that decided the architecture), **M9**. Two parameters that once read ⚠️ are
 now **closed as decisions with their uncertainty measured**: the **threshold** is a policy choice
 inside a proven 8.60-point equivalence band, and the **`α_t` weights** are a policy choice measured
-to flip no verdict. Current release **v1.5.0**. The pass threshold
+to flip no verdict. Current release **v1.5.2**. The pass threshold
 is read from `scripts/calibration.json` (see `docs/CALIBRATION.md`), so the number the loop enforces
 and the number the calibration recommends cannot drift.
 
