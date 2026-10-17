@@ -171,7 +171,8 @@ applies unchanged.
 
 ## Action versions
 
-Pinned to a **major tag** (`actions/checkout@v7`), not a commit SHA.
+Pinned to a **full commit SHA**, with the release version in a trailing comment:
+`actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1`.
 
 | | Major tag | Commit SHA |
 |---|---|---|
@@ -179,9 +180,26 @@ Pinned to a **major tag** (`actions/checkout@v7`), not a commit SHA.
 | Immune to a retagged or compromised release | no | yes |
 | Maintenance | none | a bump every time upstream releases |
 
-For a repo with one maintainer and no third-party contributors the major tag wins: a
-compromised action release is rare, an unpatched action is constant. **Revisit this the
-moment the repo gains a collaborator or goes public.**
+**This section used to argue the other way, and its own condition for revisiting has
+fired.** The old text said a major tag wins "for a repo with one maintainer and no
+third-party contributors", and ended "revisit the moment the repo gains a collaborator or
+goes public". The repository is public, its releases are downloadable anonymously, and
+anyone can fork it — so the premise is gone.
+
+What settled it was measurement, not preference: `zizmor` (now a probe, see
+`docs/TOOLCHAIN.md`) reported **5 high-severity `unpinned-uses` findings** against this
+repository's own workflows — the same defect this framework raises when it reviews
+someone else's. A tag is a moving reference: `@v7` runs whatever that tag points at when
+the job starts, so an upstream force-push or account compromise executes inside this
+repository's runner.
+
+The maintenance cost is real and is the price: a bump when upstream releases. `zizmor`
+reports a stale-but-pinned action as nothing, so the pin is a standing obligation rather
+than a one-off edit. `persist-credentials: false` accompanies it — without it the
+checkout token stays in `.git/config`, where a later step can read it (`artipacked`).
+
+Measured after the change: `council probes zizmor --repo .` reports **0 findings over 2
+files**.
 
 ### Node 20 → 24 (2026-10)
 

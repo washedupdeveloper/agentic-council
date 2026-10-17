@@ -6,6 +6,27 @@ All notable changes to this project. Format follows
 
 ## [Unreleased]
 
+## [1.4.1] — 2026-10-17
+
+### Fixed
+
+- **This repository's own workflows had 5 high-severity unpinned actions.** Adding
+  `zizmor` immediately reported them against `ci.yml` and `image.yml` —
+  `actions/checkout@v7`, `actions/setup-python@v7`, `cachix/install-nix-action@v31` — the
+  same defect the framework raises when it reviews someone else's workflows. Every action
+  is now pinned to a full commit SHA with the version in a comment, and each checkout sets
+  `persist-credentials: false` so the token does not stay in `.git/config` for a later
+  step to read.
+
+  `docs/CI.md` had argued the other way, and its own condition for revisiting had fired:
+  the old text justified major tags "for a repo with one maintainer and no third-party
+  contributors" and said to revisit "the moment the repo gains a collaborator or goes
+  public". The repository is public and its releases are downloadable anonymously. The
+  section now records that reversal, the measurement that settled it, and the standing
+  cost — a pin is an obligation to bump, not a one-off edit.
+
+  Measured after the change: `council probes zizmor --repo .` reports **0 findings over 2
+  files**.
 ## [1.4.0] — 2026-10-17
 
 ### Added
