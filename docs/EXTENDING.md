@@ -172,16 +172,36 @@ keep it short and unique.
 - `WEIGHTS["accessibility"]` — the aggregate weight. **`WEIGHTS` must sum to 1.0**;
   adding a dimension means rebalancing the others, not appending.
 
-### 4. Reinstall, so the profile carries the new rubric
+### 4. Register the rubric as a core skill, then reinstall
+
+The installer does **not** glob the rubric directory. It installs an explicit list —
+`CORE_SKILLS["reviewer"]` in `scripts/council_config.py`, or `core_skills` under
+`[bots.council-generalist]` in `review-council.toml`, which overrides it. Add your
+rubric name there:
+
+```python
+CORE_SKILLS: Dict[str, tuple] = {
+    "reviewer": (
+        "reviewer-accessibility",   # <- the new one
+        "reviewer-architecture",
+        ...
+    ),
+}
+```
 
 ```bash
 nix run .#council -- setup bots
 ```
 
-The installer globs `reviewer-*/SKILL.md`, so it picks the rubric up with no edit — and
-**prunes** a rubric the repo no longer has, because a stale one is worse than an absent
-one: the reviewer would keep working that dimension while the merge silently dropped
-its findings.
+This step is the one that fails silently if you skip it. The rubric file exists, the
+dimension is registered in the loop and the gate, the round fans out to it — and the
+reviewer is never given the rubric, so it answers with no criteria and reports
+nothing. The run looks quiet rather than broken. `tests/test_config.py` asserts the
+two lists agree, so a dimension without its core skill fails the suite instead.
+
+The installer also **prunes** a rubric the repo no longer has, because a stale one is
+worse than an absent one: the reviewer would keep working that dimension while the
+merge silently dropped its findings.
 
 ### 5. Expect the weights to matter
 

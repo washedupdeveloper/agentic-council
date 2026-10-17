@@ -137,10 +137,31 @@ def register_in_gate(fw: Path) -> None:
     path.write_text(text, encoding="utf-8")
 
 
+def register_as_core_skill(fw: Path) -> None:
+    """Step 4: name the rubric in CORE_SKILLS, which is what the installer reads.
+
+    Not a glob. `EXTENDING.md` claimed the installer globbed `reviewer-*/SKILL.md`
+    and needed no edit; it does not, and a dimension registered everywhere else but
+    missing here is installed WITHOUT its rubric -- the reviewer then answers with
+    no criteria and reports nothing, which looks like a quiet review rather than a
+    misconfiguration. This step is in the test precisely because it is the one that
+    fails silently.
+    """
+    path = fw / "scripts" / "council_config.py"
+    text = path.read_text(encoding="utf-8")
+    text = insert_after(
+        text,
+        'CORE_SKILLS: Dict[str, tuple] = {\n    "reviewer": (\n',
+        f'        "{RUBRIC}",\n',
+    )
+    path.write_text(text, encoding="utf-8")
+
+
 def verify(fw: Path) -> None:
     """Step 5's precondition, measured: the tables agree and the weights sum."""
     sys.path.insert(0, str(fw / "scripts"))
-    import council_loop as loop          # noqa: PLC0415 - the edited copy, on purpose
+    import council_config as cfg          # noqa: PLC0415 - the edited copy, on purpose
+    import council_loop as loop          # noqa: PLC0415
     import score_reviews as score        # noqa: PLC0415
 
     problems = []
@@ -157,6 +178,11 @@ def verify(fw: Path) -> None:
     total = sum(score.WEIGHTS.values())
     if abs(total - 1.0) > 1e-9:
         problems.append(f"WEIGHTS sum to {total}, not 1.0")
+
+    if RUBRIC not in cfg.CORE_SKILLS["reviewer"]:
+        problems.append(
+            f"{RUBRIC} is not in CORE_SKILLS['reviewer'], so the installer would "
+            "never put it in the profile and the reviewer would answer with no rubric")
 
     # A dimension in the round but not in WEIGHTS is a KeyError in doctor, so the
     # two tables have to agree exactly rather than merely both mention the new name.
@@ -180,6 +206,7 @@ def main(argv: list[str]) -> int:
     add_rubric(fw)
     register_in_loop(fw)
     register_in_gate(fw)
+    register_as_core_skill(fw)
     verify(fw)
     return 0
 

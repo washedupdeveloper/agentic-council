@@ -1,5 +1,14 @@
 # Clean-baseline evaluation — 2026-10-17
 
+> **CORRECTION (later the same day).** This evaluation ran at `--samples 1`, and that
+> under-samples: the reviewer finds fewer findings per sample, so the density term scores
+> higher and the aggregate is **inflated**. Re-running devshell at the shipped default
+> (`--samples 5`) gave **61.41**, not 89.23 — and it found a **real blocking finding** that
+> one sample missed: `.github/workflows/nix.yml:17` uses `NixOS/nix-installer-action@main`,
+> a moving branch, inside a job holding `permissions: contents: write`. So **devshell was
+> never clean**, and the "three pass" result below is an artifact of the sample count. The
+> table below is kept as the record of what was measured, not as a conclusion.
+
 **Purpose.** The threshold rested on **one** known-good sample — this repository's own
 level-0 rung — so its upper plateau edge was that sample's score. M8 records that as
 provisional. The question here is whether real, well-regarded repositories support it,
