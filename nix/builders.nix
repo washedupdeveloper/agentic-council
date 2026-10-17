@@ -9,6 +9,14 @@
 # read them — an inventory nothing else consults is part of the toolchain, not part
 # of the flake's output surface.
 #
+# TWO tool lists, and the split is the point:
+#   `toolNames`    the centralised QA toolchain. It ships — devshell, container,
+#                  `nix shell .#review-council` — and carries exactly what a review
+#                  RUNS. See docs/TOOLCHAIN.md for the per-tool verdict.
+#   `devToolNames` contributor DX, devshell only. Nothing in the pipeline reads these,
+#                  so they are not part of the product and each contributor can
+#                  install their own instead.
+#
 # Path literals are relative to THIS file, so they are `../<dir>`: the repo root is
 # one level up.
 {
@@ -21,15 +29,8 @@ let
     "nix" # the CLI itself: `nix flake check`, `nix eval`
     "nixfmt" # RFC 166 formatter. nixpkgs-fmt is DEPRECATED (RFC 101).
     "nixfmt-tree" # treefmt preconfigured for nixfmt; the repo `formatter`
-    "treefmt" # `treefmt --ci` — aggregate formatter gate
     "statix" # nix lints; `statix check . -o json`
     "deadnix" # dead nix code; `deadnix --output-format json --fail .`
-    "nixd" # LSP, option-system aware
-    "nil" # LSP + `nil diagnostics`
-    "nix-tree" # closure browser (--dot, --diff)
-    "nix-diff" # derivation-level diff
-    "nix-fast-build" # parallel eval+build of `checks`
-    "nix-du" # GC-root disk attribution
     # SHIPPED BUT NOT PROBED — on demand only. `vulnix` is here so closure CVEs can be
     # asked when that is the question, and it is absent from scripts/probes.py so a
     # routine review never pays for it: it fetches NVD data over the network (minutes,
@@ -40,19 +41,15 @@ let
     "vulnix" # store / CVE scanner — on demand, never probed
 
     # --- secret + supply chain ---
-    "gitleaks" # secret scanning (wired as a pre-commit hook upstream)
+    # Entropy detection plus a few hundred rules, over the WORKING TREE. Pairs with
+    # `secret-grep`, this framework's own dependency-free regex probe: gitleaks is
+    # stronger, secret-grep still runs when the toolchain is absent.
+    "gitleaks" # secret scanning
     # Dependency CVEs for every ecosystem the framework covers: PyPI, npm,
     # cargo, Go, Ruby, Composer. It replaces pip-audit, npm-audit and
     # cargo-audit with ONE binary, and unlike them it has no runtime
     # dependency of its own -- see the note where pip-audit used to be.
     "osv-scanner"
-
-    # --- density denominators (findings per KLOC) ---
-    "tokei" # `tokei -t Nix --output json`
-    "cloc" # `cloc --json --include-lang Nix`
-
-    # --- JSON glue ---
-    "jq"
 
     # --- Python (DECISIONS #3: Python first-class) ---
     "ruff" # lint + format
@@ -71,8 +68,9 @@ let
     # same job for every ecosystem with no runtime dependency to get wrong.
 
     # --- general ---
+    # The `shell` stack's scored tool. It had no probe until the audit, so a shell
+    # repository had an expected tool that could never run.
     "shellcheck" # shell lint
-    "yamllint" # yaml lint
 
     # DELIBERATELY EXCLUDED — semgrep.
     #   (a) It is not in research/nix-tooling.md §0. The regulations put Nix
@@ -217,6 +215,34 @@ let
   # `setup skill` is not a review, and it DOES need the flake: it installs it
   # into the deployment so the installed skill can build its own toolchain.
   # `flakeFiles` below is how it gets there from a tree that has none.
+  # ── Contributor DX: on PATH in the devshell, and nowhere else ────────────
+  # No probe runs these, the gate does not score them, and the container does not
+  # carry them. They are what a human working ON the framework wants: an editor that
+  # understands the option system, a way to look inside a closure, and the density
+  # meters for reading a report by hand. Keeping them out of `toolNames` is what makes
+  # the shipped toolchain the QA set rather than everything anyone has ever used, and
+  # it lets a contributor install their own editor tooling without colliding with it.
+  devToolNames = [
+    "nixd" # LSP, option-system aware
+    "nil" # LSP + `nil diagnostics`
+    "nix-tree" # closure browser (--dot, --diff)
+    "nix-diff" # derivation-level diff
+    "nix-fast-build" # parallel eval+build of `checks`
+    "nix-du" # GC-root disk attribution
+    "tokei" # density meter: `tokei -t Nix --output json`
+    "cloc" # density meter: `cloc --json --include-lang Nix`
+    "jq" # JSON glue, for reading a report by hand
+  ];
+
+  # The devshell's extra tooling. A `symlinkJoin` of whatever resolves, so a tool
+  # missing on one platform degrades to its absence rather than failing the shell.
+  mkDevTools =
+    pkgs:
+    pkgs.symlinkJoin {
+      name = "review-council-dev-tools";
+      paths = builtins.filter (p: p != null) (map (resolveTool pkgs) devToolNames);
+    };
+
   mkFramework =
     pkgs: audience:
     let
@@ -871,10 +897,12 @@ in
 {
   inherit
     toolNames
+    devToolNames
     runtimeModules
     devModules
     resolveTool
     mkToolchain
+    mkDevTools
     mkActivate
     mkFramework
     mkSkill

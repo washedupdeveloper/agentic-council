@@ -72,8 +72,13 @@ signal-to-noise term.
 nixfmt --check <files>          # or: treefmt --ci --no-cache  (project formatter — check which)
 statix check . -o json          # JSON (requires a --all-features build)
 deadnix --output-format json --fail .
-tokei -t Nix --output json | jq .Nix.code    # KLOC denominator (or cloc --json --include-lang Nix)
+tokei -t Nix --output json | jq .Nix.code    # devshell: read a density by hand
 ```
+
+> **The KLOC denominator is computed by the framework, not by `tokei` or `cloc`.** Both
+> are devshell-only conveniences for reading a report by hand; the ratio a finding is
+> normalised against comes from the framework's own source-suffix count, so it does not
+> depend on either tool being present.
 
 A finding that names a `statix`/`deadnix` rule id is worth more than an opinion.
 Formatting is a **separate binary gate**, not folded into density.

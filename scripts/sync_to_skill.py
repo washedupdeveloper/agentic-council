@@ -333,9 +333,9 @@ def main(argv: list[str] | None = None) -> int:
               f"  repository, or through the council's own launcher.", file=sys.stderr)
         return 2
     for entry in sort_names([n for n in os.listdir(nix_dir) if not n.startswith(".")]):
-        src = nix_dir / entry
-        if src.is_file():
-            place(str(src), f"{DEST}/nix/{entry}")
+        mod = nix_dir / entry
+        if mod.is_file():
+            place(str(mod), f"{DEST}/nix/{entry}")
 
     # Without these the gate falls back to the uncalibrated count-based curve.
     for name in ("calibration.json", "eval-baseline.json"):

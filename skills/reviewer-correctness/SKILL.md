@@ -81,6 +81,10 @@ nix-fast-build --flake .#checks --result-format json --result-file out.json  # p
 nixfmt --check <files>
 ```
 
+> **Devshell only:** `nix-fast-build` is a contributor accelerator, not part of the
+> shipped toolchain. The per-check results it summarises come from `nix flake check`,
+> which does ship.
+
 Quote the real output. **Never assert that something "should evaluate"** — if you
 did not run it, mark the claim `AMBIGUOUS`.
 

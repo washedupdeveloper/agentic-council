@@ -275,10 +275,23 @@ council setup toolchain --which ruff
 and the devshell exports it — so nothing builds the toolchain at run time.
 
 The tool list is `research/nix-tooling.md` §0 plus the Python toolchain DECISIONS #3
-requires. Current set (24 tools): `nix`, `nixfmt`, `nixfmt-tree`, `treefmt`, `statix`,
-`deadnix`, `nixd`, `nil`, `nix-tree`, `nix-diff`, `nix-fast-build`, `nix-du`, `vulnix`,
-`gitleaks`, `osv-scanner`, `tokei`, `cloc`, `jq`, `ruff`, `mypy`, `pytest`, `bandit`,
-`shellcheck`, `yamllint`.
+requires. **Two lists, and the split is the point** — see `docs/TOOLCHAIN.md` for the
+per-tool verdict.
+
+**The QA toolchain (13 tools, ships in the container and the app):** `nix`, `nixfmt`,
+`nixfmt-tree`, `statix`, `deadnix`, `vulnix` (on demand), `gitleaks`, `osv-scanner`,
+`ruff`, `mypy`, `pytest`, `bandit`, `shellcheck`.
+
+A tool is in this list only if it is scored by the gate (`score_reviews.expected_tools`),
+run by a probe (`scripts/probes.py`), or the mechanism that provides an output (the
+`formatter`). That is the centralised quality assurance: it does not depend on what any
+individual has installed.
+
+**Contributor DX (9 tools, devshell only):** `nixd`, `nil`, `nix-tree`, `nix-diff`,
+`nix-fast-build`, `nix-du`, `tokei`, `cloc`, `jq`. A language server, a closure browser
+and the density meters. No probe runs them and the gate does not score them, so they are
+not part of the product — and a contributor can install their own editor tooling without
+it colliding with the framework's.
 
 **`vulnix` ships but is not probed — on demand only.** It is in the toolchain so
 closure CVEs can be asked when that is the question, and absent from `probes.py` so no

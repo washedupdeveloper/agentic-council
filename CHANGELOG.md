@@ -707,6 +707,67 @@ tooling. Its absence would have left `/council` undeployable. It is now
   launchers moved into `nix/builders.nix`, and a test pinned to one filename fails on the
   next move rather than on a regression.
 
+### Added
+
+- **`gitleaks` is probed and scored.** It was in `doctor.py`'s CATALOG for "secret
+  scanning (security)" and named by that file's own comment, but no probe existed — so
+  the CATALOG described a signal the framework never produced. The probe reads the
+  WORKING TREE (`--no-git`), not git history, and the report's `Secret` field never
+  reaches a finding: only the rule, the file and the line are used, and `--redact` keeps
+  the value out of stdout too. A probe that leaked the credential it found into a review
+  report would be the exact failure it exists to catch. `gitleaks` is now scored for
+  every stack's security dimension, alongside the framework's own dependency-free
+  `secret-grep` — they fail differently, so both are expected.
+- **`shellcheck` is probed.** It was SCORED for the `shell` stack with no probe behind
+  it, so a repository containing shell had an expected tool that could never run and beta
+  could not reach 1.0 for a dimension the framework claimed to cover. The file list is
+  capped and passed on the command line, because shellcheck has no file-list option and
+  an unbounded list would hit `ARG_MAX` on a large repository.
+- **`score_reviews.EXTERNAL_TOOLS`** declares which expected-tool names are binaries the
+  toolchain must ship; every other name is a probe implemented inside `probes.py`. Four
+  tests pin the contract, including that every expected name for a stack we ship has a
+  probe — derived from `STACK_TOOLS`, not a hand-written list. The previous hand-written
+  list is exactly how the `shellcheck` gap survived.
+
+### Changed
+
+- **The toolchain is split into two lists.** `toolNames` is the centralised QA toolchain
+  that ships (devshell, container, `nix shell .#review-council`), and a tool is in it only
+  if the gate scores it, a probe runs it, or it provides an output. `devToolNames` is
+  contributor DX — the LSPs, the closure browsers and the density meters — and lands in
+  the devshell only, so the product carries only what a review runs and a contributor can
+  install their own editor tooling without colliding with the framework's. Measured: the
+  QA toolchain closure is **919.8 MB / 180 store paths**, down from 983.3 MB / 212.
+- **The rubrics that named a devshell-only tool now say so** (`nix-tree`, `nix-diff`,
+  `nix-du` in performance; `nix-fast-build` in correctness; `tokei`, `cloc` in
+  readability), so a reviewer in the container is not sent looking for a binary that is
+  not there.
+- **`docs/TOOLCHAIN.md`** records the per-tool verdict: 13 necessary, 9 DX, and the two
+  gaps this change closes.
+- **`docs/AUTONOMY.md`** carries both lists and the rule that decides membership.
+
+### Fixed
+
+- **The readability rubric's KLOC claim was wrong.** It named `tokei`/`cloc` as "the KLOC
+  denominator"; the denominator is computed by `probes.py` over its own source-suffix set
+  and neither tool is involved. The line now says so, and the two are devshell
+  conveniences for reading a report by hand.
+- **`checks.toolchain-built` called bare `gitleaks`/`shellcheck`** in a derivation with no
+  `nativeBuildInputs`, so nothing was on PATH. Every other line in that check spells
+  `${tc}/bin/...` out; the new ones do too.
+- **`checks.probes` had no shell file in its fixture**, so `shellcheck` correctly reported
+  "no shell files in the tree" and never ran. That is the check working — it caught the
+  fixture gap rather than the probe passing vacuously.
+
+### Removed
+
+- **`treefmt`** — the `formatter` execs `${nixfmt-tree}/bin/treefmt`, so the standalone
+  package was a second copy of the same binary. Measured: removing it frees 0.0 MB.
+- **`yamllint`** — nothing used it. It was tested as a flake-check candidate against the
+  repo's own workflows and fails on them (line-length errors), so making it pass would
+  have meant adding a config file to justify a linter nothing needs. For linting the
+  workflows the right tool is `actionlint`, which CI already uses.
+
 ## [1.0.0] — 2026-10-11
 
 First release. The framework reviews a git diff, scores it with a hybrid of

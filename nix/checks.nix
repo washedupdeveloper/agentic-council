@@ -200,9 +200,16 @@ in
           # The toolchain must WORK, not merely exist: `python3 -m pytest` needs
           # pytest's runtime deps importable, which a bare symlinkJoin lacks.
           toolchain-built = pkgs.runCommand "check-toolchain" { } ''
-            for b in statix deadnix nixfmt python3 pytest; do
+            # Every tool the gate scores must not merely exist but RUN. The two
+            # added by the toolchain audit are here so a broken gitleaks or
+            # shellcheck fails the check instead of silently capping beta.
+            for b in statix deadnix nixfmt python3 pytest gitleaks shellcheck; do
               test -x ${tc}/bin/$b
             done
+            # Explicit paths: this derivation has no nativeBuildInputs, so nothing
+            # is on PATH -- which is why every other line here spells ${tc}/bin out.
+            ${tc}/bin/gitleaks version >/dev/null
+            ${tc}/bin/shellcheck --version >/dev/null
             ${tc}/bin/python3 -c 'import pytest, pluggy'
             touch $out
           '';
@@ -224,6 +231,9 @@ in
                 mkdir -p fixture
                 printf 'def add(a, b):\n    return a + b\n' > fixture/main.py
                 printf '{ }\n' > fixture/flake.nix
+                # shellcheck reports "no shell files in the tree" without one, so the
+                # fixture needs a .sh file for that probe to reach the toolchain at all.
+                printf '#!/bin/sh\necho hi\n' > fixture/run.sh
 
                 ${app}/bin/council probes --all --repo "$PWD/fixture" > probes.json
 
@@ -242,8 +252,9 @@ in
                 # assert something untrue about a synthetic fixture.
                 required = {
                     "bandit", "bash-n", "complexity", "deadnix", "declared-rules",
-                    "dep-graph", "flake-check", "mypy", "nix-eval", "nixfmt",
-                    "osv-scanner", "py-compile", "ruff", "secret-grep", "statix",
+                    "dep-graph", "flake-check", "gitleaks", "mypy", "nix-eval",
+                    "nixfmt", "osv-scanner", "py-compile", "ruff", "secret-grep",
+                    "shellcheck", "statix",
                 }
                 missing = sorted(required - ran)
                 if missing:
@@ -385,7 +396,13 @@ in
         default = pkgs.mkShell {
           name = "review-council";
           packages = [
+            # The QA toolchain — the same set that ships in the container, so the
+            # devshell cannot pass where the product would fail.
             (builders.mkToolchain pkgs)
+            # Contributor DX: the LSPs, the closure browsers and the density meters.
+            # Devshell-only by design, so the product carries only what a review runs
+            # and a contributor is free to install their own editor tooling instead.
+            (builders.mkDevTools pkgs)
             (builders.mkActivate pkgs)
             # The FULL verb set, dev verbs included. This is the only surface with
             # `council ablate` / `council calibrate` / `council corpus`, because
@@ -395,7 +412,8 @@ in
           shellHook = ''
             echo "review-council devshell — pinned toolchain on PATH"
             echo "  nixpkgs: ${nixpkgsRev}"
-            echo "  tools:   $(command -v statix >/dev/null && echo statix) $(command -v deadnix >/dev/null && echo deadnix) $(command -v nixfmt >/dev/null && echo nixfmt) $(command -v ruff >/dev/null && echo ruff) $(command -v gitleaks >/dev/null && echo gitleaks)"
+            echo "  qa:      $(command -v statix >/dev/null && echo statix) $(command -v deadnix >/dev/null && echo deadnix) $(command -v nixfmt >/dev/null && echo nixfmt) $(command -v ruff >/dev/null && echo ruff) $(command -v gitleaks >/dev/null && echo gitleaks) $(command -v shellcheck >/dev/null && echo shellcheck)"
+            echo "  dx:      $(command -v nixd >/dev/null && echo nixd) $(command -v nil >/dev/null && echo nil) $(command -v nix-tree >/dev/null && echo nix-tree) $(command -v tokei >/dev/null && echo tokei) $(command -v jq >/dev/null && echo jq)"
             echo "  run:     council --help   (every verb; the shipped app has the user ones)"
           '';
         };
