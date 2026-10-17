@@ -6,6 +6,22 @@ All notable changes to this project. Format follows
 
 ## [Unreleased]
 
+## [1.6.1] — 2026-10-18
+
+### Fixed
+
+- **Two tests compared OS-native paths against POSIX literals, so they failed on
+  Windows and only on Windows.** `test_a_stale_prose_claim_is_caught` built its claim list
+  with `str(path.relative_to(root))`, which yields `docs\MILESTONES.md` there, and
+  `test_find_files_skips_host_caches` used `os.path.relpath()` raw — both asserted against
+  `docs/MILESTONES.md` and `scripts/real.py`. Ubuntu, macOS and the nix gate passed; the
+  Windows job failed with two annotations.
+
+  The first is fixed in the production path rather than the assertion: `version check`
+  reports relative paths with `as_posix()`, so a Windows checkout prints
+  `docs/MILESTONES.md` like every other platform instead of `docs\MILESTONES.md`. The
+  second normalises in the test, because it asserts *which* files were found, not how the
+  platform spells a path.
 ## [1.6.0] — 2026-10-18
 
 ### Changed

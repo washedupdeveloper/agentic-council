@@ -143,7 +143,11 @@ def _prose_version_claims(root: Path = REPO) -> list[tuple[str, str]]:
                 continue
             text = path.read_text(encoding="utf-8", errors="replace")
             for match in _PROSE_VERSION.finditer(text):
-                claims.append((str(path.relative_to(root)), match.group(1)))
+                # as_posix(), not str(): these paths are compared against POSIX
+                # literals and printed, so a Windows checkout must not report
+                # `docs\MILESTONES.md` where every other platform says
+                # `docs/MILESTONES.md`.
+                claims.append((path.relative_to(root).as_posix(), match.group(1)))
     return claims
 
 
