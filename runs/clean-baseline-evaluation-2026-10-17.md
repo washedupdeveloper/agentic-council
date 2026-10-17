@@ -28,9 +28,22 @@ council review <repo> --scope whole-repo --samples 1 \
 One sample, one round: the cheapest run that still exercises the whole pipeline —
 goals → reviewer → merge → gate. Advisory, so nothing was edited.
 
-**Cost, measured.** 18–24 minutes per repository, dominated by agent turns rather than
-repository size: flake-utils at 0.62 KLOC took the same wall clock as treefmt-nix at
-7.44 KLOC. Five repos, roughly 1h45m of compute — more than the hour estimated.
+**Cost, measured — and it does not track repository size.** Exact elapsed times per run:
+
+| repo | kloc | elapsed |
+|---|---:|---:|
+| clan-infra | 6.85 | 28.6 min |
+| zero-to-nix | 1.98 | 20.8 min |
+| flake-utils | 0.62 | 17.9 min |
+| devshell | 1.13 | 17.6 min |
+| treefmt-nix | 7.44 | 12.7 min |
+| **total** | | **97.6 min (1.63 h)**, mean 19.5 |
+
+The **smallest** repository (flake-utils, 0.62 KLOC) took **1.4× longer** than the
+**largest** (treefmt-nix, 7.44 KLOC) — 17.9 against 12.7 minutes. Cost is dominated by
+agent turns and how many findings there are to describe, not by how much code there is.
+The 5.6× spread (12.7–28.6 min) is why the estimate of "about an hour" was wrong: the
+real figure is 1.63 hours for five repositories.
 
 ## Result
 
@@ -44,6 +57,11 @@ repository size: flake-utils at 0.62 KLOC took the same wall clock as treefmt-ni
 
 **Three of five pass 87.1141 unchanged.** The two that fail do so for verifiable reasons,
 not on a scoring artefact.
+
+The loop's own `outcome` agrees with the gate in every case: three `SATISFIED` (round cap
+reached with the minimum met), two `ESCALATE` — and both escalations give the reason
+`advisory mode: report only, no fixes applied`, which is the loop correctly declining to
+edit code it was told not to edit rather than a separate judgement.
 
 ### flake-utils: 60.86, two blocking findings
 
