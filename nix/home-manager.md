@@ -72,11 +72,19 @@ the resulting profile credentials to your secret store rather than to this modul
 ## Verifying the module without a switch
 
 `nix flake check` knows a fixed set of output names and silently skips the rest, so
-`homeManagerModules` would never be evaluated by it. `checks.module-evaluates` evaluates
-the module against a stub for the home-manager surface it touches and asserts that both
-modes produce the setting they promise:
+`homeManagerModules` would never be evaluated by it. `checks.module` evaluates the
+module against a stub for the home-manager surface it touches and asserts, by name,
+what each mode produces: which option gets the skill path, that the other one stays
+empty, the defaults, and that `external-dirs` without the Hermes module is refused
+with a message naming the way out.
 
 ```console
-$ nix build .#checks.x86_64-linux.module-evaluates
+$ nix build .#checks.x86_64-linux.module
+$ nix build .#checks.x86_64-linux.flake
 $ nix build .#checks.x86_64-linux.skill-layout
 ```
+
+`checks.flake` is the other half of the eval tier: every declared system has the
+packages, the app, the formatter and a non-empty set of checks, and the only
+outputs `nix flake check` cannot see are the two module sets it is this repo's job
+to evaluate.

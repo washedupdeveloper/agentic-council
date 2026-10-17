@@ -8,6 +8,21 @@ All notable changes to this project. Format follows
 
 ### Added
 
+- **The gate is three tiers, and the eval tier is a real one.** `checks.module` and
+  `checks.flake` assert on the *evaluated* configuration through `lib.runTests`, so a
+  wiring mistake fails in milliseconds and names the test, the expected value and the
+  actual one. They replace `checks.module-evaluates`, which was a `runCommand`
+  asserting two hardcoded counts — an eval assertion paying for a build, and
+  reporting a bare exit code — and which covered neither the library link's path, nor
+  the option defaults, nor the refusal message, nor the disabled case. All four are
+  asserted now, in `nix/tests.nix`.
+
+  The rule, recorded in `nix/tests.nix` and in the `checks.*` row of `docs/NIX.md`:
+  an assertion belongs in the cheapest tier that can make it — **eval** for a value
+  in the configuration, **build** for the artifact a builder produced, **e2e** for
+  what a running machine does. `.#vm-test` stays outside `checks` because it needs
+  `/dev/kvm`.
+
 - **`council setup` is a guided first-run wizard.** It detects Hermes, asks only
   the questions that are actually the user's (the gate, the sample count, the
   autonomy mode, whether any member pins a model), prints a summary of what it is

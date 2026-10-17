@@ -3,12 +3,46 @@
 # Kept out of nix/flake-module.nix so that importing this flake's module gives a
 # consumer the packages and nothing else — the suite is about THIS tree, and running
 # it against someone else's would be meaningless.
-{ lib, inputs, ... }:
+#
+# THREE TIERS, chosen by what the assertion needs (nix/tests.nix explains the rule):
+#   eval  — a value in the evaluated configuration. `nix/tests.nix`, milliseconds.
+#   build — the artifact a builder produced. Below, seconds.
+#   e2e   — what a running machine does. `.#vm-test`, outside `checks` because it
+#           needs /dev/kvm, which a contributor may not have.
+{
+  config,
+  lib,
+  inputs,
+  ...
+}:
 let
   builders = import ./builders.nix {
     inherit lib;
     nixpkgs = inputs.nixpkgs or { };
   };
+
+  # The eval tier, as groups of `lib.runTests` assertions. One check per group so
+  # `--keep-going` reports every failing group rather than stopping at the first.
+  #
+  # `pkgs` is a parameter because the flake-level config carries no package set:
+  # `config.flake` and `config.systems` are read here, and `pkgs` is supplied by
+  # `perSystem` below.
+  evalGroups =
+    pkgs:
+    import ./tests.nix {
+      inherit lib pkgs;
+      inherit (config) flake systems;
+    };
+
+  mkEvalCheck =
+    pkgs: group: tests:
+    let
+      failures = lib.runTests tests;
+    in
+    if failures == [ ] then
+      pkgs.runCommand "check-${group}" { } "touch $out"
+    else
+      lib.debug.throwTestFailures { inherit failures; };
 
   # The devshell banner names the pin, read from this module's own `inputs`.
   nixpkgsRev = inputs.nixpkgs.rev or "unknown";
@@ -43,7 +77,11 @@ in
             rm -rf $out/tests/golden
           '';
         in
-        {
+        # The eval tier first: it costs milliseconds, so a wiring mistake fails
+        # before anything is built. `nix/tests.nix` holds the assertions; the
+        # build tier below is what inspects the artifacts they cannot see.
+        (lib.mapAttrs (mkEvalCheck pkgs) (evalGroups pkgs))
+        // {
           # The declarative path's two artifacts. Without these it is exercised only
           # by a user's switch, which is a late place to find a typo.
           skill-layout = pkgs.runCommand "check-skill-layout" { } ''
@@ -77,77 +115,6 @@ in
               || { echo "the copier shipped in .#skill" >&2; exit 1; }
             touch $out
           '';
-
-          # `nix flake check` knows a fixed set of output names and skips anything
-          # else with a warning, so homeManagerModules would never be evaluated.
-          # Evaluate it against a stub for the home-manager surface it touches, and
-          # assert that BOTH modes produce the setting each one promises.
-          module-evaluates =
-            let
-              stub =
-                { lib, ... }:
-                {
-                  # The attribute set is a whole, not a repeated `options.` prefix:
-                  # statix's W20 flags the repeated-key form, and it is right — the
-                  # dotted form reads as five separate declarations of `options`.
-                  options = {
-                    home = {
-                      # A placeholder from the repo's allowlist, not an invented
-                      # name: the portability test flags any /home/<name> that is
-                      # not a known placeholder, and "stub" was a real hit.
-                      homeDirectory = lib.mkOption {
-                        type = lib.types.str;
-                        default = "/home/user";
-                      };
-                      packages = lib.mkOption {
-                        type = lib.types.listOf lib.types.anything;
-                        default = [ ];
-                      };
-                      file = lib.mkOption {
-                        type = lib.types.attrsOf lib.types.anything;
-                        default = { };
-                      };
-                    };
-                    # home-manager declares `assertions`; the module's mode check
-                    # needs it, and its absence is what this check caught first run.
-                    assertions = lib.mkOption {
-                      type = lib.types.listOf lib.types.anything;
-                      default = [ ];
-                    };
-                    services.hermes-agent.settings.skills.external_dirs = lib.mkOption {
-                      type = lib.types.listOf lib.types.str;
-                      default = [ ];
-                    };
-                  };
-                };
-              evalMode =
-                mode:
-                lib.evalModules {
-                  modules = [
-                    stub
-                    (import ../nix/module.nix)
-                    {
-                      programs = {
-                        council = {
-                          enable = true;
-                          package = pkgs.hello;
-                          skill = builders.mkSkill pkgs;
-                          inherit mode;
-                        };
-                      };
-                    }
-                  ];
-                };
-              dirs = (evalMode "external-dirs").config.services.hermes-agent.settings.skills.external_dirs;
-              linked = (evalMode "library").config.home.file;
-            in
-            pkgs.runCommand "check-module-evaluates" { } ''
-              test ${builtins.toString (builtins.length dirs)} -eq 1 \
-                || { echo "external-dirs set ${builtins.toString (builtins.length dirs)} entries, wanted 1" >&2; exit 1; }
-              test ${builtins.toString (builtins.length (builtins.attrNames linked))} -eq 1 \
-                || { echo "library mode set no home.file entry" >&2; exit 1; }
-              touch $out
-            '';
 
           # §1: formatting is a binary gate, over every Nix file.
           nixfmt = pkgs.runCommand "check-nixfmt" { nativeBuildInputs = [ tc ]; } ''
