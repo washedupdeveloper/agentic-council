@@ -6,6 +6,38 @@ All notable changes to this project. Format follows
 
 ## [Unreleased]
 
+## [1.6.2] — 2026-10-18
+
+### Changed
+
+- **Finding more clean baselines is cheap if you pre-screen, and the population is
+  thinner than expected.** The threshold needs repositories with no blocking findings.
+  Reviewing candidates blind costs ~12 minutes each to learn a fact that is detectable in
+  seconds, because the blocking class is dominated by unpinned or dangerously-triggered
+  Actions and tracked secrets:
+
+  ```bash
+  zizmor --format json .github \
+    | jq '[.[] | select(((.determinations.severity // .severity // "") | ascii_downcase) == "high")] | length'
+  git ls-files | grep -E '\.(tfstate|pem|key)$|^\.env$|^\.env\.|credentials'
+  ```
+
+  Across nine well-regarded Nix repositories, **one** is clean of blocking findings
+  (treefmt-nix) and one more is plausible (flake-compat, which has no workflows at all).
+  Unpinned actions and `pull_request_target` are common in repositories that are otherwise
+  carefully maintained, which is why a threshold derived from "known-good repositories" has
+  almost no clean class to work with. Recorded in
+  `runs/clean-baseline-5-samples-2026-10-18.md`.
+
+### Fixed
+
+- **Three bugs in the pre-screen script, each of which made it report "clean" for every
+  repository.** A pre-screen that returns zero is indistinguishable from one that is
+  broken, and the first version cost a full 12-minute review of a repository that has 11
+  high findings: zizmor emits a **top-level array** (not `{"findings": …}`), its severity
+  values are **capitalised** (`"High"`, so `== "high"` matched nothing), and `^\.env`
+  matched **`.envrc`**, a direnv config. The script now prints the raw severity histogram
+  beside the count, so a zero is evidence rather than silence.
 ## [1.6.1] — 2026-10-18
 
 ### Fixed

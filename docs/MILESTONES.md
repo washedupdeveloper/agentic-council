@@ -13,7 +13,7 @@ the measurement that justifies the state: the **threshold** is *consistent* with
 but not *derived* from them — at the shipped default five of six well-regarded repositories fail on
 real blocking findings, leaving one clean repository, which gives an upper bound and no floor.
 The **`α_t` weights** are closed: a policy choice measured to flip no verdict. Current release
-**v1.6.1**. The pass threshold
+**v1.6.2**. The pass threshold
 is read from `scripts/calibration.json` (see `docs/CALIBRATION.md`), so the number the loop enforces
 and the number the calibration recommends cannot drift.
 

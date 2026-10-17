@@ -84,6 +84,59 @@ a curve steep enough to separate classes — not an absolute-scale rule, and app
 the density term forces clean code to the middle of the scale. The change is reverted
 (`e2b5439`); the reasoning is recorded here so it is not re-attempted.
 
+## How to find more clean baselines without paying for full reviews
+
+The threshold needs repositories with **no blocking findings**, and most well-regarded
+repositories have some. Reviewing candidates blind costs ~12 minutes each to learn a fact
+that is detectable in seconds, because the blocking class is dominated by unpinned or
+dangerously-triggered GitHub Actions and tracked secrets:
+
+```bash
+git clone --depth 1 https://github.com/<owner>/<repo> /tmp/cand
+cd /tmp/cand
+zizmor --format json .github \
+  | jq '[.[] | select(((.determinations.severity // .severity // "") | ascii_downcase) == "high")] | length'
+git ls-files | grep -E '\.(tfstate|pem|key)$|^\.env$|^\.env\.|credentials'
+```
+
+A non-zero count on either means the repository already fails on blocking findings, so a
+full review only confirms it.
+
+**Three bugs in this pre-screen, each of which made it report "clean" for everything.**
+They are recorded because a pre-screen that returns zero is indistinguishable from one
+that is broken, and the first version cost a full 12-minute review of a repository with
+11 high findings:
+
+| bug | symptom | fix |
+|---|---|---|
+| indexed `.findings` | zizmor emits a **top-level array** | index `.[]` |
+| compared `== "high"` | zizmor capitalises severity as **`"High"`** | `ascii_downcase` both sides |
+| `^\.env` | matched **`.envrc`**, a direnv config | anchor to `^\.env$` / `^\.env\.` |
+
+The script now prints the raw severity histogram beside the count, so a zero is evidence
+rather than silence.
+
+Pre-screened candidates, with the histogram as proof:
+
+| repo | nix files | kloc | High | verdict |
+|---|---:|---:|---:|---|
+| edolstra/flake-compat | 5 | 0.5 | 0 | **clean candidate** (no workflows at all) |
+| nix-community/disko | 122 | 11.0 | 7 | fails |
+| nix-community/nix-direnv | 10 | 0.4 | 11 | fails — confirmed by review: **39.80**, blocked on `on: pull_request_target` with `contents: write` and a GitHub App token, no author guard |
+| nix-community/naersk | 56 | 3.1 | 12 | fails |
+
+`Mic92/sops-nix` was **excluded** despite zero high findings: its only "secret" is a GPG
+**test fixture** under `pkgs/sops-install-secrets/test-assets/`, which `gitleaks` would
+very likely raise as a blocking finding — a correct finding against a fixture, which makes
+it useless as either class.
+
+**What this says about the population.** Of nine well-regarded Nix repositories examined,
+**one** is clean of blocking findings (treefmt-nix) and one more is plausible
+(flake-compat). The blocking class is not rare among respected projects: unpinned actions
+and `pull_request_target` are common in repositories that are otherwise carefully
+maintained. That is a finding about the ecosystem, and it is also why a threshold derived
+from "known-good repositories" has almost no clean class to work with.
+
 ## Limits
 
 - **One clean repository.** The upper bound rests on treefmt-nix alone. A second clean repo
