@@ -400,6 +400,64 @@ def hill_density(density: float, dimension: Optional[str] = None,
     return 100.0 / (1.0 + (density / max(d_star, 1e-9)) ** k)
 
 
+def llm_density_reference(calibration: Optional[Dict[str, Any]] = None
+                          ) -> Optional[float]:
+    """The pooled d* for LLM findings density, if it has been calibrated.
+
+    `d*` in the `d_star` table is measured from the PROBES — findings per KLOC as
+    an analyzer reports them. The density term scores the REVIEWER's findings, and
+    the two populations are not the same size: on one 1.13-KLOC repository the
+    probes report a density under 2/KLOC while the reviewer reports 4.4 at one
+    sample and 57 at five. Applying a probe-calibrated `d*` to a reviewer density
+    puts the term at ~1/100 for every real review, which is a penalty for finding
+    things rather than a measure of quality.
+
+    So the LLM half gets its own reference, measured from known-good runs at the
+    sample count the tool actually ships with (`council calibrate --from-runs`).
+    Returns None when that has not been done, and the caller must say so rather
+    than silently borrowing the probe curve.
+    """
+    cal = calibration if calibration is not None else load_calibration()
+    if not cal:
+        return None
+    block = cal.get("llm_density") or {}
+    per_dim = block.get("per_dimension") or {}
+    values = sorted(
+        v["d_star"] for v in per_dim.values()
+        if isinstance(v, dict) and isinstance(v.get("d_star"), (int, float))
+        and v["d_star"] > 0
+    )
+    if values:
+        return values[len(values) // 2]
+    pooled = block.get("d_star")
+    if isinstance(pooled, (int, float)) and pooled > 0:
+        return float(pooled)
+    return None
+
+
+def hill_llm_density(density: float, dimension: Optional[str] = None,
+                     calibration: Optional[Dict[str, Any]] = None
+                     ) -> Tuple[float, bool]:
+    """Density curve for the REVIEWER's findings. Returns (score, calibrated).
+
+    Same Hill shape as `hill_density`, but anchored on a reference measured from
+    reviewer output rather than analyzer output. `calibrated` is False when no
+    such reference exists, in which case the probe curve is used as a fallback
+    AND the caller must report it — a silently wrong anchor is how a clean
+    repository ends up scoring 61.
+    """
+    cal = calibration if calibration is not None else load_calibration()
+    k = HILL_N
+    if cal:
+        k = float(cal.get("halflife_k") or HILL_N)
+    d_star = llm_density_reference(cal)
+    if d_star is None:
+        return hill_density(density, dimension, cal), False
+    if density <= 0:
+        return 100.0, True
+    return 100.0 / (1.0 + (density / max(d_star, 1e-9)) ** k), True
+
+
 def weighted_geometric_mean(pairs: List[Tuple[float, float]]) -> float:
     """Weighted geometric mean of (value, weight); one failing term is not
     diluted by passing ones (FRAMEWORK §6: "weighted geometric mean, so one
@@ -602,9 +660,20 @@ def deterministic_score(review: Dict[str, Any], dimension: str,
     # §3: severity-weighted findings per KLOC, NOT a raw count. A raw count makes
     # a 100-line file with 5 findings score identically to a 10,000-line repo
     # with 5, and makes an `info` note cost as much as a defect.
+    #
+    # The curve is the LLM-population one, NOT `hill_density`: that one is anchored
+    # on probe densities, which are an order of magnitude smaller than a reviewer's
+    # findings density, and using it here made every real review's density term
+    # collapse to ~1/100. See `hill_llm_density`.
     open_findings = weighted_open_findings(review.get("findings"))
     if size_kloc > 0:
-        density_score = hill_density(open_findings / size_kloc)
+        density_score, density_calibrated = hill_llm_density(
+            open_findings / size_kloc, dimension
+        )
+        if not density_calibrated:
+            # Visible in the same channel as "this tool did not run", because that
+            # is what it is: the density term has no measured anchor.
+            missing.append("llm-density-uncalibrated")
     else:
         density_score = hill_curve(float(open_findings))
     det = weighted_geometric_mean([(det, 0.7), (density_score, 0.3)]) if signals else density_score

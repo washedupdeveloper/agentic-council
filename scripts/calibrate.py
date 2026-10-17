@@ -531,6 +531,71 @@ def _scorer() -> Any:
     return module
 
 
+def llm_density_from_runs(run_dirs: List[Path]) -> Dict[str, Any]:
+    """Derive the density anchor for the REVIEWER's findings from known-good runs.
+
+    The `d_star` table is calibrated from probe output. The density term scores
+    reviewer output, and those are different populations: on one 1.13-KLOC repo
+    the probes sit under 2 findings/KLOC while the reviewer reports 4.4 at one
+    sample and 57 at five. Reusing the probe anchor put the term at ~1/100 for
+    every real review, so a clean repository scored 61 and nothing could pass.
+
+    §7 step 2's rule is "d* = the density seen on the known-good baseline", so a
+    known-good density lands mid-scale. This applies that rule to reviewer
+    findings, which is what the term actually scores.
+
+    Takes RUN DIRECTORIES (each a `council review --run-root` output) of
+    repositories considered clean, at the sample count the tool ships with --
+    the anchor is only meaningful at the count it was measured at.
+    """
+    scorer = _scorer()
+    per_dim: Dict[str, List[float]] = {}
+    for run_dir in run_dirs:
+        outcome = run_dir / "outcome.json"
+        if not outcome.exists():
+            raise SystemExit(f"{run_dir} has no outcome.json -- not a run directory")
+        repo = json.loads(outcome.read_text(encoding="utf-8")).get("repo")
+        size = _shared.kloc(Path(repo)) if repo else 0.0
+        if size <= 0:
+            raise SystemExit(
+                f"{run_dir}: cannot measure KLOC for {repo!r}; the density needs it"
+            )
+        # The last round is the one a run's verdict was taken from.
+        rounds = sorted(p for p in run_dir.iterdir() if p.is_dir() and p.name.startswith("round-"))
+        if not rounds:
+            raise SystemExit(f"{run_dir} has no round directories")
+        round_dir = rounds[-1]
+        for dim in scorer.WEIGHTS:
+            f = round_dir / f"{dim}.json"
+            if not f.exists():
+                continue
+            review = json.loads(f.read_text(encoding="utf-8"))
+            weighted = scorer.weighted_open_findings(review.get("findings"))
+            per_dim.setdefault(dim, []).append(weighted / size)
+
+    if not per_dim:
+        raise SystemExit("no dimension files found in the given run directories")
+
+    # d* per dimension = the MEDIAN known-good density across the baselines. The
+    # median, not the mean: one unusually noisy run should not move the anchor
+    # that decides where "clean" sits on the curve.
+    block: Dict[str, Any] = {
+        "source": "reviewer findings on known-good runs",
+        "runs": [str(p) for p in run_dirs],
+        "per_dimension": {},
+    }
+    for dim, values in sorted(per_dim.items()):
+        values = sorted(values)
+        block["per_dimension"][dim] = {
+            "d_star": round(values[len(values) // 2], 4),
+            "n": len(values),
+            "samples": values,
+        }
+    pooled = sorted(v["d_star"] for v in block["per_dimension"].values() if v["d_star"] > 0)
+    block["d_star"] = round(pooled[len(pooled) // 2], 4) if pooled else None
+    return block
+
+
 def profile_of(round_dir: Path, threshold: float) -> Dict[str, float]:
     """The per-dimension scores the gate produces for a round directory."""
     scorer = _scorer()
@@ -626,7 +691,31 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--sensitivity", metavar="ROUND_DIR",
                         help="Measure how far the aggregate moves when one alpha_t "
                              "weight does, for the round directory given")
+    parser.add_argument("--from-runs", action="append", metavar="RUN_DIR",
+                        help="Anchor the density curve for REVIEWER findings on "
+                             "known-good run directories (repeatable). This is a "
+                             "different anchor from `d_star`, which measures probes. "
+                             "Measure it at the sample count you ship with.")
     args = parser.parse_args(argv)
+
+    if args.from_runs:
+        # Writes INTO an existing manifest rather than replacing it: `d_star`,
+        # `halflife_k` and the threshold are probe-side calibrations and this only
+        # adds the reviewer-side anchor beside them.
+        target = Path(args.out).expanduser() if args.out else HERE / "calibration.json"
+        runs = [Path(p).expanduser().resolve() for p in args.from_runs]
+        block = llm_density_from_runs(runs)
+        manifest: Dict[str, Any] = {}
+        if target.exists():
+            manifest = json.loads(target.read_text(encoding="utf-8"))
+        manifest["llm_density"] = block
+        target.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8", newline="\n")
+        print(f"llm_density anchored on {len(runs)} known-good run(s): "
+              f"pooled d*={block['d_star']}")
+        for dim, v in block["per_dimension"].items():
+            print(f"  {dim:14} d*={v['d_star']:7.3f}  (n={v['n']})")
+        print(f"written to {target}")
+        return 0
 
     if args.sensitivity:
         round_dir = Path(args.sensitivity).expanduser().resolve()

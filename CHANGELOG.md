@@ -6,6 +6,36 @@ All notable changes to this project. Format follows
 
 ## [Unreleased]
 
+## [1.6.0] — 2026-10-18
+
+### Fixed
+
+- **The density term scored reviewer findings with a curve calibrated on probe
+  findings, and the two populations differ by an order of magnitude.** `d*` is derived
+  from `council probes` output; the density term inside `det` scores the *reviewer's*
+  findings. On one 1.13-KLOC repository the probes report under 2 findings/KLOC while the
+  reviewer reports 4.4 at one sample and **57** at five, so the Hill curve returned
+  **1.66** where a calibrated anchor returns ~50 — the term was penalising the reviewer
+  for finding things. Every review scored at the shipped default had its `det` dragged to
+  roughly 30–45 for that reason alone.
+
+  The reviewer-findings curve now has its own anchor, `llm_density`, derived from
+  known-good run directories at the sample count the tool ships with:
+
+  ```bash
+  council calibrate --from-runs <run-dir> [--from-runs <run-dir> ...]
+  ```
+
+  It applies §7 step 2's own rule — `d*` is the density seen on the known-good baseline,
+  so a known-good density lands mid-scale — to the population the term actually scores.
+  `d*` per dimension is the **median** across the baselines, so one noisy run cannot move
+  the anchor that decides where "clean" sits.
+
+- **An uncalibrated anchor is now reported, not silently substituted.** When
+  `llm_density` is absent the scorer still falls back to the probe curve, so an existing
+  checkout keeps working, but it appends `llm-density-uncalibrated` to the dimension's
+  `missing` list — the same channel as "this analyzer did not run". A silent fallback is
+  how a clean repository scored 61 and nothing could pass.
 ### Added
 
 - **A check for prose that names a superseded release.** `docs/MILESTONES.md` advertised

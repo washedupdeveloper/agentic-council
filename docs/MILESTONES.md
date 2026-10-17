@@ -13,7 +13,7 @@ the measurement that justifies the state: the **threshold** is a decision whose 
 bounded by the reviewer's run-to-run noise — the band is derivable only if the scores were exact,
 and four repeat runs of one clean repository spread **3.57 points** with one failing the gate.
 The **`α_t` weights** are closed: a policy choice measured to flip no verdict. Current release
-**v1.5.2**. The pass threshold
+**v1.6.0**. The pass threshold
 is read from `scripts/calibration.json` (see `docs/CALIBRATION.md`), so the number the loop enforces
 and the number the calibration recommends cannot drift.
 
