@@ -673,8 +673,9 @@ tooling. Its absence would have left `/council` undeployable. It is now
   (provably unreachable — `sweep_threshold` returns `[]` under exactly the condition that
   makes `choose_threshold` return `None`, so a sweep-based fallback could only ever
   contribute `None`); `baseline.head_sha` (the changed set comes from the round's
-  recorded `target_sha`); `baseline.carried_llm_scores` (an identity wrapper whose
-  contract is implemented nowhere); and `probes.py`'s unused `baseline_path`.
+  recorded `target_sha`); `baseline.carried_llm_scores` (an identity wrapper — the
+  behaviour lives in `council_loop.apply_carry`); and `probes.py`'s unused
+  `baseline_path`.
 
 ### Fixed
 
@@ -758,6 +759,33 @@ tooling. Its absence would have left `/council` undeployable. It is now
 - **`checks.probes` had no shell file in its fixture**, so `shellcheck` correctly reported
   "no shell files in the tree" and never ran. That is the check working — it caught the
   fixture gap rather than the probe passing vacuously.
+
+### Fixed
+
+- **The NixOS VM test had been exercising an empty round.** `mkStubHermes` read the
+  prompt from `-q` / `--query`, but `council_loop` sends `--query-file` — because a
+  reviewer prompt exceeds `ARG_MAX`. The stub therefore found no prompt, printed usage
+  and exited 0, and `.#vm-test` passed its own assertions without a review ever running.
+  It reads both forms now, verified by building the stub and invoking it with
+  `--query-file`: it writes the findings file with all five dimension scores.
+- **`doctor.py` pointed at the wrong file.** Three user-facing strings said to declare a
+  missing tool in `flake.nix`'s `toolNames`; the tool set moved to `nix/builders.nix`, so
+  the advice sent the user to a file that no longer holds it.
+- **`reviewer-security`'s whole secret-scanning procedure could not run.** Its seven
+  `rg` commands are the rubric's scan for secrets reaching the store, impure eval,
+  hash-less fetches, `allowUnfree`, `allow-flake-config` and `trusted-users` — and
+  ripgrep is in neither tool list, so in the container every one was "command not found"
+  and the dimension reported nothing for the procedure it documents. They use `grep`
+  now, which ships in the toolchain's shell dependencies. Verified against planted text
+  for all four command shapes (pipe, `-E` alternation, `--` separator, `-v`).
+- **`docs/CI.md`'s cache numbers were from the pre-split toolchain.** 925.8 MiB / 238
+  paths and "236 of 238 available" are now 919.8 MB / 180 and **178 of 180** — measured
+  per path, one at a time. The conclusion is unchanged and now rests on current numbers:
+  the only two paths not on `cache.nixos.org` are the two `symlinkJoin`s. The doc also
+  records why the measurement must be per-path: a batched query reported 30 absent paths
+  where the true figure was 2.
+- **`docs/RESEARCH.md` indexed 4 of the 6 reports** in `research/`. The two Nix reports
+  are listed now, so the index covers the directory.
 
 ### Removed
 

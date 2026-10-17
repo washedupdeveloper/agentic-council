@@ -663,7 +663,7 @@ deleted, because the CLI and the docs already promised them; two were deleted.
 | `calibrate.calibrate_ladder` | **wired** — `council calibrate --ladder <manifest>` |
 | `calibrate.pick_threshold` | **deleted** — provably unreachable (below) |
 | `baseline.head_sha` | **deleted** — `since` comes from the round's meta |
-| `baseline.carried_llm_scores` | **deleted** — an identity wrapper, contract implemented nowhere |
+| `baseline.carried_llm_scores` | **deleted** — an identity wrapper; the behaviour lives in `council_loop.apply_carry` |
 | `probes.py:579` `baseline_path` | **deleted** — bound and never read |
 
 `--build-eval` already produced a manifest whose entries carry
@@ -826,10 +826,13 @@ exist to Nix, which is the repo's own standing rule and cost one extra cycle her
   because unifying it moves which findings merge.
 - **The module-loader idiom** (§10.2) — kept, and the reason is recorded there rather
   than left as an unexplained duplication.
-- **`baseline.carried_llm_scores`' contract.** Deleting the function removes the
-  only statement of it: "a reviewer that saw only the changed files cannot honestly
-  score the whole repository, so the baseline's score is carried for those
-  dimensions". `baseline_scores` appeared nowhere else in `scripts/`, so the
-  contract is implemented nowhere. Deleting the dead function and *reporting* the
-  missing behaviour is deliberate — implementing it is a feature, not a cleanup,
-  and it is your call.
+- **A false claim of mine, corrected here.** I first reported that
+  `baseline.carried_llm_scores`' contract was "implemented nowhere", on the evidence
+  that its parameter name `baseline_scores` appeared nowhere else in `scripts/`. That
+  was wrong: the contract **is** implemented, in `council_loop.apply_carry`
+  (`council_loop.py:991-1022`), under different names — it sets
+  `review["score"]` to the baseline's value and marks `llm_carried_from_baseline`,
+  with the docstring "Its self-assigned number is discarded and the baseline's is
+  carried." So the deleted function was a dead *duplicate* of live behaviour, not the
+  only statement of it. The lesson is narrow and worth keeping: grepping for one
+  identifier cannot establish that a *contract* is absent.

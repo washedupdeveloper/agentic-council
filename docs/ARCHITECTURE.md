@@ -8,7 +8,7 @@ Status: design. Companion to `MILESTONES.md` (the build plan) and `DECISIONS.md`
 
 A Hermes-native, cross-platform system where a **reviewer** inspects a git diff, publishes findings as one JSON file per dimension, and an orchestrator iterates (via Hermes' own loop engine) until a hybrid deterministic+LLM satisfaction score clears a threshold or the run stalls. Every entry point is one CLI, `council <verb>` (`nix run .#council -- <verb>`, or the container image).
 
-The reviewer is **one generalist carrying all five rubrics, sampled N times**. Five isolated specialist profiles used to run here; M8.5 measured the two at equal cost and the generalist won — 22/22 injected defects against 13/22 — so the five profiles, and the mode that spawned them, were deleted rather than kept as an alternative nothing installs. See `MILESTONES.md` M8.5.
+The reviewer is **one generalist carrying all five rubrics, sampled N times**. Five isolated specialist profiles used to run here; M8.5 measured the two at equal cost and the generalist won — 22/22 injected defects against 13/22 — so the five profiles, and the mode that spawned them, were deleted. See `MILESTONES.md` M8.5.
 
 ## 2. The four layers
 
@@ -48,7 +48,7 @@ The reviewer is **one generalist carrying all five rubrics, sampled N times**. F
 | Stop | judge `done` / budget / gates | `LOOP_COMPLETE` / `--until` (fail-open) / `--times` / `max_ticks` |
 | Fit | "iterate until SCORE ≥ threshold" | "re-run on a cadence" |
 
-They coexist: an active `/goal` **defers** `/loop` ticks. Use `/goal` for the scored loop, and `/loop 10m /recap` for status heartbeats (or `/loop --until "<score condition>"` for the literal "loop until score" request, with its fail-open caveat documented).
+They coexist: an active `/goal` **defers** `/loop` ticks. Use `/goal` for the scored loop and `/loop 10m /recap` for status heartbeats, or `/loop --until "<score condition>"` for the literal "loop until score" request (fail-open).
 
 ### 3.3 The hybrid score
 
@@ -114,7 +114,7 @@ git diff (pinned SHA)
 
 ## 5. Envelope (abridged — full schema in `protocol/`)
 
-> **Designed, not built.** This is the uniform envelope M1 specified, and M1 was never implemented. What ships is one **JSON** file per dimension (`round-N/<dimension>.json`), written by the harness and read by the gate. The shape below is the intended contract if M1 is ever built; the `from:`/`to:` ids in it are illustrative agent names, not profiles that exist (there is one reviewer profile, `council-generalist`).
+> **Designed, not built.** M1 specified this uniform envelope and was never implemented; what ships is one **JSON** file per dimension (`round-N/<dimension>.json`), written by the harness and read by the gate. The shape below is the intended contract if M1 is ever built; the `from:`/`to:` ids are illustrative names, not profiles that exist (there is one reviewer profile, `council-generalist`).
 
 ```yaml
 schema_version: "review.msg/v1"
@@ -166,18 +166,16 @@ extensions: {}
 
 ## 8. Repository structure
 
-Every top-level entry, what it is, and whether it **ships**. "Ships" means
-`flake.nix` copies it into the framework tree, so it is inside the container image
-and reachable from a review. Nothing else is: the image carries no test suite, no
-documentation and no development verb.
+Every top-level entry, and whether it **ships**. "Ships" means `mkFramework` (in `nix/builders.nix`) copies it into the framework tree, so it is in the container image and reachable from a review; the image carries no test suite, no documentation and no development verb.
 
 | Path | What it is | Ships |
 |---|---|---|
-| `flake.nix` | The build: toolchain, framework tree, dispatcher, image, gates, devshell, formatter. `runtimeModules`/`devModules` here **are** the shipping manifest. | — |
-| `flake.lock` | Pins nixpkgs. The determinism contract — the same lock gives the same store path on every machine. | — |
+| `flake.nix` | The configuration: `systems`, the `imports`, and the `flake.flakeModules` / `flake.homeManagerModules` outputs. | — |
+| `nix/` | The construction: `builders.nix` (derivations, `toolNames`/`devToolNames`, `runtimeModules`/`devModules`), `flake-module.nix` (consumer outputs), `checks.nix` (this repo's gates + devshell), `module.nix` (the home-manager module). | — |
+| `flake.lock` | Pins nixpkgs and flake-parts. The determinism contract — the same lock gives the same store path on every machine. | — |
 | `scripts/` | The implementation: one module per verb. | runtime subset |
-| `skills/` | The five rubrics (`reviewer-*`) plus the council skill. Installed into Hermes by `council setup bots`. | yes |
-| `bots/` | The orchestrator profile — `SOUL.md`, `bot.yaml`, `profile.yaml`. | yes |
+| `skills/` | The five reviewer rubrics (`reviewer-*`), the orchestrator rubric (`review-council-orchestrator`) plus the council skill. Installed by `council setup bots` / `setup skill`. | yes |
+| `bots/` | The two profiles — `council-generalist` (`SOUL.md`) and `council-orchestrator` (`SOUL.md`, `bot.yaml`, `profile.yaml`). | yes |
 | `tests/` | The suite, plus `golden/` (fixture data whose line count *is* the golden suite's kloc). | — |
 | `docs/` | The specification: framework, architecture, decisions, milestones, and per-topic notes. | — |
 | `research/` | The research record. `§` references in `docs/*` and `scripts/calibrate.py` point here. | — |
@@ -189,12 +187,7 @@ documentation and no development verb.
 
 ### 8.1 What is in `scripts/`, and what ships
 
-`runtimeModules` in `flake.nix` is the shipped set; `devModules` is everything
-else. The split is **enforced, not documented**: `checks.commands` reads the CLI's
-own verb table (`council --verbs-json`) and fails if a user verb's module is
-missing from the shipped tree, if a dev verb's module is present in it, or if the
-tree carries `tests/`, `pyproject.toml`, `README.md` or the flake files — none of
-which anything at review time reads.
+`runtimeModules` (in `nix/builders.nix`) is the shipped set; `devModules` is everything else. The split is **enforced, not documented**: `checks.commands` reads the CLI's own verb table (`council --verbs-json`) and fails if a user verb's module is missing from the shipped tree, if a dev verb's module is present in it, or if the tree carries `tests/`, `pyproject.toml`, `README.md` or the flake files.
 
 | Module | Verb | Ships |
 |---|---|---|
@@ -207,12 +200,14 @@ which anything at review time reads.
 | `sample.py` | `sample` | yes |
 | `merge.py` | `merge` | yes |
 | `baseline.py` | `baseline` | yes |
+| `goal.py` | `goal` | yes |
 | `toolchain.py` | `setup toolchain` | yes |
 | `install_bots.py` | `setup bots` | yes |
 | `install_dispatcher.py` | `setup dispatcher` | yes |
+| `init.py` | `setup init` | yes |
 | `sync_to_skill.py` | `setup skill` | yes |
 | `entrypoint.py` | — (the container ENTRYPOINT) | yes |
-| `hermes_home.py` | — (shared helper) | yes |
+| `council_config.py` · `_shared.py` · `hermes_home.py` · `hermes.py` | — (shared helpers) | yes |
 | `calibration.json` · `eval-baseline.json` | — (data the gate and the probes read) | yes |
 | `calibrate.py` | `calibrate` | dev |
 | `ablate.py` | `ablate` | dev |
@@ -221,32 +216,13 @@ which anything at review time reads.
 
 ### 8.2 A module is not a program
 
-Every module refuses a direct invocation — `python3 scripts/ablate.py` — unless
-`REVIEW_COUNCIL_DISPATCHED` is set, and `scripts/council.py` sets it. Child
-processes inherit it, which is how the harness still runs `probes.py` and
-`score_reviews.py`. An agent turn spawned by the harness has it **removed**: a
-reviewer reads untrusted repository content, and inheriting the variable would make
-the guard inert exactly where the content is untrusted.
+Every module refuses a direct invocation — `python3 scripts/ablate.py` — unless `REVIEW_COUNCIL_DISPATCHED` is set, and `scripts/council.py` sets it. Child processes inherit it, which is how the harness runs `probes.py` and `score_reviews.py`; an agent turn spawned by the harness has it **removed**, because a reviewer reads untrusted repository content and inheriting it would make the guard inert there.
 
-The guard is load-bearing for **accident**, not for intent. Several modules act:
-`setup bots` writes into `HERMES_HOME`, `setup skill` prunes a skill deployment,
-`corpus` plants defects in a repository it is pointed at, and `review`, `sample`
-and `ablate` spend real agent turns over the network. Reaching them through `council`
-is what puts the pinned toolchain on `PATH` and the right verb surface in front of
-the caller, and the guard keeps someone exploring the tree from running one by
-mistake.
+The guard is load-bearing for **accident**, not intent: `setup bots` writes into `HERMES_HOME`, `setup skill` prunes a skill deployment, `corpus` plants defects in a repository it is pointed at, and `review`, `sample` and `ablate` spend real agent turns over the network.
 
-**It is not a security boundary and must not be described as one.** Any caller who
-can set one environment variable passes, and so can an agent with a terminal
-toolset. The boundary is the sandbox and the filesystem permissions. A guard that
-claimed more than this would be worse than none, because it would invite trust it
-cannot hold.
+**It is not a security boundary and must not be described as one.** Any caller who can set one environment variable passes, and so can an agent with a terminal toolset; the boundary is the sandbox and the filesystem permissions.
 
-`checks.commands` asserts both halves — a direct invocation must be refused, and
-the same verb through the CLI must work — so it fails if the guard is dropped *or*
-if it is too eager. `entrypoint.py` is the one exception to the mechanism, not to
-the rule: the container's ENTRYPOINT launcher sets the same variable before
-running it.
+`checks.commands` asserts both halves — a direct invocation must be refused and the same verb through the CLI must work — so it fails if the guard is dropped *or* too eager. `entrypoint.py` is the one exception to the mechanism, not the rule: the container's ENTRYPOINT sets the same variable.
 
 ## 9. Hard limits inherited from Hermes (design around, don't fight)
 

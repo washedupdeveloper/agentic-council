@@ -1,6 +1,6 @@
 # Getting started — clone, then what
 
-Four steps. Step 3 is the one people get stuck on, and it is not optional.
+Four steps; step 3 is the one people get stuck on.
 
 ```
 1. get `council`      — one of three commands, by what the machine has
@@ -17,7 +17,7 @@ Four steps. Step 3 is the one people get stuck on, and it is not optional.
 | docker | load the release tarball, then `docker run --rm -it -v "$PWD:/repo" review-council setup` |
 | git + python ≥ 3.11 | `git clone https://github.com/washedupdeveloper/agentic-council && cd agentic-council && python scripts/council.py setup` |
 
-For the docker row, get the image first — it is a release asset, not a registry pull:
+The docker image is a release asset, not a registry pull:
 
 ```bash
 curl -L -O https://github.com/washedupdeveloper/agentic-council/releases/latest/download/review-council.tar.gz
@@ -25,12 +25,12 @@ docker load -i review-council.tar.gz
 ```
 
 The repository is published as **`agentic-council`**; the flake and the directory are
-**`review-council`**. Same project, two names — the GitHub repo predates the rename.
+**`review-council`**. Same project, two names.
 
-The third row is the non-Nix path, and it needs no wrapper script: every module under
-`scripts/` is stdlib-only, so the CLI itself runs on any Python ≥ 3.11. On a Hermes
-host use `$HERMES_PYTHON` — never assume the interpreter is named `python3`, because
-NixOS has none and Windows does not use that name.
+The third row is the non-Nix path: every module under `scripts/` is stdlib-only, so the
+CLI itself runs on any Python ≥ 3.11. On a Hermes host use `$HERMES_PYTHON` — never
+assume the interpreter is named `python3`, because NixOS has none and Windows does not
+use that name.
 
 ## 2. `council setup`
 
@@ -49,9 +49,8 @@ on a prompt. Edit `review-council.toml` any time, then `council setup bots` to a
 
 ## 3. Credentials
 
-**Hermes keeps provider credentials per profile and shares none between them.** So
-installing the members is not the same as them being able to reach a provider, and
-the council cannot run until each one can.
+**Hermes keeps provider credentials per profile and shares none between them**, so the
+council cannot run until each member can reach a provider.
 
 There are exactly **two** members, so two commands:
 
@@ -63,7 +62,7 @@ hermes -p council-orchestrator setup
 Each is interactive: it asks for the provider and the key, and writes them to that
 profile's own `$HERMES_HOME/profiles/<name>/config.yaml`.
 
-Three things worth knowing before you debug a 401:
+Before you debug a 401:
 
 - **A 401 right after install is a provisioning step, not breakage.** Profile
   export/import deliberately never carries credentials (`.env` is excluded), so an
@@ -75,15 +74,14 @@ Three things worth knowing before you debug a 401:
   to be written by round-tripping `config.yaml` — with a comment-preserving writer
   (ruamel, the one Hermes itself uses) — after backing the file up.
 
-**Prove it, don't assume it.** One command per member:
+One command per member:
 
 ```bash
 hermes -p council-generalist chat -q 'Reply with exactly: SMOKE_OK'
 ```
 
-A printed `SMOKE_OK` means that profile's credentials and model resolve. Do this
-before a review, because otherwise the first failure you see is a reviewer exiting
-non-zero several minutes into a run.
+A printed `SMOKE_OK` means that profile's credentials and model resolve. Do this before
+a review — otherwise the first failure is a reviewer exiting non-zero minutes into a run.
 
 ## 4. Review something
 
@@ -105,13 +103,11 @@ inputs.agentic-council.url = "github:washedupdeveloper/agentic-council";
 home-manager.users.<name>.imports = [ inputs.agentic-council.homeManagerModules.default ];
 ```
 
-That puts `council` on PATH and points Hermes at the skill — which is a **store
-path**, so it is read-only and cannot drift. `nix/home-manager.md` has the options
-and the two modes.
+That puts `council` on PATH and points Hermes at the skill — a **store path**, so it is
+read-only and cannot drift. `nix/home-manager.md` has the options and the two modes.
 
-**Credentials remain step 3.** A module can install a definition; it cannot install a
-secret, and a provider key does not belong in a world-readable store path. Two honest
-options:
+**Credentials remain step 3.** A module can install a definition, not a secret, and a
+provider key does not belong in a world-readable store path. Two options:
 
 - **Run it once per member** (`hermes -p <member> setup`). Imperative, but it is a
   one-time act on a machine, and the profiles it writes are ordinary Hermes state.

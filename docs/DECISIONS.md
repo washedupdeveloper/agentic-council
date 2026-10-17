@@ -16,22 +16,21 @@ research. Everything below is **locked** unless listed under "Still open".
 | 7 | **Review scope** | **Git diff / PR changeset** — review only what changed. |
 | 8 | **Project name** | **`review-council`** → the project's own directory (resolved from the checkout, never hardcoded). |
 
-> **Three of these were later changed; the rows above are the record of what was decided.** Each change
-> came from evidence, not preference — see `MILESTONES.md`:
+> **Three of these were later changed; the rows above record what was decided.** Each change came
+> from evidence — see `MILESTONES.md`:
 >
-> - **#1 Foundation** no longer includes `delegate_task`. It was the original fan-out mechanism, and it
->   was removed after a defect: a delegated child inherits the *parent's* `HERMES_HOME` and so cannot
->   load another profile's rubric, which silently ran generic subagents wearing dimension labels. No
->   profile carries `delegation` now; the harness spawns the reviewer.
-> - **#2 Cross-platform** no longer means Windows *native*. nix does not run on Windows, so the
->   Windows path is the container image; the WSL bridge was deleted rather than kept as a second
->   route to maintain.
-> - **#5 Reviewer roster** is no longer "core five" *profiles*. M8.5 measured five isolated specialist
->   profiles against one generalist sampled N times, at equal cost, and the specialists lost twice —
->   13/22 and 16/22 injected defects against 22/22. The five profiles were deleted; the five
->   **rubrics** remain and are loaded together by one `council-generalist`.
+> - **#1 Foundation** no longer includes `delegate_task`. A delegated child inherits the *parent's*
+>   `HERMES_HOME` and so cannot load another profile's rubric, running as a generic subagent wearing
+>   a dimension label. No profile carries `delegation`; the harness spawns the reviewer.
+> - **#2 Cross-platform** no longer means Windows *native*: nix does not run on Windows, so the
+>   Windows path is the container image and the WSL bridge was deleted.
+> - **#5 Reviewer roster** is no longer "core five" *profiles*. M8.5 measured five specialist profiles
+>   against one generalist sampled N times at equal cost: the specialists lost twice — 13/22 and 16/22
+>   injected defects against 22/22. The five profiles were deleted; the five **rubrics** remain,
+>   loaded together by one `council-generalist`.
 >
-> #15 (Kanban for durability) is unstarted, not overturned — it is M7.
+> #15 (Kanban for durability) is not overturned — it is M7, shipped as the durable swarm and
+> dispatcher.
 
 ## Locked (interview, round 2)
 
@@ -73,14 +72,14 @@ research. Everything below is **locked** unless listed under "Still open".
   design is deterministic-first, with the LLM's judgement as the fallback for stacks the probes do not
   cover. Its *findings* still feed the density term either way; only its self-assigned score is
   ignored.
-- Stated because it looks like a bug from the outside ("the LLM score is being ignored") and because
-  the β defect of the same session was the opposite failure: β stuck at 0, so the deterministic half
-  was ignored and the LLM's number decided everything, with nothing reporting it.
+- Stated because it looks like a bug from outside ("the LLM score is being ignored"), and because the
+  β defect of the same session was the opposite failure: β stuck at 0, so the deterministic half was
+  ignored and the LLM's number decided everything, with nothing reporting it.
 
 ## Still open (needed at M5 / M8)
 
 | Topic | Working default |
 |-------|-----------------|
 | **Per-run token/cost ceiling** (concrete number) | to set at M5 |
-| **Initial `SCORE` threshold + per-category weights** | starting point now, calibrated in M8 |
+| **Per-category weights `α_t`** | working defaults; the threshold itself is calibrated (`87.1141`, PROVISIONAL) — see `CALIBRATION.md` |
 | **Exact judge model** for `auxiliary.goal_judge` | pin at M5 |

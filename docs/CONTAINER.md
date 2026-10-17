@@ -43,7 +43,7 @@ and prints the flag rather than a traceback.
 
 | | |
 |---|---|
-| the 24 pinned analyzers | the same store paths the native toolchain pins, from the same `flake.lock` |
+| the 13 pinned analyzers | the same store paths the native toolchain pins, from the same `flake.lock` |
 | the framework | `scripts/`, `bots/`, `skills/`, under `/opt/review-council` — the runtime modules only; the dev verbs are not in the image |
 | the `council` CLI | the same verb table as the flake app, so `doctor`, `gate`, `probes` and the rest work without Hermes |
 | `git` | `--baseline` shells out to it to find what changed |
@@ -78,29 +78,23 @@ digests — a push uploads only what changed and a pull fetches only what the lo
 copy lacks. That is the whole caching story; there is no build cache to configure.
 
 The earlier build used `buildImageWithNixDb` and one layer (**365 MiB** as a
-tarball) to
-register the copied store paths in a nix database. Measured, the database bought
-nothing: `nix --version`, `nix-instantiate --parse` (what the nix-eval probe
-actually runs), all 14 analyzers and `doctor` reporting beta 1.00 all work without
-it. It was also the **only** thing forcing a single layer, because its gcroots
-point into a layer that is not there while it is being generated:
+tarball) to register the copied store paths in a nix database. Measured, the
+database bought nothing: `nix --version`, `nix-instantiate --parse` (what the nix-eval
+probe actually runs), all 14 analyzers and `doctor` reporting beta 1.00 all work
+without it. It was also the **only** thing forcing a single layer, because its
+gcroots point into a layer that is not there while it is being generated:
 
 ```
 ln: failed to create symbolic link 'nix/var/nix/gcroots/docker/...': Permission denied
 ```
 
-Dropping it cost nothing and bought layering.
-
 ## What is verified, and how to verify it yourself
 
-The image is verified by loading it into a **real docker daemon** and asserting from
-inside the container. A docker daemon is run for this purpose in a disposable VM, so
-the check needs no particular host, no privileges on the machine you are reading this
-on, and no container runtime on the build machine — the VM supplies namespaces,
-mounts and cgroups for real, rather than extracting layers and chrooting into them,
-which exercises only their contents.
+Verified by loading the image into a **real docker daemon** in a disposable VM — so the
+check needs no particular host and no container runtime on the build machine, and the
+namespaces, mounts and cgroups are real rather than extracted layers under a chroot.
 
-Verified: it loads; it runs as uid 1000 in `/repo`; all 24 analyzers resolve on PATH;
+Verified: it loads; it runs as uid 1000 in `/repo`; all 13 analyzers resolve on PATH;
 `git`, `nixfmt`, `ruff` and `deadnix` work; `nix --version`, `nix eval` and
 `nix-instantiate` work with `NIX_CONF_DIR=/opt/nix`; the harness `--help` prints; a
 file is written. And a **complete scored review runs inside it** — fan-out, bucketing,
@@ -114,8 +108,8 @@ docker run --rm -v "$PWD:/repo" review-council doctor --repo /repo
 ```
 
 `doctor` reports the toolchain, the detected stacks and **beta now vs reachable**, so a
-green line there means the pinned analyzers are present and running in the image on
-*your* machine — which is the only verification that counts for your machine.
+green line means the pinned analyzers are present and running in the image on *your*
+machine.
 
 **Not covered by the VM check:** the provenance of the artifact you download. CI builds
 it and attaches it to the release, so the tarball is the one CI produced — not one built
@@ -125,7 +119,7 @@ rebuild from the same `flake.lock` (deterministic, so the content matches) and c
 
 ### The Dockerfile's own verification
 
-The Dockerfile is checked the same way, and the gap it used to have is closed.
+The Dockerfile is checked the same way.
 
 Verified: the rootfs step is run **verbatim** (the same commands, extracted from the
 file) and produces the right modes — `tmp` `1777`, `repo` and the profile home `0777`,
@@ -142,8 +136,7 @@ this look untestable). The build pulls `nixos/nix:2.35.3`, resolves nixpkgs, bui
 tool closure and finishes: exit code 0, image tagged, verbs printed, every pinned tool
 resolving inside the result.
 
-That test found a real defect, and it is why the step looks the way it does. The
-materialisation step piped through `sed`, and `nixos/nix` ships **no `sed` and no
+That test found a real defect. The materialisation step piped through `sed`, and `nixos/nix` ships **no `sed` and no
 `awk`** — its `/bin` holds only `sh` — so the build died at `[builder 9/9]` with
 `/bin/sh: line 1: sed: command not found`. Every earlier check had stopped at "the
 Dockerfile parses", which is a different claim from "the image builds". The step now
@@ -211,9 +204,8 @@ machine:
 docker build -t review-council .
 ```
 
-The Dockerfile is the fallback for a host that can run docker but not nix, and it
-exists because docker is the one interface every CI system and PaaS platform
-already speaks. It produces a **single layer**: the layering is `dockerTools`' and
+The Dockerfile is the fallback for a host that can run docker but not nix. It
+produces a **single layer**: the layering is `dockerTools`' and
 `docker build` cannot reproduce it, so prefer the flake when you have nix.
 
 ⚠️ **This path is instructions, not a verified one.** CI does not run `docker build`, so
@@ -228,19 +220,19 @@ a different claim from "the image builds". Two consequences worth knowing:
   produces is not subtle, but nothing will produce it for you.
 
 The full `docker build` verification — in a NixOS VM, with network, asserting the built
-image runs and every pinned tool executes — is described below and was run when it was
+image runs and every pinned tool executes — is described above and was run when it was
 written. It is not part of CI.
 
-**Neither path is defined twice.** `flake.nix` owns what goes in the image —
+**Neither path is defined twice.** `nix/builders.nix` owns what goes in the image —
 `mkContainer` for the layered one, `mkImageRoot` for the tree the Dockerfile
 copies, and both share `imagePrep`, the entrypoint and the nix config. The
 Dockerfile adds only the container plumbing. A second copy of any of that is how
 "the image works and the Dockerfile does not" happens, which is the one failure a
 reader cannot debug.
 
-One subtlety is worth knowing if you edit either path: **nix makes everything under
-a store path read-only**, so the modes the flake sets do not survive into the
-Dockerfile's copy — `tmp` arrives `0555`, not `1777`. That is why the prep ships as
-`.nix/prep.sh` and the Dockerfile re-runs it. `mkContainer` needs no such step,
-because `dockerTools` runs `extraCommands` on the image root, where modes are
-preserved. One definition of the prep, two ways of applying it.
+One subtlety if you edit either path: **nix makes everything under a store path
+read-only**, so the modes the flake sets do not survive into the Dockerfile's copy —
+`tmp` arrives `0555`, not `1777`. That is why the prep ships as `.nix/prep.sh` and the
+Dockerfile re-runs it. `mkContainer` needs no such step, because `dockerTools` runs
+`extraCommands` on the image root, where modes are preserved. One definition of the
+prep, two ways of applying it.

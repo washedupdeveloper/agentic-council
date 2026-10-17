@@ -697,7 +697,24 @@ let
           return ""
 
 
-      prompt = arg("-q") or arg("--query")
+      def prompt_text():
+          """The prompt, from `--query-file` or `-q` / `--query`.
+
+          `council_loop` sends `--query-file` because a reviewer prompt exceeds
+          ARG_MAX, so a stub reading only `-q` sees NOTHING, prints usage and exits --
+          and the whole VM test then exercises an empty round while still passing its
+          own assertions. That is why this reads both forms.
+          """
+          path = arg("--query-file")
+          if path:
+              try:
+                  return Path(path).read_text(encoding="utf-8", errors="replace")
+              except OSError:
+                  return ""
+          return arg("-q") or arg("--query")
+
+
+      prompt = prompt_text()
 
       # `--version` and `--help` come first: they carry no prompt, and without
       # this the stub would answer them with the aggregate branch and report a
@@ -706,7 +723,7 @@ let
           print("hermes (vm-test stub) 1.0.0")
           sys.exit(0)
       if not prompt:
-          print("usage: hermes -p <profile> chat -q <prompt>")
+          print("usage: hermes -p <profile> chat (-q <prompt> | --query-file <path>)")
           sys.exit(0)
 
       if "set this round's goals" in prompt:

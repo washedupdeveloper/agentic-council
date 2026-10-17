@@ -1,6 +1,5 @@
 # review-council — Autonomy & Invocation
 
-How the council runs **fully autonomously** and how to **invoke it manually**.
 Implements the locked design in `docs/DECISIONS.md` #6 and #10, and
 `docs/FRAMEWORK.md` §7 (the loop), §8 (termination), §12 (autonomy).
 
@@ -14,23 +13,21 @@ or through the container image; every command below is one of its verbs.
 | **Manual** | Reviews the current stage and reports. Never edits. | `/council [<repo>]` — the `council` skill |
 | **Autonomous** | Reviews, applies fixes, re-reviews until the gate passes or the run stalls. | `council review [<repo>] --mode full` |
 
-Both are driven by the same deterministic gate, so a "pass" means the same either way.
+Both run on the same deterministic gate, so "pass" means the same either way.
 
 ## Resolving the target project
 
-The repo argument is **optional**. The run starts from a live session (the desktop
+The repo argument is **optional**: the run starts from a live session (the desktop
 app, the TUI, or the CLI), so the target is resolved from the session, not a shell:
 
 1. An **explicit path** always wins.
-2. **The session working directory**, walked up to the nearest `.git` — the
-   project boundary Hermes itself uses. If there is no git root, take the nearest
-   directory carrying `.hermes.md`, `HERMES.md`, `AGENTS.md`, `CLAUDE.md`,
-   `pyproject.toml`, `package.json`, `Cargo.toml`, or `go.mod`. In the desktop app
-   a *Project* anchors the chat's workspace, so the session working directory
-   follows it.
+2. **The session working directory**, walked up to the nearest `.git` — the project
+   boundary Hermes itself uses. With no git root, the nearest directory carrying
+   `.hermes.md`, `HERMES.md`, `AGENTS.md`, `CLAUDE.md`, `pyproject.toml`,
+   `package.json`, `Cargo.toml`, or `go.mod`. In the desktop app a *Project* anchors
+   the chat's workspace, so the session working directory follows it.
 
-`resolve_project()` implements both, and the run prints what it inferred and why,
-so a wrong inference is visible rather than silent:
+`resolve_project()` implements both; the run prints what it inferred and why:
 
 ```
 $ council review --dry-run
@@ -40,10 +37,10 @@ inferred project: /home/you/projects/myrepo
 
 ### When the session is not anchored
 
-With no project (cwd is a home directory, no git root, no marker) and a terminal
+With no project (cwd a home directory, no git root, no marker) and a terminal
 attached, the run **asks** for the path. With no terminal — a scheduled job, a
 spawned worker, an agent turn — it **refuses** with exit 2 rather than reviewing the
-wrong tree, and writing `.review-council/` into it:
+wrong tree and writing `.review-council/` into it:
 
 ```
 council_loop: could not identify a project from the session.
@@ -58,9 +55,9 @@ Fix one of:
              `--in` is Hermes main only and is absent from the wheel)
 ```
 
-**Anchoring the session is the recommended setup.** Create or switch a desktop
-Project, or launch the TUI/CLI from inside the project (`cd /path/to/project`);
-`/council` then reviews the right repo with no argument.
+Anchoring the session is the recommended setup: create or switch a desktop Project,
+or launch the TUI/CLI from inside the project (`cd /path/to/project`); `/council`
+then reviews the right repo with no argument.
 
 ## The loop (FRAMEWORK §7)
 
@@ -71,57 +68,50 @@ intake → set goals → convene (each with its goal) → validate → aggregate
 
 **The orchestrator sets the goals; the harness owns the convening.** Each round the
 orchestrator decides what the round is *for* — one goal per dimension — and the
-harness then spawns **one generalist profile sampled N times**. A reviewer's rubric
-is installed into its profile, which is why the harness spawns a profile rather than
-delegating.
+harness spawns **one generalist profile sampled N times**. A reviewer's rubric lives
+in its own profile, so only a spawned profile loads it.
 
-1. **Intake** (harness). Resolve the target revision, detect the stacks, and run
-   every deterministic probe **once** for the whole run.
-2. **Goals** (orchestrator). Given the repo and the probe summary, write
-   `<run_root>/round-N/goals.json`: one goal per dimension, each an *objective*
-   plus the *evidence that would show it is met*, and optionally the paths to focus
-   on. Goals are deliberately **qualitative** — the prompt forbids naming a score or
-   a threshold, because a goal that names a number invites gaming it and the
-   threshold is held out of every child's context.
-   **Fail-open:** if the orchestrator cannot produce a *complete* goal set, the
-   built-in default set is used and the round proceeds. A goal-setting failure is
-   not a review failure. A partial set is treated as absent rather than partially
-   applied, so the difference is never invisible in the run report.
+1. **Intake** (harness). Resolve the target revision, detect the stacks, run every
+   deterministic probe **once** for the whole run.
+2. **Goals** (orchestrator). Write `<run_root>/round-N/goals.json`: one goal per
+   dimension — an *objective*, the *evidence that would show it is met*, and
+   optionally paths to focus on. Goals are deliberately **qualitative**: naming a
+   score or threshold is forbidden, and the threshold is held out of every child's
+   context. **Fail-open:** an incomplete goal set falls back to the built-in default
+   set and the round proceeds — a goal-setting failure is not a review failure — and
+   a partial set is treated as absent rather than partially applied.
 3. **Convene** (harness). Spawn the generalist profile N times (5), each sample
-   carrying all five rubrics, its probe slice **and the goals**; the harness buckets
-   each finding by the dimension it declares, giving
+   carrying all five rubrics, its probe slice **and the goals**; findings are
+   bucketed by the dimension each declares into
    `<run_root>/round-N/<dimension>.json`. The harness also writes `meta.json` — it
    knows the sha and the stacks, the LLM does not.
-4. **Aggregate** (orchestrator). Validates each file's schema and builds the
-   evidence matrix. It does **not** fan out, re-review, or score.
-5. **Gate.** `council gate` reads the reviewer files and recomputes the hybrid
-   score itself. It never trusts a number any agent asserted. Exit 0 = satisfied,
-   1 = not satisfied, 2 = error. A reviewer that produced **no file** is an ERROR,
-   never a clean bill of health.
-6. **Goal review** (orchestrator). Reviews the round against the goals it set:
-   MET / PARTIAL / NOT MET per goal, with the evidence, and what the next round
-   should target. A dimension whose reviewer produced no file is **UNVERIFIED**,
-   never "met". The gate has already decided acceptance — the goal review explains
-   it and never overrides it, so the verdict lives in exactly one place.
-7. **Fix turn** (`--mode full` only). The gate's stdout — the ranked findings — is
-   fed back as the continuation prompt, and the orchestrator applies fixes.
+4. **Aggregate** (orchestrator). Validates each file's schema and builds the evidence
+   matrix; it does **not** fan out, re-review, or score.
+5. **Gate.** `council gate` reads the reviewer files and recomputes the hybrid score
+   itself — it never trusts a number any agent asserted. Exit 0 = satisfied, 1 = not
+   satisfied, 2 = error. A reviewer that produced **no file** is an ERROR, never a
+   clean bill of health.
+6. **Goal review** (orchestrator). MET / PARTIAL / NOT MET per goal, with the evidence
+   and what the next round should target. A dimension whose reviewer produced no file
+   is **UNVERIFIED**, never "met". The gate has already decided acceptance; the goal
+   review explains it and never overrides it.
+7. **Fix turn** (`--mode full` only). The gate's stdout — the ranked findings — is fed
+   back as the continuation prompt, and the orchestrator applies fixes.
 8. **Repeat** until a termination condition fires.
 
 ### Why profiles, not `delegate_task`
 
 `delegate_task` spawns **in-process subagents that inherit the parent's
-`HERMES_HOME`**. A reviewer rubric lives in the reviewer's *own* profile, so a
-delegated child cannot load it. An earlier version fanned out that way and ran five
-generic subagents wearing dimension labels — applying none of the rubrics' scoring
-anchors, hard gates or checklists — while still producing gate-readable JSON.
+`HERMES_HOME`**, so a delegated child cannot load a rubric that lives in the
+reviewer's *own* profile. An earlier version fanned out that way and ran five generic
+subagents wearing dimension labels, applying none of the rubrics' scoring anchors,
+hard gates or checklists, while still producing gate-readable JSON.
 
-Consequences, all enforced rather than merely documented:
-
-- **No agent in the fleet has `delegation`** — not the reviewers, and not the
-  orchestrator. The harness is the only thing that spawns agents, so there is
-  exactly one fan-out path and it is the one that applies the rubrics.
-- The reviewers are therefore **sub-agents of the council**, not free-standing
-  agents. Each is a leaf: no `delegation`, no code edits.
+- **No agent in the fleet has `delegation`** — not the reviewers, not the
+  orchestrator. The harness is the only thing that spawns agents, so there is exactly
+  one fan-out path, and it applies the rubrics.
+- The reviewers are **sub-agents of the council**, not free-standing agents. Each is
+  a leaf: no `delegation`, no code edits.
 - They remain individually invocable for a single-dimension check, but that is a
   debugging affordance; the council is the supported path.
 
@@ -133,17 +123,15 @@ Consequences, all enforced rather than merely documented:
 | `semi` | yes | only after approval | at threshold/stall/before edits |
 | `advisory` | yes | never | always |
 
-`semi` prompts before each edit and refuses to edit when stdin is not a TTY —
-an unattended `semi` run degrades to `advisory` rather than editing unattended.
+`semi` prompts before each edit and refuses to edit when stdin is not a TTY — an
+unattended `semi` run degrades to `advisory` rather than editing unattended.
 
 ## Termination — adaptive (FRAMEWORK §8, M8)
 
-**The threshold is the MINIMUM requirement. Everything above it is desirable but
-not required.** The loop climbs while it is gaining ground and stops — handing over
-a next-steps plan — once the gains stall, the time budget is spent, or the hard
-round cap is reached. Chasing the theoretical maximum is explicitly not the goal.
-
-Order of precedence:
+**The threshold is the MINIMUM requirement; everything above it is desirable but not
+required.** The loop climbs while it is gaining ground and stops — handing over a
+next-steps plan — once the gains stall, the budget is spent, or the round cap is
+reached.
 
 | # | Condition | Outcome | Reason string |
 |---|---|---|---|
@@ -157,13 +145,11 @@ Order of precedence:
 | 7 | no new finding id for `k` rounds | `escalate` | `novelty: …` |
 | 8 | `advisory`/`semi` declined to edit | `escalate` | `advisory mode: …` / `semi mode: …` |
 
-Notes on the ordering:
-
-- **Hard limits outrank the `--min-rounds` floor**, or the floor could overrun a
-  cap or budget.
+- **Hard limits outrank the `--min-rounds` floor**, or the floor could overrun a cap
+  or budget.
 - **A specific reason beats a generic one.** If an oscillation and the round cap
-  coincide, the reason is `oscillation` — it tells the next iteration what to
-  change, where `round cap reached` does not. The decision to stop is the same.
+  coincide, the reason is `oscillation` — it tells the next iteration what to change,
+  where `round cap reached` does not. The decision to stop is the same.
 - **Hitting a cap is not a failure** if the minimum was already met; the outcome
   reflects the requirement, not the mechanism that ended the run.
 
@@ -173,11 +159,9 @@ diminishing-returns floor.
 ## The next-steps plan
 
 A plan is written on **every** termination — satisfied or not — to
-`<run-root>/next-steps.md`, and its path is recorded in `outcome.json`. When the
-loop stops early (budget spent, gains stalled, cap reached) this is the
-deliverable that lets the next iteration pick up instead of starting over.
-
-Structure:
+`<run-root>/next-steps.md`, and its path is recorded in `outcome.json`; when the loop
+stops early (budget spent, gains stalled, cap reached) it is the deliverable that lets
+the next iteration pick up instead of starting over.
 
 | Part | Content |
 |---|---|
@@ -189,9 +173,7 @@ Structure:
 
 The score requirement and the blocking-finding gate are independent: a run whose
 aggregate clears the minimum but is blocked by a finding reports **meets the minimum**
-plus **blocked by**, never "below the minimum". The same ranking is fed to the fix turn
-as a prioritised work list, so an in-flight fix targets the highest-value items rather
-than whatever the prose mentioned first.
+plus **blocked by**, never "below the minimum". The same ranking feeds the fix turn.
 
 ## Flags
 
@@ -245,8 +227,8 @@ aggregate = Σ weight[c]·score[c]
 
 Weights: security .30, correctness .25, readability .20, architecture .15,
 performance .10. With β = 0 the det term is inert by construction, so a vacuous
-deterministic signal cannot inflate a score — the failure mode where a zero-Nix
-repo makes Nix-pattern greps trivially "clean".
+deterministic signal cannot inflate a score — the failure mode where a zero-Nix repo
+makes Nix-pattern greps trivially "clean".
 
 **The threshold is calibrated to this repository from one sample** — `87.1141`,
 marked `PROVISIONAL` in `scripts/calibration.json` — and the `α_t` weights remain
@@ -260,9 +242,10 @@ reviewer judgement alone.
 
 ### Nix is the provisioning path (pinned, declarative)
 
-`flake.nix` declares the tool set; `flake.lock` pins the exact nixpkgs revision.
-`nix build .#toolchain` yields the same store path on every machine, so every reviewer
-runs identical tool versions. Nothing is installed imperatively and nothing drifts.
+`nix/builders.nix` declares the tool set; `flake.lock` pins the exact nixpkgs
+revision. `nix build .#toolchain` yields the same store path on every machine, so
+every reviewer runs identical tool versions; nothing is installed imperatively and
+nothing drifts.
 
 ```bash
 council setup toolchain --path        # the toolchain store path
@@ -271,36 +254,31 @@ council setup toolchain -- statix check . -o json
 council setup toolchain --which ruff
 ```
 
-`REVIEW_COUNCIL_TOOLCHAIN` wins when it is set — the container image bakes it in
-and the devshell exports it — so nothing builds the toolchain at run time.
+`REVIEW_COUNCIL_TOOLCHAIN` wins when set — the container image bakes it in and the
+devshell exports it — so nothing builds the toolchain at run time.
 
 The tool list is `research/nix-tooling.md` §0 plus the Python toolchain DECISIONS #3
 requires. **Two lists, and the split is the point** — see `docs/TOOLCHAIN.md` for the
 per-tool verdict.
 
-**The QA toolchain (13 tools, ships in the container and the app):** `nix`, `nixfmt`,
+**QA toolchain (13 tools, ships in the container and the app):** `nix`, `nixfmt`,
 `nixfmt-tree`, `statix`, `deadnix`, `vulnix` (on demand), `gitleaks`, `osv-scanner`,
-`ruff`, `mypy`, `pytest`, `bandit`, `shellcheck`.
-
-A tool is in this list only if it is scored by the gate (`score_reviews.expected_tools`),
-run by a probe (`scripts/probes.py`), or the mechanism that provides an output (the
-`formatter`). That is the centralised quality assurance: it does not depend on what any
-individual has installed.
+`ruff`, `mypy`, `pytest`, `bandit`, `shellcheck`. A tool is in this list only if the
+gate scores it (`score_reviews.expected_tools`), a probe runs it (`scripts/probes.py`),
+or it is the mechanism that provides an output (the `formatter`).
 
 **Contributor DX (9 tools, devshell only):** `nixd`, `nil`, `nix-tree`, `nix-diff`,
-`nix-fast-build`, `nix-du`, `tokei`, `cloc`, `jq`. A language server, a closure browser
-and the density meters. No probe runs them and the gate does not score them, so they are
-not part of the product — and a contributor can install their own editor tooling without
-it colliding with the framework's.
+`nix-fast-build`, `nix-du`, `tokei`, `cloc`, `jq` — a language server, a closure
+browser and the density meters. No probe runs them and the gate does not score them,
+so they are not part of the product.
 
 **`vulnix` ships but is not probed — on demand only.** It is in the toolchain so
 closure CVEs can be asked when that is the question, and absent from `probes.py` so no
 routine review pays for it. Running it is the expensive half: it fetches NVD data over
 the network (minutes, and the answer moves with the date), it is unmaintained, and it
 matches name+version against NVD so backported fixes are invisible — whitelisting is
-mandatory to make the output usable, and no whitelist ships. Its own closure is 193.3 MB,
-19.7% of the toolchain and 26 MB of the container, which is the price of having it
-available. `tests/test_probes.py` pins both halves: shipped, and not probed.
+mandatory to make the output usable, and no whitelist ships. Its closure is 193.3 MB,
+19.7% of the toolchain and 26 MB of the container. `tests/test_probes.py` pins both halves: shipped, and not probed.
 
 **semgrep is deliberately excluded**: it is not in the §0 inventory, and it does not
 build on this nixpkgs revision (`pyjwt~=2.13.0 not satisfied by 2.14.0`). A tool that
@@ -310,10 +288,10 @@ other analyzer with it.
 ### Per-stack tool tables
 
 `STACK_TOOLS` in `score_reviews.py` keys expected tools by **language stack**, not by
-a single fixed toolchain. A Nix-only table makes β structurally 0 on a Python repo no
-matter how many analyzers run, which makes the deterministic half of the hybrid
-decorative. Stacks are detected from marker files and source extensions
-(`detect_stacks`), and a dimension's expected set is the union across every stack present.
+a single fixed toolchain: a Nix-only table makes β structurally 0 on a Python repo no
+matter how many analyzers run, which makes the deterministic half decorative. Stacks
+come from marker files and source extensions (`detect_stacks`), and a dimension's
+expected set is the union across every stack present.
 
 ```bash
 council gate <run-dir> --repo <repo>        # auto-detect
@@ -322,8 +300,8 @@ council gate <run-dir> --stacks nix,python  # force
 
 ### Built-in probes — zero installs
 
-`scripts/probes.py` implements the checks the framework owns, so a review has
-real deterministic signal even on a machine with no Nix:
+`scripts/probes.py` implements the checks the framework owns, so a review has real
+deterministic signal even on a machine with no Nix:
 
 | Probe | Dimension | What it checks |
 |---|---|---|
@@ -345,15 +323,15 @@ council probes --all --repo <repo>
 council probes statix --repo <repo>
 ```
 
-Each emits `{"tool","ran","parsed","signal","findings"}` where `signal` is a
-normalized 0-100 deterministic score the gate feeds into the geometric mean. A
-probe that cannot run reports `ran: false` — it never invents a result, because
-that would inflate β.
+Each emits `{"tool","ran","parsed","signal","findings","note"}`; `signal` is a
+normalized 0-100 deterministic score the gate feeds into the geometric mean. A probe
+that cannot run reports `ran: false` — it never invents a result, because that would
+inflate β.
 
-Note the parser: statix pretty-prints each JSON object across many lines while deadnix
+The parser: statix pretty-prints each JSON object across many lines while deadnix
 emits one object per line. `_json_objects` uses `raw_decode` over the whole stream so
-both shapes parse — a line-based parser works for one and silently returns **zero**
-for the other, which reads as a clean bill of health on a file that does not even parse.
+both parse — a line-based parser works for one and silently returns **zero** for the
+other, which reads as a clean bill of health on a file that does not even parse.
 
 ### doctor — what's missing and how to get it
 
@@ -365,26 +343,21 @@ council doctor --repo <repo> --install  # install what's missing (asks first)
 
 It reports the detected stacks, whether Nix is available, the pinned nixpkgs revision
 and toolchain store path, β now vs reachable, and how to get anything missing. With
-Nix available the advice is **always declarative**: add the tool to `flake.nix`'s
-`toolNames` and rebuild. The pip/brew/scoop hints appear only for hosts without Nix,
-and only for installers that are actually present.
+Nix available the advice is **always declarative**: add the tool to
+`nix/builders.nix`'s `toolNames` and rebuild. The pip/brew/scoop hints appear only for
+hosts without Nix, and only for installers that are actually present.
 
-It also reports **Hermes**, because β answers "how much of the score is deterministic"
-and says nothing about whether a review can run at all. A machine with no Hermes and
-β 1.00 is a machine that cannot review, and reporting only the second number is how a
-user discovers the first from a failed run.
+It also reports **Hermes**: β says how much of the score is deterministic and nothing
+about whether a review can run at all, so a machine with no Hermes and β 1.00 cannot
+review.
 
 ### Finding Hermes — and what can actually be known
 
 The council does **not** talk to a Hermes *gateway*. It shells out to the `hermes`
-launcher (`hermes -p <profile> chat -q <prompt>`) and reads the file that turn writes.
-`hermes serve` — the backend the desktop app and remote clients connect to — is a
-different thing, and a reachable port on it is **not** evidence that the council can
-run an agent. Conflating the two is how a host reports "Hermes available" and then
-fails every review.
-
-So the question is answered in layers, cheapest and most certain first, and a weak
-signal is never promoted into a strong claim:
+launcher (`hermes -p <profile> chat --query-file <path>`) and reads the file that turn
+writes. `hermes serve` — the backend the desktop app and remote clients connect to —
+is a different thing, and a reachable port on it is **not** evidence that the council
+can run an agent.
 
 | Layer | Kind | What it establishes |
 |---|---|---|
@@ -394,8 +367,8 @@ signal is never promoted into a strong claim:
 | **L3 gateway** | optimistic, network | something is listening where a backend would be. A **hint**, and never part of the verdict. |
 | **L4 capability** | authoritative, costly | one real minimal turn. The only layer that proves anything, and the only one that costs money — so it is opt-in, behind `council doctor --probe`. |
 
-The verdict names the **first** thing that would stop a review, because that is the one
-worth fixing:
+The verdict names the **first** thing that would stop a review, because that is the
+one worth fixing:
 
 ```
 hermes    : Hermes Agent v0.0.0 (2026.9.24)  (/home/you/.nix-profile/bin/hermes)
@@ -404,14 +377,13 @@ hermes    : Hermes Agent v0.0.0 (2026.9.24)  (/home/you/.nix-profile/bin/hermes)
   verdict : ready — a review can run
 ```
 
-**Why not just check the port?** Because it answers a question nobody asked. The
-requirement is "a launcher that can complete a turn", and a listening socket is neither
-necessary nor sufficient for it: the gateway can be up while the launcher is absent (the
-desktop case), and the launcher can work with no gateway at all (the CLI case, which is
-every ordinary install). The port is a useful diagnostic when a *remote* setup
-misbehaves; it is not the availability test. `tests/test_hermes.py` pins both directions:
-a live listener must not turn a missing launcher into `ready`, and a dead port must not
-spoil a working one.
+**The port is not the availability test.** The requirement is "a launcher that can
+complete a turn", and a listening socket is neither necessary nor sufficient for it:
+the gateway can be up while the launcher is absent (the desktop case), and the launcher
+can work with no gateway at all (the CLI case, every ordinary install). The port is a
+useful diagnostic when a *remote* setup misbehaves. `tests/test_hermes.py` pins both
+directions: a live listener must not turn a missing launcher into `ready`, and a dead
+port must not spoil a working one.
 
 **Reaching a host from a VM or container — measured, not assumed.** A `127.0.0.1`
 inside a guest is the guest. In a NixOS VM test:
@@ -422,10 +394,8 @@ inside a guest is the guest. In a NixOS VM test:
 | host service via `127.0.0.1` | CLOSED | CLOSED |
 | host service via `10.0.2.2` | CLOSED | **OPEN** |
 
-Three separate facts, and the middle one is the one that surprises people:
-
-1. **`127.0.0.1` is the guest.** It never reaches the host, in any configuration. The
-   control line is what makes that a measurement rather than an assertion.
+1. **`127.0.0.1` is the guest.** It never reaches the host, in any configuration; the
+   control line makes that a measurement rather than an assertion.
 2. **`10.0.2.2` is QEMU's SLIRP gateway** — the loopback of whatever network namespace
    the QEMU process is in. The test driver's own listener is reachable there in both
    columns, so the gateway works; what differs is *which* namespace it points at.
@@ -434,19 +404,18 @@ Three separate facts, and the middle one is the one that surprises people:
    `--option sandbox false` makes the host's `127.0.0.1` reachable at `10.0.2.2`.
 
 So a VM reaches the host at **`10.0.2.2`, and only with the sandbox off** — not at
-`127.0.0.1`. Under WSL's mirrored networking `127.0.0.1` *does* reach the Windows host,
-which is exactly why the assumption is easy to make: it is a property of that setup,
-not of guests in general. A container sharing the host's network namespace
-(`--network host`) gets a host process's reach; a VM does not.
+`127.0.0.1`. Under WSL's mirrored networking `127.0.0.1` *does* reach the Windows host:
+a property of that setup, not of guests in general. A container sharing the host's
+network namespace (`--network host`) gets a host process's reach; a VM does not.
 
-Note that `--option sandbox false` alone changes nothing on a second run — it is not
-part of the derivation, so nix returns the cached result and the option looks inert.
-Force it with `--rebuild`, or the experiment will "confirm" whatever it did last time.
+`--option sandbox false` alone changes nothing on a second run — it is not part of the
+derivation, so nix returns the cached result and the option looks inert. Force it with
+`--rebuild`.
 
 ### Tool-name matching is fuzzy on purpose
 
 A reviewer may report `py_compile`, `py-compile`, `python -m py_compile`,
-`python3 -m py_compile`, `/usr/bin/ruff`, `ruff.exe`, or `cargo test`. All resolve to
+`python3 -m py_compile`, `/usr/bin/ruff`, `ruff.exe`, or `cargo test`; all resolve to
 the expected tool (`tool_name_candidates`). Without that, one character or one
 invocation style silently zeros a dimension's β.
 
@@ -468,12 +437,13 @@ belong in `runs/`, which **is** committed.
 For a schedule that survives restarts, use cron rather than a live session:
 
 ```bash
-hermes cron add --name council-nightly --schedule "0 2 * * *" \
-  --command "council review <repo> --mode full --max-rounds 2"
+hermes cron add --name council-nightly "0 2 * * *" \
+  "council review <repo> --mode full --max-rounds 2"
 ```
 
 For unattended runs that must survive restarts, `council swarm` builds the durable
-council as a kanban graph and `council setup dispatcher` runs it as a systemd user service.
+council as a kanban graph and `council setup dispatcher` runs it as a systemd user
+service.
 
 ## Distribution: repo ↔ skill
 
@@ -487,15 +457,15 @@ rubrics under its own directory, so installing it on a new machine needs no clon
 <skill_dir>/assets/rubrics/<name>/SKILL.md
 ```
 
-Push repo changes into the installed skill with `council setup skill`; it resolves the
+`council setup skill` pushes repo changes into the installed skill; it resolves the
 destination from the live Hermes config (`skills.external_dirs`, else the Hermes
 home), so it is portable across Windows/macOS/Linux. `council setup bots` (the
-installer) reads from either layout — `<root>/bots` + `<root>/skills` (repo) or
+installer) reads either layout — `<root>/bots` + `<root>/skills` (repo) or
 `<root>/assets/bots` + `<root>/assets/rubrics` (skill) — so the same installer
 bootstraps profiles from whichever tree it lives in.
 
-**Nothing in this framework hardcodes a machine path.** Every location is derived
-at runtime from the skill's own directory, the Hermes home, or the session.
+**Nothing in this framework hardcodes a machine path.** Every location is derived at
+runtime from the skill's own directory, the Hermes home, or the session.
 
 ## Testing
 
