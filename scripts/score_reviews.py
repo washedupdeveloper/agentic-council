@@ -11,12 +11,21 @@ prompt), 2 error. Input contract: docs/FRAMEWORK.md.
 from __future__ import annotations
 
 import argparse
+import importlib.util as _shared_util
 import json
 import math
 import re
 import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
+
+# `_shared` by path, like every sibling here -- see its own docstring for why a
+# plain import would not be safe.
+_SHARED_SPEC = _shared_util.spec_from_file_location(
+    "_shared", Path(__file__).resolve().parent / "_shared.py")
+assert _SHARED_SPEC is not None and _SHARED_SPEC.loader is not None, "_shared.py"
+_shared = _shared_util.module_from_spec(_SHARED_SPEC)
+_SHARED_SPEC.loader.exec_module(_shared)
 
 HERE = Path(__file__).resolve().parent
 
@@ -317,18 +326,7 @@ def kloc(root: Optional[Path]) -> float:
     """
     if root is None or not root.is_dir():
         return 0.0
-    total = 0
-    for path in root.rglob("*"):
-        if not path.is_file() or path.suffix not in SOURCE_SUFFIXES:
-            continue
-        if any(part in {".git", ".review-council", "node_modules", "result"}
-               for part in path.parts):
-            continue
-        try:
-            total += sum(1 for _ in path.open("r", encoding="utf-8", errors="replace"))
-        except OSError:
-            continue
-    return total / 1000.0
+    return _shared.kloc(root)
 
 
 def hill_density(density: float, dimension: Optional[str] = None,

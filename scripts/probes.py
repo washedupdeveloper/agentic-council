@@ -576,7 +576,7 @@ def probe_nix_eval_time(root: Path) -> Dict[str, Any]:
     if rc == 127:
         return result("nix-eval-time", False, None, [], out[:200], parsed=False)
 
-    baseline, baseline_path = load_eval_baseline(root)
+    baseline, _ = load_eval_baseline(root)
 
     if baseline is None:
         return result("nix-eval-time", True, None, [],

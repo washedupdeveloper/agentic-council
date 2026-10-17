@@ -275,10 +275,17 @@ council setup toolchain --which ruff
 and the devshell exports it — so nothing builds the toolchain at run time.
 
 The tool list is `research/nix-tooling.md` §0 plus the Python toolchain DECISIONS #3
-requires. Current set (24 tools): `nix`, `nixfmt`, `nixfmt-tree`, `treefmt`, `statix`,
-`deadnix`, `nixd`, `nil`, `nix-tree`, `nix-diff`, `nix-fast-build`, `nix-du`, `vulnix`,
+requires. Current set (23 tools): `nix`, `nixfmt`, `nixfmt-tree`, `treefmt`, `statix`,
+`deadnix`, `nixd`, `nil`, `nix-tree`, `nix-diff`, `nix-fast-build`, `nix-du`,
 `gitleaks`, `osv-scanner`, `tokei`, `cloc`, `jq`, `ruff`, `mypy`, `pytest`, `bandit`,
 `shellcheck`, `yamllint`.
+
+**`vulnix` is deliberately NOT in the set** (24 -> 23). It is unmaintained upstream;
+it needs a maintained whitelist this repo does not ship, so its own rubric line
+could not run; and `--system` scans the closure of the machine RUNNING it rather
+than the repository under review. Advisory CVEs for the pinned nixpkgs come from
+the Nixpkgs security tracker instead. Measured: removing it frees 193.3 MB, 19.7%
+of the toolchain closure and 26 MB off the container.
 
 **semgrep is deliberately excluded**: it is not in the §0 inventory, and it does not
 build on this nixpkgs revision (`pyjwt~=2.13.0 not satisfied by 2.14.0`). A tool that

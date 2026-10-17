@@ -92,8 +92,10 @@ of the gap between the best bad and the worst good. The separating interval is
 Reading the plateau off the sweep instead produces an artifact: a score of 79.8399 becomes a candidate
 of 79.84 and thereby lands on the "bad" side of itself, so the plateau appears only by coincidence of
 rounding — and collapses to a single point whenever no observed score falls in the gap.
-`choose_threshold` works from labels; `pick_threshold` (sweep-based) is retained only as a fallback
-when labels are unavailable.
+`choose_threshold` works from labels and returns nothing when a class has no labelled point.
+There is deliberately **no sweep-based fallback**: `sweep_threshold` needs both classes too, so a
+manifest with no labels yields no threshold at all. Reporting nothing is the honest answer — a
+threshold derived from a one-class sweep would be a number with no evidence behind it.
 
 ## What is NOT calibrated
 
@@ -144,6 +146,16 @@ council calibrate --build-eval /tmp/ladder --base .
 council calibrate --good <known-good> --bad <known-bad> --out calibration.json
 ```
 
-`calibrate.recalibrate(measured, k=...)` re-derives `d*`, the sweep and the threshold from
-**already-measured** points, so `k` and the selection rule can be re-tuned without paying for the
-toolchain sweep again.
+The ladder is measured once and then re-tuned for free:
+
+```sh
+# Measure every rung (the slow half) and keep the raw points
+council calibrate --ladder /tmp/ladder/manifest.json --out calibration.json
+
+# Re-derive d*, the sweep and the threshold from those points alone
+council calibrate --recalibrate calibration.json --k 1.4 --out retuned.json
+```
+
+`--recalibrate` reads the `measured` points a calibration already recorded, so `k` and the selection
+rule can be re-tuned without paying for the toolchain sweep again. A manifest with no `ladder` key
+is refused by name, as is a ladder handed to `--recalibrate`.

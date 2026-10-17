@@ -4,15 +4,23 @@
 from __future__ import annotations
 
 import glob
+import importlib.util as _shared_util
 import locale
 import os
 import re
 import shutil
-import subprocess
 import sys
 from pathlib import Path
 
 from hermes_home import resolve as resolve_hermes_home
+
+# `_shared` by path, like every sibling here -- see its own docstring for why a
+# plain import would not be safe.
+_SHARED_SPEC = _shared_util.spec_from_file_location(
+    "_shared", Path(__file__).resolve().parent / "_shared.py")
+assert _SHARED_SPEC is not None and _SHARED_SPEC.loader is not None, "_shared.py"
+_shared = _shared_util.module_from_spec(_SHARED_SPEC)
+_SHARED_SPEC.loader.exec_module(_shared)
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -53,12 +61,7 @@ FLAKE_FILES = ("flake.nix", "flake.lock")
 
 def hermes_run(args: list[str]) -> tuple[int, str]:
     """A `hermes ...` call's exit status and stdout; stderr dropped."""
-    try:
-        proc = subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-                              text=True, encoding="utf-8", errors="replace")
-    except OSError:
-        return 127, ""
-    return proc.returncode, proc.stdout or ""
+    return _shared.hermes_run(args)
 
 
 def sort_names(names: list[str]) -> list[str]:

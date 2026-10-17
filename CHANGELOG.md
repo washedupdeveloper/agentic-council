@@ -639,6 +639,63 @@ tooling. Its absence would have left `/council` undeployable. It is now
   `docs/CI.md` records both, with the numbers, plus how to add substituters or a private
   cache if the closure ever stops being fully substitutable.
 
+### Changed
+
+- **`flake.nix` is a flake-parts flake.** It was 1,351 lines in one file; it is now
+  ~90 lines of configuration over four modules — `nix/builders.nix` (the derivation
+  builders), `nix/flake-module.nix` (the consumer-facing surface), `nix/checks.nix`
+  (this repo's own gates and the devshell) and `flake.nix` itself. The builders were
+  moved as text rather than retyped, and the proof is derivation path: six outputs are
+  byte-identical to their pre-conversion paths, including `packages.toolchain`,
+  `packages.framework` and `checks.module-evaluates`.
+- **`flake.flakeModules.default` is the integration point for another flake.**
+  `imports = [ inputs.review-council.flakeModules.default ];` yields the packages, the
+  formatter and the app — the same definitions this repo builds for itself, not a copy.
+  `flake-parts.inputs.nixpkgs-lib.follows = "nixpkgs"` keeps it to one extra lock entry
+  for a consumer.
+- **`docs/OPTIMISATION.md`** records the measurements behind all of the below, including
+  the ones that were wrong first.
+
+### Removed
+
+- **`vulnix` is out of the toolchain.** Measured: the toolchain closure drops from
+  983.3 MB to 790.0 MB (−193.3 MB, −19.7%; 212 → 156 store paths), and its own closure
+  was the single largest member at 555 MiB. It is unmaintained upstream; it needs a
+  maintained whitelist this repo does not ship, so its own rubric line could not run as
+  written; and `vulnix --system` scans the closure of the machine RUNNING it rather than
+  the repository under review. Advisory CVEs for the pinned nixpkgs come from the Nixpkgs
+  security tracker instead. The rubric line, the `docs/AUTONOMY.md` inventory (24 → 23)
+  and both `research/nix-tooling.md` tables are updated to match.
+- **Three unreachable functions and one unused binding.** `calibrate.pick_threshold`
+  (provably unreachable — `sweep_threshold` returns `[]` under exactly the condition that
+  makes `choose_threshold` return `None`, so a sweep-based fallback could only ever
+  contribute `None`); `baseline.head_sha` (the changed set comes from the round's
+  recorded `target_sha`); `baseline.carried_llm_scores` (an identity wrapper whose
+  contract is implemented nowhere); and `probes.py`'s unused `baseline_path`.
+
+### Fixed
+
+- **`council calibrate --ladder` and `--recalibrate` exist and work.** The verb's own
+  description promised "recalibrate the threshold and curves" and `docs/CALIBRATION.md`
+  documented `calibrate.recalibrate(...)`, but `main()` never called it. `--ladder`
+  measures a ladder once and records the raw points; `--recalibrate` re-derives `d*`, the
+  sweep and the threshold from those points without re-running the probes. A manifest of
+  the wrong kind is refused by name rather than by traceback.
+- **`recalibrate` keeps the measurements it was given.** It dropped `measured` from its
+  output, so a re-tuned manifest could not be re-tuned again — which defeats the
+  function's whole purpose. Now pinned by a test.
+- **`docs/CALIBRATION.md` no longer claims a sweep fallback that cannot exist.** It
+  described `pick_threshold` as the fallback "when labels are unavailable", but a
+  one-class point set empties the sweep too, so the honest answer is no threshold at all.
+- **The duplicated helpers are one implementation, `scripts/_shared.py`.** `norm_path`
+  (×2) and `fingerprint` (×2) were byte-identical; `kloc` (×2) differed by a floor nobody
+  had written down, which is now the explicit `kloc(root, *, floor=...)`; the `hermes`
+  subprocess wrapper (×2) is one function. `_shared.py` is listed in `runtimeModules`,
+  because a shared module that does not ship breaks the shipped tree.
+- **`tests/test_portability.py` reads every Nix source, not `flake.nix` by name.** The
+  launchers moved into `nix/builders.nix`, and a test pinned to one filename fails on the
+  next move rather than on a regression.
+
 ## [1.0.0] — 2026-10-11
 
 First release. The framework reviews a git diff, scores it with a hybrid of

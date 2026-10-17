@@ -44,7 +44,7 @@ as pre-commit hooks.
 | `nil` | `pkgs.nil` | LSP + CLI diagnostics. |
 | `nixd` | `pkgs.nixd` | LSP, option-system aware. |
 | `nixpkgs-hammering` | `nix run github:Mic92/nixpkgs-hammering` | Package-expression linter; not for NixOS modules. |
-| `vulnix` | `pkgs.vulnix` | **Unmaintained** but still the only store/CVE scanner. |
+| `vulnix` | `pkgs.vulnix` | **Unmaintained**; the only store/CVE scanner. **Deliberately not shipped** — see §4.1. |
 | `nix-tree` | `pkgs.nix-tree` | Interactive closure browser + `--dot` + `--diff`. |
 | `nix-diff` | `pkgs.nix-diff` | Derivation-level diff. |
 | `nix-fast-build` | `pkgs.nix-fast-build` / `nix run github:Mic92/nix-fast-build` | Parallel eval+build of `checks`. |
@@ -179,7 +179,7 @@ the deterministic way to detect it.
 
 | Tool | Invocation | Output | Signal | Runtime | False positives |
 |---|---|---|---|---|---|
-| **`vulnix`** | `vulnix --system -w whitelist.toml --json` | **JSON** | CVE count (filtered by whitelist) | minutes (NVD download, cached) | **High.** Matches name+version against NVD; upstream backports are invisible, so patched-but-same-version packages report as vulnerable. Whitelisting is mandatory to make it usable. Unmaintained. |
+| ~~**`vulnix`**~~ **not shipped** | `vulnix --system -w whitelist.toml --json` | **JSON** | CVE count (filtered by whitelist) | minutes (NVD download, cached) | **High.** Matches name+version against NVD; upstream backports are invisible, so patched-but-same-version packages report as vulnerable. Whitelisting is mandatory to make it usable. Unmaintained. |
 | **`nix store verify`** | `nix store verify --recursive --sigs-needed 1 <path>` | exit code | unsigned/untrusted path count | seconds | None. |
 | **`nix why-depends`** | `nix why-depends --all <pkg> <dep>` | text | whether a sensitive path is reachable from a service closure | seconds | None. |
 | **`nix flake archive`** | `nix flake archive --json .` | **JSON** | input closure size / all inputs locked | seconds | None. |

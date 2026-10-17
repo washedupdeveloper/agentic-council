@@ -91,7 +91,11 @@ Store/closure hygiene (needs a Linux host with Nix):
 nix store verify --recursive --sigs-needed 1 <toplevel>   # unsigned path count
 nix why-depends --all <pkg> <dep>                         # reachability of a sensitive path
 nix flake archive --json .                                # all inputs locked
-vulnix --system -w whitelist.toml --json                  # CVE count (unmaintained, high FP)
+# Advisory CVEs for the PINNED nixpkgs (the question a repo review can answer):
+#   https://tracker.security.nixos.org/
+# `vulnix` is deliberately NOT shipped. It is unmaintained, it needs a maintained
+# whitelist the repo does not carry, and `--system` scans the closure of the
+# machine RUNNING it rather than the repository under review. See docs/NIX.md.
 ```
 
 **Multiplicative gates (not averaged):**
