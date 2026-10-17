@@ -32,7 +32,25 @@ goals → reviewer → merge → gate. Advisory mode means nothing is edited.
 (18 min): 3m 5s for the orchestrator's goal phase, 7m 51s for the reviewer sample, the
 rest for merge and gate. The cost is dominated by agent turns, not by repository size.
 
-## Result so far — flake-utils: 60.86, and two real findings
+## Result — 3 of 5 complete
+
+| repo | hybrid | blocking | verdict |
+|---|---:|---:|---|
+| clan-infra | **94.83** | — | passes |
+| devshell | **89.23** | — | passes |
+| flake-utils | **60.86** | **2** | fails |
+| treefmt-nix | — | — | running |
+| zero-to-nix | — | — | queued |
+
+**The threshold is not obviously wrong.** Two of three well-regarded repositories clear
+87.11 without any adjustment. The one that fails does so with two verifiable blocking
+findings rather than on a marginal score — 60.86, more than 26 points below.
+
+That changes what the calibration question is. It is not "the threshold is too strict for
+real repos"; it is "one of these five repos has a genuine supply-chain finding, and the
+gate caught it".
+
+### flake-utils: 60.86, and two real findings
 
 | dimension | llm | det | β | score |
 |---|---:|---:|---:|---:|
@@ -42,39 +60,32 @@ rest for merge and gate. The cost is dominated by agent turns, not by repository
 | architecture | 78.0 | 65.5 | 1.0 | 65.5 |
 | performance | 96.0 | 100.0 | 1.0 | 100.0 |
 
-**60.86** — below the archived *bad* run's 74.00, and far below the 87.11 threshold. The
-reason is not a scoring fault. The reviewer found two **blocking** findings:
-
 1. `.github/workflows/nix.yml:9` — CI installs Nix via `NixOS/nix-installer-action@main`,
    a moving branch rather than an immutable SHA, and the workflow declares no
    `permissions:` block. Third-party code therefore executes on every push with the
-   repository-default `GITHUB_TOKEN`. Pinning the action and adding
-   `permissions: contents: read` is the fix.
+   repository-default `GITHUB_TOKEN`.
 2. `examples/check-utils/flake.nix:28-29` — the shipped `check-utils` template puts
    intentionally-failing derivations in `checks`, so `nix flake check` in that subflake
-   exits 1 by construction. The rubric's zero-cap applies to that subflake, not the root
-   flake.
+   exits 1 by construction.
 
 Both are verifiable by the command each finding names. The first is a genuine
-supply-chain exposure in a widely-used repository.
+supply-chain exposure in a widely-used repository — and `zizmor` finds it mechanically in
+5 findings (see below), which is why it is now a probe.
 
-## What this already implies
+### A toolchain gap this run exposed
 
-**Reputation is not a label.** "Well-regarded and maintained" is not the same as
-"defect-free", and a calibration baseline has to be the second thing. If a repository
-with an unpinned CI action counts as known-good, then the threshold must sit below 60
-and the gate would pass code with a real high-severity finding — which is the failure
-mode the framework exists to catch.
+The first finding above is a class the deterministic half could not see: nothing in the
+toolchain read `.github/`. `ipetkov/crane` lints its workflows with `zizmor`, and adding
+that probe found flake-utils' unpinned `@main` action in one pass — plus 4 findings the
+LLM review had not reported (`artipacked`, `excessive-permissions`,
+`dependabot-cooldown`).
 
-So the honest options are:
+Adding it also reported **5 high-severity `unpinned-uses` findings against this
+repository's own workflows**, which were then fixed: every action is pinned to a full
+commit SHA. `docs/CI.md` had argued for major tags and its own condition for revisiting —
+"the moment the repo goes public" — had already fired.
 
-- **keep 87.11** and record that these repositories are *not* clean baselines — they
-  are well-regarded but defective, and the gate is doing its job by failing them; or
-- **find genuinely defect-free baselines** and derive the threshold from those.
-
-Lowering the threshold to accommodate them is not on the list, because it would mean
-weakening the gate to match the sample rather than choosing the sample to test the gate.
-
-**Status: 1 of 5 complete.** The remaining four are running. The table and the
-derivation follow when they finish; the conclusion above does not depend on them unless
-all four come back with zero blocking findings, which would make flake-utils the outlier.
+**Status: 3 of 5 complete.** treefmt-nix and zero-to-nix are still running at roughly
+18 minutes each. The conclusion above does not depend on them unless both also pass, in
+which case the pattern is "4 of 5 pass, 1 has real defects" and the threshold stands
+unchallenged.
