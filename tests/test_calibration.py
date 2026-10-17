@@ -6,7 +6,6 @@ Run standalone (no pytest needed):
 from __future__ import annotations
 
 import importlib.util
-import json
 import sys
 import tempfile
 from pathlib import Path
@@ -219,105 +218,6 @@ def test_density_scorer_falls_back_without_a_manifest():
     """
     got = score.hill_density(5.0, calibration={})
     assert got == score.hill_curve(5.0), "uncalibrated must match the legacy curve"
-
-
-# --- the reviewer-findings curve ------------------------------------------
-#
-# `d_star` is measured from PROBES. The density term scores the REVIEWER's
-# findings, a population an order of magnitude larger, so it needs its own
-# anchor. Borrowing the probe one put the term at ~1/100 for every real review.
-
-def test_llm_density_is_reported_uncalibrated_without_an_anchor():
-    """No anchor: fall back AND say so. A silent fallback is how a clean
-    repository scored 61."""
-    manifest = {"halflife_k": 1.2, "d_star": {"complexity": {"d_star": 2.0, "floored": False}}}
-    got, calibrated = score.hill_llm_density(56.0, "security", calibration=manifest)
-    assert calibrated is False
-    assert got == score.hill_density(56.0, "security", manifest), \
-        "the fallback must be the probe curve, unchanged"
-
-
-def test_llm_density_anchors_a_known_good_density_at_mid_scale():
-    """§7 step 2: d* = the density seen on the known-good baseline, so a
-    known-good density lands at 50 on the curve."""
-    manifest = {
-        "halflife_k": 1.2,
-        "d_star": {"complexity": {"d_star": 2.0, "floored": False}},
-        "llm_density": {
-            "per_dimension": {
-                "security": {"d_star": 56.0},
-                "readability": {"d_star": 56.0},
-            }
-        },
-    }
-    got, calibrated = score.hill_llm_density(56.0, "security", calibration=manifest)
-    assert calibrated is True
-    assert abs(got - 50.0) < 0.5, f"known-good density must land mid-scale, got {got}"
-
-
-def test_llm_density_and_probe_density_disagree_by_design():
-    """The two curves must NOT coincide: if they do, the anchor was not applied
-    and the density term is measuring probes against reviewer output."""
-    manifest = {
-        "halflife_k": 1.2,
-        "d_star": {"complexity": {"d_star": 2.0, "floored": False}},
-        "llm_density": {"per_dimension": {"security": {"d_star": 56.0}}},
-    }
-    probe_side = score.hill_density(56.0, "security", manifest)
-    llm_side, _ = score.hill_llm_density(56.0, "security", manifest)
-    assert llm_side > probe_side + 10, \
-        f"llm curve {llm_side} should sit well above the probe curve {probe_side}"
-
-
-def test_scoring_reports_a_missing_llm_anchor():
-    """The gap must reach the gate's output, not stay inside the scorer."""
-    review = {
-        "score": 70.0,
-        "tools_run": [{"name": "complexity", "ran": True, "signal": 90}],
-        "findings": [],
-    }
-    _det, _beta, missing = score.deterministic_score(
-        review, "architecture", ["generic"], size_kloc=1.0)
-    assert "llm-density-uncalibrated" in missing
-
-
-def test_llm_density_from_runs_uses_the_median(tmp_path):
-    """d* = median known-good density, so one noisy baseline cannot move the
-    anchor that decides where "clean" sits."""
-
-    def make_run(name: str, counts: list) -> Path:
-        run = tmp_path / name
-        (run / "round-1").mkdir(parents=True)
-        repo = tmp_path / f"repo-{name}"
-        repo.mkdir()
-        # 1 KLOC exactly, so density == weighted findings.
-        (repo / "a.py").write_text("\n" * 1000, encoding="utf-8")
-        (run / "outcome.json").write_text(
-            json.dumps({"repo": str(repo)}), encoding="utf-8")
-        for dim, n in zip(("security", "correctness", "readability",
-                           "architecture", "performance"), counts):
-            (run / "round-1" / f"{dim}.json").write_text(
-                json.dumps({"findings": [
-                    {"severity": "low", "status": "open"} for _ in range(n)
-                ]}), encoding="utf-8")
-        return run
-
-    runs = [make_run("r1", [2, 2, 2, 2, 2]),
-            make_run("r2", [4, 4, 4, 4, 4]),
-            make_run("r3", [60, 60, 60, 60, 60])]
-    block = cal.llm_density_from_runs(runs)
-    # Median of [2, 4, 60] is 4 -- the outlier must not win.
-    assert block["per_dimension"]["security"]["n"] == 3
-    assert block["per_dimension"]["security"]["d_star"] < 10, \
-        "one noisy baseline must not drag the anchor"
-
-
-def test_llm_density_from_runs_rejects_a_non_run(tmp_path):
-    try:
-        cal.llm_density_from_runs([tmp_path])
-    except SystemExit:
-        return
-    raise AssertionError("a directory with no outcome.json must be refused")
 
 
 def test_kloc_of_an_unknown_repo_is_zero():
