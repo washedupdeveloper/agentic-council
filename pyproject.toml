@@ -5,7 +5,7 @@
 # under `skills/`. A build backend here would imply a wheel nobody consumes.
 [project]
 name = "review-council"
-version = "1.4.1"
+version = "1.4.2"
 description = "Hermes-native code review: a generalist reviewer sampled N times, a deterministic gate, and an autonomous loop."
 readme = "README.md"
 requires-python = ">=3.11"

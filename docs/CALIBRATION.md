@@ -96,10 +96,23 @@ with no evidence behind it.
 
 ## What is NOT calibrated
 
-- **The threshold is provisional.** It rests on **one** known-good sample; the plateau's upper edge
-  *is* that sample's score. Add more known-good repos and re-run before treating 87.11 as settled.
-- **The LLM half is not calibrated.** This measures the deterministic half only; that needs labelled
-  real council runs at roughly 9 minutes each.
+- **The threshold is provisional, and now measured against real repositories.** It rests
+  on one known-good sample; the plateau's upper edge *is* that sample's score. Five
+  well-regarded repositories were reviewed end-to-end on the **hybrid** scale
+  (`runs/clean-baseline-evaluation-2026-10-17.md`): **three pass 87.1141 unchanged**
+  (treefmt-nix 98.40, clan-infra 94.83, devshell 89.23) and **two fail for verifiable
+  reasons** (zero-to-nix 80.63 on 45 dependency CVEs; flake-utils 60.86 on two blocking
+  findings). The classes do not separate: the best failing repo (80.63) sits 0.59 above
+  the golden defects fixture (80.04), so a max-margin threshold would be 80.34 with a
+  margin of 0.30 — unusable. **The threshold is therefore a policy line, not a measured
+  boundary**, and it sits above every repo in the sample with a real finding and below
+  every one without. Add more known-good repos before treating 87.11 as settled.
+- **The LLM half now has measurements, not a calibration.** Five hybrid end-to-end runs
+  exist (`runs/clean-baseline-evaluation-2026-10-17.md`), each n=1 at one sample and one
+  round. That is enough to show the hybrid scale does not separate clean from defective
+  code — and therefore that no threshold is derivable from it — but it is not a
+  calibration of the reviewer's scores. The LLM half would need repeated samples per
+  repository to estimate its variance, at roughly 18 minutes a run.
 - **Weights `α_t` are still the working defaults.** §7 says reweight only with evidence.
   That evidence does not exist, and the measurement below shows it would buy little
   anyway — see "How much `α_t` could move the verdict".

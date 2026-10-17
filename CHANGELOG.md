@@ -6,6 +6,39 @@ All notable changes to this project. Format follows
 
 ## [Unreleased]
 
+## [1.4.2] — 2026-10-17
+
+### Changed
+
+- **The threshold was measured against real repositories, and the answer is that it
+  cannot be derived.** Five well-regarded repos were reviewed end-to-end on the hybrid
+  scale — the same numbers the gate enforces — at one sample and one round each
+  (`runs/clean-baseline-evaluation-2026-10-17.md`):
+
+  | repo | hybrid | verdict |
+  |---|---:|---|
+  | treefmt-nix | 98.40 | passes |
+  | clan-infra | 94.83 | passes |
+  | devshell | 89.23 | passes |
+  | zero-to-nix | 80.63 | fails |
+  | flake-utils | 60.86 | fails |
+
+  **Three of five pass 87.1141 unchanged**, and the two failures are verifiable rather
+  than marginal: zero-to-nix's security `det` is 58.84 because `osv-scanner` reports 45
+  dependency CVEs, and flake-utils has two blocking findings (an unpinned `@main` action,
+  and a template that fails its own `nix flake check`).
+
+  The classes do not separate. The best failing repo (80.63) sits **0.59 points** above
+  the golden defects fixture (80.04), so a max-margin threshold would be **80.34 with a
+  margin of 0.30** — a line that puts a repository with 45 CVEs within a rounding step of
+  passing. The reason is structural: both classes contain imperfect code, so "known-good"
+  and "known-bad" differ in density, not in kind, and a weighted mean reflects density.
+
+  **The threshold is therefore recorded as a policy line, not a measured boundary**, and
+  it is left at 87.1141. It sits above every repository in the sample with a real finding
+  and below every one without; nothing in this run argues for moving it. `docs/CALIBRATION.md`
+  says so, with the sample's limits stated: n=1 per repo, β varies by content, and five
+  hand-picked repositories are not a distribution.
 ## [1.4.1] — 2026-10-17
 
 ### Fixed

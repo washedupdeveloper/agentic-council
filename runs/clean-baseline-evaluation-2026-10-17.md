@@ -1,11 +1,11 @@
-# Clean-baseline evaluation — 2026-10-17 (in progress)
+# Clean-baseline evaluation — 2026-10-17
 
 **Purpose.** The threshold rested on **one** known-good sample — this repository's own
-level-0 rung — so its upper plateau edge was that sample's score. M8 records this as a
-provisional number. The question here is whether real, well-regarded repositories
-support it, and whether they can serve as known-good baselines at all.
+level-0 rung — so its upper plateau edge was that sample's score. M8 records that as
+provisional. The question here is whether real, well-regarded repositories support it,
+and whether the hybrid scale separates clean code from defective code at all.
 
-**Baselines.** Five repositories named by the owner as candidates:
+**Baselines.** Five repositories named by the owner:
 
 | repo | kloc | nix files | HEAD |
 |---|---:|---:|---|
@@ -16,41 +16,36 @@ support it, and whether they can serve as known-good baselines at all.
 | zero-to-nix | 1.98 | 16 | `ce2725e` |
 
 **Method — the hybrid scale, not the deterministic one.** The existing calibration
-measures `score_from_densities`, but the gate enforces its threshold on the **hybrid**
-aggregate. Deriving a threshold on one scale and enforcing it on another is the
-mismatch this run exists to close. Each repo gets a real end-to-end review:
+measured `score_from_densities`, but the gate enforces its threshold on the **hybrid**
+aggregate. Deriving a threshold on one scale and enforcing it on another is the mismatch
+this run exists to close. Each repo got a real end-to-end review:
 
 ```bash
 council review <repo> --scope whole-repo --samples 1 \
     --min-rounds 1 --max-rounds 1 --mode advisory --run-root /tmp/cal-runs/<name>
 ```
 
-One sample and one round is the cheapest run that still exercises the whole pipeline:
-goals → reviewer → merge → gate. Advisory mode means nothing is edited.
+One sample, one round: the cheapest run that still exercises the whole pipeline —
+goals → reviewer → merge → gate. Advisory, so nothing was edited.
 
-**Cost, measured.** flake-utils, the smallest repo at 0.62 KLOC, took **1074 s**
-(18 min): 3m 5s for the orchestrator's goal phase, 7m 51s for the reviewer sample, the
-rest for merge and gate. The cost is dominated by agent turns, not by repository size.
+**Cost, measured.** 18–24 minutes per repository, dominated by agent turns rather than
+repository size: flake-utils at 0.62 KLOC took the same wall clock as treefmt-nix at
+7.44 KLOC. Five repos, roughly 1h45m of compute — more than the hour estimated.
 
-## Result — 3 of 5 complete
+## Result
 
-| repo | hybrid | blocking | verdict |
-|---|---:|---:|---|
-| clan-infra | **94.83** | — | passes |
-| devshell | **89.23** | — | passes |
-| flake-utils | **60.86** | **2** | fails |
-| treefmt-nix | — | — | running |
-| zero-to-nix | — | — | queued |
+| repo | hybrid | β | blocking | verdict |
+|---|---:|---:|---:|---|
+| treefmt-nix | **98.40** | 0.61 | 0 | passes |
+| clan-infra | **94.83** | 1.00 | 0 | passes |
+| devshell | **89.23** | 1.00 | 0 | passes |
+| zero-to-nix | **80.63** | 0.80 | 0 | fails |
+| flake-utils | **60.86** | 1.00 | 2 | fails |
 
-**The threshold is not obviously wrong.** Two of three well-regarded repositories clear
-87.11 without any adjustment. The one that fails does so with two verifiable blocking
-findings rather than on a marginal score — 60.86, more than 26 points below.
+**Three of five pass 87.1141 unchanged.** The two that fail do so for verifiable reasons,
+not on a scoring artefact.
 
-That changes what the calibration question is. It is not "the threshold is too strict for
-real repos"; it is "one of these five repos has a genuine supply-chain finding, and the
-gate caught it".
-
-### flake-utils: 60.86, and two real findings
+### flake-utils: 60.86, two blocking findings
 
 | dimension | llm | det | β | score |
 |---|---:|---:|---:|---:|
@@ -68,24 +63,65 @@ gate caught it".
    intentionally-failing derivations in `checks`, so `nix flake check` in that subflake
    exits 1 by construction.
 
-Both are verifiable by the command each finding names. The first is a genuine
-supply-chain exposure in a widely-used repository — and `zizmor` finds it mechanically in
-5 findings (see below), which is why it is now a probe.
+### zero-to-nix: 80.63, no blocking findings
 
-### A toolchain gap this run exposed
+| dimension | llm | det | β | score | missing |
+|---|---:|---:|---:|---:|---|
+| security | 74.0 | **58.84** | 1.00 | 58.84 | — |
+| correctness | 88.0 | 89.08 | 0.57 | 88.62 | jest, tsc, pytest |
+| readability | 90.0 | 89.08 | 0.75 | 89.31 | eslint, prettier |
+| architecture | 88.0 | 94.57 | 1.00 | 94.57 | — |
+| performance | 85.0 | 89.08 | 0.67 | 87.72 | bundle-size |
 
-The first finding above is a class the deterministic half could not see: nothing in the
-toolchain read `.github/`. `ipetkov/crane` lints its workflows with `zizmor`, and adding
-that probe found flake-utils' unpinned `@main` action in one pass — plus 4 findings the
-LLM review had not reported (`artipacked`, `excessive-permissions`,
-`dependabot-cooldown`).
+Every dimension sits at 87–94 except security, which is dragged down by **45 dependency
+CVEs** from `osv-scanner` — `golang.org/x/crypto 0.52.0` (GO-2026-5932) among them. No
+single finding is high enough to block; the density is what fails the run.
 
-Adding it also reported **5 high-severity `unpinned-uses` findings against this
-repository's own workflows**, which were then fixed: every action is pinned to a full
-commit SHA. `docs/CI.md` had argued for major tags and its own condition for revisiting —
-"the moment the repo goes public" — had already fired.
+## The classes do not separate on the hybrid scale
 
-**Status: 3 of 5 complete.** treefmt-nix and zero-to-nix are still running at roughly
-18 minutes each. The conclusion above does not depend on them unless both also pass, in
-which case the pattern is "4 of 5 pass, 1 has real defects" and the threshold stands
-unchallenged.
+| | score |
+|---|---:|
+| worst **passing** repo (devshell) | 89.23 |
+| best **failing** repo (zero-to-nix) | 80.63 |
+| known-bad: golden defects fixture | 80.04 |
+
+`zero-to-nix` at 80.63 sits **0.59 points above** the golden defects fixture at 80.04. A
+max-margin threshold over these two classes would be **80.34, margin 0.30** — a line that
+puts a repository with 45 dependency CVEs within a rounding step of passing.
+
+**So no threshold is derivable from this data.** The reason is structural, not
+statistical: both classes contain imperfect code. A well-regarded repository is not
+defect-free, so "known-good" and "known-bad" differ in *density*, not in kind, and the
+hybrid score is a weighted mean of quality — it reflects density. There is no gap to find.
+
+That makes 87.1141 a **policy line rather than a measured boundary**, and it is a
+defensible one: it sits above every repository in this sample that has a real finding and
+below every one that does not. **Nothing in this run argues for moving it.**
+
+## What this run did change
+
+Three things, none of them the threshold:
+
+1. **`d*` was anchored on one repo, with 11 of 12 entries floored.** Rebuilt from six
+   known-good baselines: `calibrate --good` is repeatable, and `d*` anchors on the *worst*
+   density per tool across the set (v1.3.3). Anchoring on the tidiest repo would mark every
+   other clean repo as failing.
+2. **A probe bug hid the measurement.** `run_probes` treated any non-JSON answer as "no
+   probes", so a calibration invoked as a library measured zero points and reported "no
+   labels" (v1.3.3).
+3. **A toolchain gap.** Nothing read `.github/`, which is why flake-utils' unpinned action
+   went unseen by the deterministic half. `zizmor` is now a probe (v1.4.0), and it
+   immediately reported **5 high-severity unpinned actions in this repository's own
+   workflows**, since fixed (v1.4.1).
+
+## What is still not known
+
+- **n=1 per repo.** One sample, one round. M8.5 showed sampling buys recall, so a
+  five-sample run could move these scores; nothing here estimates by how much.
+- **β varies with what a repository contains** (0.61 for treefmt-nix, 1.00 for two
+  others), so the scores are comparable as the gate's *verdicts* — which is what they are
+  — but not as measurements of code quality.
+- **Two of the five are small** (0.62 and 1.13 KLOC), where one finding moves the density
+  a lot. KLOC normalisation is weak at that size.
+- **Five hand-picked repositories is not a sample.** The threshold's position relative to
+  the distribution of real repositories is unknown.

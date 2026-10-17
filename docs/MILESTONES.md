@@ -243,6 +243,16 @@ is a policy choice because a weight encodes consequence cost rather than accurac
   the metrics are `no data` by construction.
 - ✅ **A/B harness** — built as M8.5 (`scripts/ablate.py`): four arms at equal cost against a pre-registered rule; the answer was **collapse** (M8.5).
 - ✅ **Golden end-to-end regression suite** — `scripts/golden.py` + `tests/golden/`, run by `council golden --check` and by `pytest`. Two layers, because the pipeline fails differently in each: a **round** layer (reviewer files → hybrid verdict, pinning det, β, the Hill density, the aggregate and pass/fail) and a **merge** layer (samples + probes → per-dimension files, pinning the `tools_run` union and the probe seed). `tests/test_golden.py` is the criterion executed: each test mutates one scoring input, asserts the check fails, restores it, asserts it passes. Built because the β defect shipped with **210 green tests** — every merge test supplied its own fixture and nothing asserted a number end to end, so two halves could both drop `tools_run` while the suite stayed green and the score quietly became the LLM's judgement (see M8.5).
+- ⚠️ **The threshold is provisional, and the hybrid scale cannot settle it.** It rests on
+  one known-good sample. Five well-regarded repositories were reviewed end-to-end on the
+  hybrid scale (`runs/clean-baseline-evaluation-2026-10-17.md`): **three pass 87.1141
+  unchanged** (98.40, 94.83, 89.23) and **two fail for verifiable reasons** — zero-to-nix
+  at 80.63 on 45 dependency CVEs, flake-utils at 60.86 on two blocking findings. The
+  classes overlap (best failing repo 80.63 vs golden defects fixture 80.04), so no
+  threshold is derivable: a max-margin line would be 80.34 with a margin of 0.30. The
+  shipped value is therefore a **policy line** that happens to sit above every repo in the
+  sample with a real finding and below every one without. Nothing argues for moving it;
+  what would is a larger sample.
 - ⚠️ **`α_t` weights are uncalibrated, and measured to be immaterial.** §7 says reweight
   only with evidence. The evidence does not exist — a weight encodes *consequence cost*
   per dimension, which needs incident data, not defect labels — and
