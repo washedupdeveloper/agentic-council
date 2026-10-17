@@ -129,6 +129,7 @@ let
     "calibrate.py" # dev/calibrate
     "golden.py" # dev/golden
     "inject_defects.py" # dev/corpus
+    "version.py" # dev/version — the release policy, docs/VERSIONING.md
   ];
 
   # Resolve a tool name to a package. Top-level attrs first; then the Python

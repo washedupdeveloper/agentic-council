@@ -6,7 +6,18 @@ All notable changes to this project. Format follows
 
 ## [Unreleased]
 
+## [1.1.0] — 2026-10-17
+
 ### Added
+
+- **A written version policy, and the check that enforces it.** `docs/VERSIONING.md`
+  defines what major, minor and patch mean here: the deciding question is whether an
+  existing user has to change something, applied to the surfaces that actually exist —
+  user verbs, flake outputs, module options, run artifacts, finding fields, gate exit
+  codes, the container and the score. `council version` (devshell) prints, checks and
+  bumps; `checks.version` runs the check on every `nix flake check`; and `image.yml`
+  compares the pushed tag against `pyproject.toml` before it builds, so a mistyped tag
+  costs a minute instead of publishing a 300 MB artifact under the wrong version.
 
 - **The gate is three tiers, and the eval tier is a real one.** `checks.module` and
   `checks.flake` assert on the *evaluated* configuration through `lib.runTests`, so a
@@ -133,6 +144,15 @@ All notable changes to this project. Format follows
 
 
 ### Changed
+
+- **The score moved when the analyzer set changed, and this release records it.** Adding
+  `gitleaks` and `shellcheck` as probes moved the golden defects fixture from **52.69 to
+  55.16**, and beta *fell* on dimensions where a newly expected tool cannot run on that
+  fixture (security 1.0 to 0.667): beta is coverage, so expecting a tool that does not run
+  lowers it. The shipped threshold **87.1141** still yields the same verdicts on both
+  golden fixtures — clean satisfied at 100.0, defects not satisfied — which is what keeps
+  this a minor release under `docs/VERSIONING.md` rather than a major one. A threshold
+  tuned by hand before this release should be recalibrated.
 
 
 - **The shipped tree carries only what a review runs.** `mkFramework` now takes the

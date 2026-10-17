@@ -39,7 +39,7 @@ nix shell .#review-council               # the command + the analyzers on PATH
 | `setup dispatcher` | Run the kanban dispatcher as a systemd user service |
 | `setup toolchain` | Print or activate the pinned toolchain |
 
-Four more verbs — `calibrate`, `ablate`, `golden`, `corpus` — exist only in the **devshell**; `nix develop` then `council --help` lists them, and the shipped app refuses them.
+Five more verbs — `calibrate`, `ablate`, `golden`, `corpus`, `version` — exist only in the **devshell**; `nix develop` then `council --help` lists them, and the shipped app refuses them.
 
 `swarm`, `sample` and `merge` are **user** verbs: the dispatcher executes the worker cards and has no devshell or PATH entry for this framework, so the invocation must be the shipped app. `checks.commands` enforces the split — every dev verb must be rejected by the app and accepted by the devshell.
 

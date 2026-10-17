@@ -164,6 +164,16 @@ in
             touch $out
           '';
 
+          # The version policy (docs/VERSIONING.md) is a gate, not a convention:
+          # `pyproject.toml` and the newest CHANGELOG release have to agree, the
+          # releases have to descend, and `[Unreleased]` has to be first. There is no
+          # git in the sandbox, so the tag half of the check is CI's job (`--tag`);
+          # everything else is asserted here, on every `nix flake check`.
+          version = pkgs.runCommand "check-version" { nativeBuildInputs = [ tc ]; } ''
+            REVIEW_COUNCIL_DISPATCHED=1 python3 ${src}/scripts/version.py check
+            touch $out
+          '';
+
           # The toolchain must WORK, not merely exist: `python3 -m pytest` needs
           # pytest's runtime deps importable, which a bare symlinkJoin lacks.
           toolchain-built = pkgs.runCommand "check-toolchain" { } ''

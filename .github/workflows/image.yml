@@ -44,6 +44,14 @@ jobs:
       - uses: actions/checkout@v7
       - uses: cachix/install-nix-action@v31
 
+      # A tag that disagrees with `pyproject.toml` would publish an artifact whose
+      # name says one version and whose contents say another. This runs BEFORE the
+      # build, so a mistyped tag costs a minute rather than a 300 MB image, and the
+      # release it would have created never exists.
+      - name: the tag matches the version
+        run: |
+          REVIEW_COUNCIL_DISPATCHED=1 python3 scripts/version.py check --tag "$GITHUB_REF_NAME"
+
       - name: build
         run: |
           image=$(nix build .#container --print-out-paths --no-link)

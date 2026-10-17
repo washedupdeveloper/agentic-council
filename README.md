@@ -243,6 +243,7 @@ Nothing resolves a path from the author's machine. See `docs/NIX.md`.
 | [docs/CONTAINER.md](docs/CONTAINER.md) | the image: what it sets up, and its one limitation |
 | [docs/NIX.md](docs/NIX.md) | the flake: outputs, the toolchain split, darwin |
 | [docs/TOOLCHAIN.md](docs/TOOLCHAIN.md) | what each tool is for, and whether it is necessary |
+| [docs/VERSIONING.md](docs/VERSIONING.md) | what major, minor and patch mean here, and what enforces it |
 | [research/](research/) | the reports the design rests on |
 | [CHANGELOG.md](CHANGELOG.md) | what shipped in each release |
 

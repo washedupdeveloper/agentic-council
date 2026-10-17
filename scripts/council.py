@@ -42,6 +42,7 @@ VERBS: Dict[str, Tuple[str, str, bool, str]] = {
     "golden": ("golden.py", "dev", True, "replay fixed inputs and diff against pinned values"),
     "baseline": ("baseline.py", "user", True, "report the baseline, or what changed since it"),
     "goal": ("goal.py", "user", True, "express a run as a native Hermes /goal + quality gate"),
+    "version": ("version.py", "dev", True, "check or bump the release version (docs/VERSIONING.md)"),
     "corpus": ("inject_defects.py", "dev", True, "build a defect corpus with independent truth"),
 }
 
