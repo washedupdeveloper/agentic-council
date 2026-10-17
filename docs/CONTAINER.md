@@ -70,9 +70,10 @@ credential error where the help should have been.
 
 ## Why it is layered
 
-`buildLayeredImage`, no nix database: **99 layers**. Measured on the current build, the
-tarball is **313 MiB** (328,344,703 bytes) and its layers hold **1.06 GB**
-(1,064,611,840) uncompressed. The layers are gzipped, so the download is not the image.
+`buildLayeredImage`, no nix database: **99 layers**. Measured on v1.4.3's published asset,
+the tarball is **322.0 MiB** (337,566,420 bytes) and its layers hold **1.02 GiB**
+(1,090,508,800 bytes) uncompressed. The layers are gzipped, so the download is not the
+image.
 A store path's layer is content-addressed, so an unchanged toolchain produces
 byte-identical layer digests — a push uploads only what changed and a pull fetches only
 what the local copy lacks. That is the whole caching story; there is no build cache to
@@ -81,7 +82,7 @@ configure.
 The earlier build used `buildImageWithNixDb` and one layer (**365 MiB** as a
 tarball) to register the copied store paths in a nix database. Measured, the
 database bought nothing: `nix --version`, `nix-instantiate --parse` (what the nix-eval
-probe actually runs), all 14 analyzers that then shipped, and `doctor` reporting beta
+probe actually runs), all the analyzers that then shipped, and `doctor` reporting beta
 1.00 all work without it. It was also the **only** thing forcing a single layer, because its
 gcroots point into a layer that is not there while it is being generated:
 
@@ -95,7 +96,7 @@ Verified by loading the image into a **real docker daemon** in a disposable VM �
 check needs no particular host and no container runtime on the build machine, and the
 namespaces, mounts and cgroups are real rather than extracted layers under a chroot.
 
-Verified: it loads; it runs as uid 1000 in `/repo`; all 13 analyzers resolve on PATH;
+Verified: it loads; it runs as uid 1000 in `/repo`; every analyzer in `toolNames` resolves on PATH;
 `git`, `nixfmt`, `ruff` and `deadnix` work; `nix --version`, `nix eval` and
 `nix-instantiate` work with `NIX_CONF_DIR=/opt/nix`; the harness `--help` prints; a
 file is written. And a **complete scored review runs inside it** — fan-out, bucketing,

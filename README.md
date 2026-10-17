@@ -174,9 +174,12 @@ re-sync. The copier remains for hosts without Nix.
 ## Before you trust a score
 
 The shipped threshold (**87.1141**) was calibrated on *this* repository from **one**
-known-good sample, and `scripts/calibration.json` calls it `PROVISIONAL`. On your
-repository it is not a pass mark — read the score as a relative signal, or set your own
-with `--threshold`.
+known-good sample, and `scripts/calibration.json` calls it `PROVISIONAL`. Five
+well-regarded repositories were then reviewed end-to-end on the hybrid scale: **three pass
+it unchanged** and two fail for real reasons, but the best failing one sits **0.59 points**
+above the known-bad fixture — so the threshold is a policy line, not a measured boundary
+(`runs/clean-baseline-evaluation-2026-10-17.md`). On your repository it is not a pass mark
+— read the score as a relative signal, or set your own with `--threshold`.
 
 **The findings are the portable output; the score is a local yardstick.**
 
@@ -186,8 +189,8 @@ with `--threshold`.
   readability, architecture, performance — and labelling each finding with its dimension.
   Measured against five isolated specialists at equal cost on a 22-defect corpus:
   **22/22 against 13/22**, so the specialists were deleted.
-- **A deterministic half.** 13 pinned analyzers (`statix`, `deadnix`, `ruff`, `bandit`,
-  `gitleaks`, `shellcheck`, …) plus built-in probes that need nothing installed. `beta` is
+- **A deterministic half.** 14 pinned analyzers (`statix`, `deadnix`, `zizmor`, `ruff`,
+  `bandit`, `gitleaks`, `shellcheck`, …) plus built-in probes that need nothing installed. `beta` is
   the fraction of the score they cover; at `beta` = 1 the score is deterministic.
 - **A hybrid gate.** `score = beta·deterministic + (1−beta)·LLM`, against a threshold,
   with stall and no-improvement detection.

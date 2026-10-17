@@ -156,10 +156,12 @@ choice. So `nix/builders.nix` now has two lists:
 
 | list | count | where it lands |
 |---|---|---|
-| `toolNames` | 13 | devshell, container, `nix shell .#review-council` |
+| `toolNames` | 14 | devshell, container, `nix shell .#review-council` |
 | `devToolNames` | 9 | devshell only (`mkDevTools`) |
 
-Measured: the QA toolchain closure is **919.8 MB / 180 paths**, down from 983.3 MB / 212.
+Measured: the QA toolchain closure is **945.6 MB / 181 paths** (901.8 MiB), from
+983.3 MB / 212 before the optimisation — and up from 919.8 MB / 180 when `zizmor` was
+added in v1.4.0.
 The 9 DX tools are absent from the container entirely.
 
 Two tools were dropped outright rather than moved:

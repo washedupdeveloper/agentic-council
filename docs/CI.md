@@ -107,8 +107,8 @@ assumption behind it was false.
 
 | Measurement | Value |
 |---|---|
-| Toolchain closure | **919.8 MB**, 180 paths |
-| Available from `cache.nixos.org` | **178 of 180** |
+| Toolchain closure | **945.6 MB** (901.8 MiB), 181 paths |
+| Available from `cache.nixos.org` | **179 of 181** |
 | Not available | our own `review-council-toolchain` and `python3-…-env` |
 
 Both are `symlinkJoin`s — directories of symlinks, almost no bytes, seconds to build.

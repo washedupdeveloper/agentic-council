@@ -172,8 +172,9 @@ The NixOS VM test's `testScript` is 608 lines of shell inside a Nix string, in t
 file as everything else. That is 45% of `flake.nix` for one output, and it is the main
 argument for splitting the file.
 
-Container facts, measured: **99 layers**, tarball 313 MiB, and its layers hold 1.06 GB
-uncompressed — the layers are gzipped, so the download is not the image.
+Container facts, measured on v1.4.3's published asset: **99 layers**, tarball 322.0 MiB
+(337,566,420 bytes), and its layers hold **1.02 GiB** (1,090,508,800 bytes) uncompressed —
+the layers are gzipped, so the download is not the image.
 
 `flake.nix` has no flake-parts and no clan. Whether that should change, and in which
 order of the clan → flake-parts → nix priority the user asked for, is the subject of
@@ -815,7 +816,9 @@ exist to Nix, which is the repo's own standing rule and cost one extra cycle her
 ## 11. What I did not verify
 
 - **The container saving in a published release asset.** The 307 M figure is a
-  local build; the published asset is 348,769,967 bytes and was not rebuilt.
+  local build; the published asset was 348,769,967 bytes and was not rebuilt at the
+  time. **Since verified:** v1.4.3's asset measures 337,566,420 bytes (322.0 MiB),
+  built by CI, downloaded and unpacked — 99 layers holding 1,090,508,800 bytes.
 - **The condensed-probe prompt** (§4) — no round has been run with it.
 - **darwin execution** — unchanged from `docs/NIX.md`: declared and evaluated, not
   built.

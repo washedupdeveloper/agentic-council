@@ -299,9 +299,9 @@ The tool list is `research/nix-tooling.md` §0 plus the Python toolchain DECISIO
 requires. **Two lists, and the split is the point** — see `docs/TOOLCHAIN.md` for the
 per-tool verdict.
 
-**QA toolchain (13 tools, ships in the container and the app):** `nix`, `nixfmt`,
+**QA toolchain (14 tools, ships in the container and the app):** `nix`, `nixfmt`,
 `nixfmt-tree`, `statix`, `deadnix`, `vulnix` (on demand), `gitleaks`, `osv-scanner`,
-`ruff`, `mypy`, `pytest`, `bandit`, `shellcheck`. A tool is in this list only if the
+`zizmor`, `ruff`, `mypy`, `pytest`, `bandit`, `shellcheck`. A tool is in this list only if the
 gate scores it (`score_reviews.expected_tools`), a probe runs it (`scripts/probes.py`),
 or it is the mechanism that provides an output (the `formatter`).
 

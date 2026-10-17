@@ -6,6 +6,37 @@ All notable changes to this project. Format follows
 
 ## [Unreleased]
 
+## [1.4.4] — 2026-10-17
+
+### Fixed
+
+- **Six stale measurements across five docs, all traceable to `zizmor` being added in
+  v1.4.0.** Adding one tool moved every figure that counts or weighs the toolchain, and
+  nothing re-measured them:
+
+  | claim | was | measured |
+  |---|---|---|
+  | toolchain closure | 919.8 MB / 180 paths | **945.6 MB (901.8 MiB) / 181 paths** |
+  | substitutable from `cache.nixos.org` | 178 of 180 | **179 of 181** |
+  | QA tool count | 13 | **14** |
+  | release tarball | 313 MiB / 328,344,703 B | **322.0 MiB / 337,566,420 B** |
+  | layer content | 1.06 GB | **1.02 GiB (1,090,508,800 B)** |
+  | darwin dry-run | 239 paths fetched | **209 paths (454.3 MiB), 5 built** |
+
+  The count was wrong in six places (`docs/NIX.md` ×2, `docs/TOOLCHAIN.md`,
+  `docs/AUTONOMY.md`, `README.md`, `docs/CONTAINER.md`), and `docs/AUTONOMY.md` listed
+  only 13 names against a stated count of 14 — `zizmor` was missing from the enumeration.
+
+  Two counts were **removed rather than corrected**: `docs/CONTAINER.md` said "all 13
+  analyzers resolve on PATH" and "all 14 analyzers that then shipped". The first is now
+  "every analyzer in `toolNames`", which cannot go stale; the second described a past
+  measurement whose exact count is no longer recoverable, so it says "all the analyzers
+  that then shipped".
+
+  Every figure above was measured on this host: the closure and its substitutability path
+  by path against `cache.nixos.org` (one at a time — batched queries silently report
+  misses), the tarball and its 99 layers by downloading and unpacking the actual v1.4.3
+  release asset, and the darwin numbers from a `--dry-run` for `aarch64-darwin`.
 ## [1.4.3] — 2026-10-17
 
 ### Added

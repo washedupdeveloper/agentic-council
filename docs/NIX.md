@@ -58,7 +58,7 @@ A verb whose module parses arguments passes `--help` through to that module's ow
 
 | Part | How | Why |
 |---|---|---|
-| The toolchain — 13 analyzers | `packages.toolchain` | One nixpkgs input, so the whole set moves atomically with a single lock revision. |
+| The toolchain — 14 analyzers | `packages.toolchain` | One nixpkgs input, so the whole set moves atomically with a single lock revision. |
 | The framework tree | `packages.framework` | The **shipped** tree — runtime modules, `bots/`, `skills/` — and nothing else. `packages.dev-framework` is the same tree plus the dev verbs and the suite. |
 | What ships | `runtimeModules` / `devModules` (`nix/builders.nix`) | The shipping manifest, asserted against the CLI's own verb table by `checks.commands`. |
 | The command surface | `apps.council` | The pinned toolchain is on PATH at exec time, so no devshell and no PATH setup. |
@@ -91,8 +91,8 @@ The flake declares **`aarch64-darwin`** alongside the two Linux systems, so `nix
 | claim | how |
 |---|---|
 | the flake evaluates for `aarch64-darwin` | `nix flake check --all-systems --no-build` — every declared system, evaluated, nothing built |
-| every one of the 13 analyzers resolves | `nix eval .#toolchain.absent --system aarch64-darwin` → `[]` |
-| the closure is mostly substitutable | `nix build .#toolchain --system aarch64-darwin --dry-run` → **239 paths fetched, 5 built** |
+| every one of the 14 analyzers resolves | `nix eval .#toolchain.absent --system aarch64-darwin` → `[]` |
+| the closure is mostly substitutable | `nix build .#toolchain --system aarch64-darwin --dry-run` → **209 paths fetched (454.3 MiB), 5 built** |
 
 The toolchain is built from one nixpkgs revision, so a package missing for darwin shows up as an entry in `absent`, not as a failure halfway through a build.
 
