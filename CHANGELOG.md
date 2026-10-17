@@ -6,6 +6,32 @@ All notable changes to this project. Format follows
 
 ## [Unreleased]
 
+## [1.4.0] — 2026-10-17
+
+### Added
+
+- **`zizmor` — the only analyzer that reads `.github/`.** A workflow file is executed by
+  a forge with the repository token's authority, so it is attack surface nothing else in
+  the toolchain looked at. It catches the class a reviewer has to notice by hand: an
+  unpinned `uses: owner/repo@main` runs whatever that branch points at on every push, and
+  an absent `permissions:` block leaves the default token, which is write-all on
+  repositories created before February 2023.
+
+  Measured on `numtide/flake-utils`: **5 findings, including
+  `uses: NixOS/nix-installer-action@main`** — the same defect an end-to-end LLM review of
+  that repository found, caught mechanically and at a fixed cost. On `ipetkov/crane`,
+  which pins every action to a full SHA and sets `permissions: contents: read`: **0
+  findings**, so the probe distinguishes the two rather than flagging CI in general.
+
+  It is deliberately **not** in `STACK_TOOLS`. It only applies when
+  `.github/workflows` exists, and listing it as expected would make beta fall on every
+  repository without CI — punishing a repository for a check that cannot apply to it. It
+  contributes to `det` through `tools_run` whenever it does run. `docs/TOOLCHAIN.md` and
+  a test both pin that.
+
+  Cost: the QA toolchain goes from 919.8 MB / 180 paths to **945.6 MB / 181 paths**
+  (+25.8 MB; zizmor's own closure is 78.4 MB, the rest shared with tools already
+  present).
 ## [1.3.3] — 2026-10-17
 
 ### Added

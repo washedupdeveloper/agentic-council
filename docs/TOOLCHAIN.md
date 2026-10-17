@@ -18,6 +18,7 @@ Evidence for every row: `scripts/probes.py` (what executes), `scripts/score_revi
 | `statix` | — | scored (security/nix, readability/nix), probed | **necessary** |
 | `deadnix` | — | scored (readability/nix), probed | **necessary** |
 | `osv-scanner` | — | scored (security/python, javascript, rust, go), probed | **necessary** |
+| `zizmor` | 25.8 | probed (security) — the only analyzer that reads `.github/`; **not** in the expected set, so it cannot lower β where no workflows exist | **necessary** |
 | `ruff` | — | scored (readability/python), probed | **necessary** |
 | `mypy` | — | scored (readability/python), probed | **necessary** |
 | `pytest` | — | scored (correctness/python), probed | **necessary** |
