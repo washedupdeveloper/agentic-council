@@ -177,10 +177,10 @@ The shipped threshold (**87.1141**) was calibrated on *this* repository from **o
 known-good sample, and `scripts/calibration.json` calls it `PROVISIONAL`. Five
 well-regarded repositories were then reviewed end-to-end on the hybrid scale: **three pass
 it unchanged** and two fail for real reasons. The classes overlap, so no point estimate is
-recoverable — but the **equivalence band is**: every threshold that passes all seven
-samples lies in **(80.63, 89.23)**, 8.60 points wide, and 87.1141 sits inside it. So the
-value is a policy choice with a *measured* consequence: none, on this evidence
-(`docs/CALIBRATION.md`). On your repository it is still not a pass mark — read the score as
+recoverable — and the **equivalence band**, which looked derivable at 8.60 points wide, does
+not survive measurement: four repeat runs of one clean repo spread **3.57 points** and one
+failed this threshold outright. The calibration used `--samples 1`; the shipped default is
+**5**. `docs/CALIBRATION.md` records the spread and what it means. On your repository it is still not a pass mark — read the score as
 a relative signal, or set your own with `--threshold`.
 
 **The findings are the portable output; the score is a local yardstick.**
@@ -193,7 +193,10 @@ a relative signal, or set your own with `--threshold`.
   **22/22 against 13/22**, so the specialists were deleted.
 - **A deterministic half.** 14 pinned analyzers (`statix`, `deadnix`, `zizmor`, `ruff`,
   `bandit`, `gitleaks`, `shellcheck`, …) plus built-in probes that need nothing installed. `beta` is
-  the fraction of the score they cover; at `beta` = 1 the score is deterministic.
+  the fraction of the score they cover. At `beta` = 1 the LLM's **self-assigned score** stops
+  counting — but its **findings still feed the density term**, so the number can still move
+  between runs. Measured on one clean repo at `beta` = 1.0: **85.66 to 89.23** across four
+  runs (`docs/CALIBRATION.md`).
 - **A hybrid gate.** `score = beta·deterministic + (1−beta)·LLM`, against a threshold,
   with stall and no-improvement detection.
 - **Incremental review.** `--baseline auto` reads only what changed since the last

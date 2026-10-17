@@ -105,8 +105,9 @@ with no evidence behind it.
   findings). The classes do not separate — the best failing repo (80.63) sits 0.59 above
   the golden defects fixture (80.04), so a max-margin threshold would be 80.34 with a
   margin of 0.30, which is unusable. What *is* derivable is the **equivalence band**:
-  every threshold that passes all seven samples lies in **(80.63, 89.23)**, 8.60 points
-  wide, and the shipped value sits inside it. See "The equivalence band" below.
+  every threshold that passes all eight samples lies in **(80.63, 89.23)**, 8.60 points
+  wide — but only if those scores were exact, and four repeat runs of one clean repo
+  spread **3.57 points**. See "The equivalence band — and the limit it does not cover".
 - **The LLM half now has measurements, not a calibration.** Five hybrid end-to-end runs
   exist (`runs/clean-baseline-evaluation-2026-10-17.md`), each n=1 at one sample and one
   round. That is enough to place every sample in a band and to show the hybrid scale does
@@ -191,14 +192,14 @@ The escalation was **not** threshold-driven: the round-2 fixture scored **85.23*
 constraint is the blocking-finding gate, not the threshold; raising or lowering it would not have
 changed any of those outcomes.
 
-## The equivalence band: what *is* derivable
+## The equivalence band — and the limit it does not cover
 
 "No threshold is derivable" was the conclusion from a **gap** framing — the clean and defective
 classes overlap, so no midpoint separates them. That framing is right and it answers the wrong
 question. A threshold does not need a gap. It needs the set of values that yield **identical
 verdicts** on every sample we have, and that set *is* derivable.
 
-Seven samples, all measured end to end on the hybrid scale:
+Eight samples, all measured end to end on the hybrid scale:
 
 | class | sample | score |
 |---|---|---:|
@@ -206,33 +207,53 @@ Seven samples, all measured end to end on the hybrid scale:
 | clean | clan-infra | 94.83 |
 | clean | devshell | 89.23 |
 | defective | zero-to-nix (45 dependency CVEs) | 80.63 |
-| defective | golden defects fixture | 80.04 |
+| defective | `tests/golden/rounds/defects` (round layer) | 80.04 |
 | defective | archived escalated run | 74.00 |
 | defective | flake-utils (2 blocking findings) | 60.86 |
+| defective | end-to-end defects fixture (`council golden --check`) | 55.16 |
 
-Any threshold that fails all four defective samples and passes all three clean ones lies in
-**(80.63, 89.23)** — **8.60 points wide**. The endpoints are open because the gate compares
-`aggregate >= threshold`: measured with the shipped gate, `--threshold 89.23` **fails** devshell
-(its aggregate is 89.2299…) and `--threshold 80.62` **passes** zero-to-nix (80.6299…).
+The two defects fixtures are different artifacts, not a contradiction: the **round layer** pins
+one round's dimension scores (80.04), while the end-to-end fixture runs the whole pipeline
+(55.16). The binding floor is zero-to-nix at 80.63 either way.
 
-| threshold | devshell 89.23 | zero-to-nix 80.63 |
-|---:|---|---|
-| 89.24 | fails | fails |
-| 89.23 | **fails** | fails |
-| 87.1141 (shipped) | **passes** | **fails** |
-| 80.64 | passes | **fails** |
-| 80.62 | passes | **passes** |
+If those eight numbers were exact, any threshold that fails all five defective samples and passes
+all three clean ones would lie in **(80.63, 89.23)** — 8.60 points wide. Both ends are open
+because the gate compares `aggregate >= threshold`: measured with the shipped gate,
+`--threshold 89.23` **fails** devshell (its aggregate is 89.2299…) and `--threshold 80.62`
+**passes** zero-to-nix (80.6299…).
 
-So the shipped **87.1141** sits inside a proven-equivalent band, 2.12 points below the ceiling and
-6.48 above the floor. Every value in that interval is a defensible policy; none is more "measured"
-than another, and moving within it changes no verdict on any sample.
+### They are not exact, and that breaks the band
 
-**That is the honest close.** The threshold is not *calibrated* — there is no point estimate to
-recover — but the remaining freedom is **bounded and measured**, so choosing 87.1141 is a decision
-with a known consequence (none, on this evidence) rather than an open question. What would move the
-band is a sample that lands outside it: a clean repository below 89.23, or a defective one above
-80.63. Neither exists in the sample; if one appears, the band narrows or closes and the threshold
-must be revisited.
+Four repeat runs of **devshell** at the same settings, same commit, same toolchain:
+
+| run | score | security findings | security `det` |
+|---|---:|---:|---:|
+| original | 89.23 | 3 | 85.54 |
+| 1 | 88.97 | 6 | 69.58 |
+| 2 | **85.66** | 7 | 68.37 |
+| 3 | 88.41 | 6 | 69.58 |
+
+mean **88.07**, standard deviation **1.64**, range **3.57 points** — and **one of the four runs
+failed the 87.1141 threshold outright** (`met_minimum: false`). Treating a normal approximation as
+indicative only, 87.1141 passes a clean repository about **72%** of runs.
+
+**Why the spread is there.** `beta` was **1.0 in all four runs**, so `score = det` — the LLM's
+self-assigned score never entered. But `det` is a Hill curve over **severity-weighted findings
+density**, and the findings are the reviewer's own output. So the deterministic half is a
+deterministic *formula over a non-deterministic input*: "β = 1 means deterministic" is true of the
+arithmetic and false of the number. The original 89.23 came from the run that reported the fewest
+security findings; the three repeats reported 6–7 and scored 68–70 on that dimension.
+
+That also means the band's **ceiling was set by the luckiest of four runs.** The band is not a
+property of the threshold — it is a property of the threshold *at a given sample count*, and the
+calibration runs used `--samples 1` while the shipped default is **5**.
+
+### What follows
+
+At one sample the noise (3.57) is comparable to the distance between the classes (5.03), so the
+threshold cannot be made reliable by moving it: any value low enough to pass devshell reliably is
+close enough to zero-to-nix to risk passing it. The lever is the sample count, not the threshold —
+which is what the 5-sample measurement below exists to settle.
 
 ## Reproducing
 

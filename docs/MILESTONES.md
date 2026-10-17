@@ -8,10 +8,12 @@ run stalls) — using as few moving parts as the job needs.
 **M3**, **M4**'s deterministic gate (`scripts/score_reviews.py`), **M5** (the orchestrator sets each
 round's goals and judges the round against them; the harness convenes the reviewer), **M6**
 (`runs/fixture-fixround-2026-10-06.md`), **M7** (durable swarm, dispatcher, cron, PR path), **M8**,
-**M8.5** (the ablation that decided the architecture), **M9**. Two parameters that once read ⚠️ are
-now **closed as decisions with their uncertainty measured**: the **threshold** is a policy choice
-inside a proven 8.60-point equivalence band, and the **`α_t` weights** are a policy choice measured
-to flip no verdict. Current release **v1.5.2**. The pass threshold
+**M8.5** (the ablation that decided the architecture), **M9**. One parameter is recorded as ⚠️ with
+the measurement that justifies the state: the **threshold** is a decision whose reliability is
+bounded by the reviewer's run-to-run noise — the band is derivable only if the scores were exact,
+and four repeat runs of one clean repository spread **3.57 points** with one failing the gate.
+The **`α_t` weights** are closed: a policy choice measured to flip no verdict. Current release
+**v1.5.2**. The pass threshold
 is read from `scripts/calibration.json` (see `docs/CALIBRATION.md`), so the number the loop enforces
 and the number the calibration recommends cannot drift.
 
@@ -238,18 +240,21 @@ is a policy choice because a weight encodes consequence cost rather than accurac
   the metrics are `no data` by construction.
 - ✅ **A/B harness** — built as M8.5 (`scripts/ablate.py`): four arms at equal cost against a pre-registered rule; the answer was **collapse** (M8.5).
 - ✅ **Golden end-to-end regression suite** — `scripts/golden.py` + `tests/golden/`, run by `council golden --check` and by `pytest`. Two layers, because the pipeline fails differently in each: a **round** layer (reviewer files → hybrid verdict, pinning det, β, the Hill density, the aggregate and pass/fail) and a **merge** layer (samples + probes → per-dimension files, pinning the `tools_run` union and the probe seed). `tests/test_golden.py` is the criterion executed: each test mutates one scoring input, asserts the check fails, restores it, asserts it passes. Built because the β defect shipped with **210 green tests** — every merge test supplied its own fixture and nothing asserted a number end to end, so two halves could both drop `tools_run` while the suite stayed green and the score quietly became the LLM's judgement (see M8.5).
-- ✅ **The threshold is a decision inside a measured equivalence band, not a point estimate.**
-  The earlier framing — "the classes overlap, so no threshold is derivable" — answered the
-  wrong question. A threshold needs the set of values that yield *identical verdicts* on
-  every sample, and that set is derivable. Across seven samples (three clean: 98.40, 94.83,
-  89.23; four defective: 80.63, 80.04, 74.00, 60.86) any threshold in the open interval
-  **(80.63, 89.23)** — **8.60 points wide** — passes every clean sample and fails every
-  defective one. Verified with the shipped gate at both endpoints: `--threshold 89.23`
-  fails devshell (its aggregate is 89.2299…) and `--threshold 80.62` passes zero-to-nix
-  (80.6299…). The shipped **87.1141** sits inside, 2.12 below the ceiling and 6.48 above
-  the floor, so every value in the band is a defensible policy and none is more measured
-  than another. Recorded in `docs/CALIBRATION.md`. What would reopen it is a sample outside
-  the band — a clean repository below 89.23 or a defective one above 80.63.
+- ⚠️ **The threshold cannot be closed by derivation, because the scores are noisy.** The
+  band arithmetic is real: across eight samples (three clean: 98.40, 94.83, 89.23; five
+  defective: 80.63, 80.04, 74.00, 60.86, 55.16) every threshold in the open interval
+  **(80.63, 89.23)** yields identical verdicts. But that assumes each score is exact, and
+  it is not. Four repeat runs of devshell at the same commit and toolchain gave **89.23,
+  88.97, 85.66, 88.41** — mean 88.07, **stdev 1.64, range 3.57** — and **one of the four
+  failed the 87.1141 threshold outright**. `beta` was 1.0 in all four, so the spread is not
+  LLM-score noise: `det` is a Hill curve over severity-weighted *findings density*, and
+  the findings are the reviewer's output. The original 89.23 came from the run reporting
+  the fewest security findings (3, against 6–7 in the repeats), so the band's ceiling was
+  set by the luckiest run. At one sample the noise (3.57) is comparable to the class gap
+  (5.03), so no threshold value is reliable there. The calibration used `--samples 1`; the
+  shipped default is **5**, which averages five samples per dimension and dedupes findings
+  — so the lever is the sample count, and the band must be restated at the count it was
+  measured at. Recorded in `docs/CALIBRATION.md`.
 - ✅ **`α_t` weights are a policy choice, and the choice is measured to be immaterial.** §7
   says reweight only with evidence, and the evidence that would justify a weight —
   *consequence cost* per dimension, from incident data rather than defect labels — does not
