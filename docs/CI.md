@@ -87,6 +87,32 @@ which is what "Hermes is available" means at that boundary.
 | the gate | a clean run is `satisfied`; a run with one open **high** finding is refused **with every score still 100** — so the block is the finding, not the aggregate |
 | the deliverable | `next-steps.md` names the blocking finding |
 | the guard | a bare `python3 …/probes.py` **fails** in the VM, and the same verb through `council` succeeds |
+| add a reviewer | `docs/EXTENDING.md` applied to a writable copy: the rubric, the loop, the gate tables, and `CORE_SKILLS` — then `setup bots` installs **6** skills and the new dimension moves the aggregate from `[100.0]` to **95.8** (`0.93*100 + 0.07*40`), which is the rebalanced weighted mean |
+
+The add-a-reviewer rows are M9's second acceptance clause executed rather than asserted. That
+clause had been unverifiable: the stub that stands in for Hermes carried its own hardcoded
+list of five dimensions, so a six-dimension round could never be produced, and the test double
+would have looked like a gate failure. It now takes the round's dimension set from
+`COUNCIL_STUB_DIMS`, and one dimension can be scored low with `COUNCIL_STUB_LOW`, which is what
+makes "the dimension is part of the score" measurable instead of "the file exists".
+
+Writing that test found a real defect: `EXTENDING.md` claimed the installer globbed
+`reviewer-*/SKILL.md` and needed no edit, but `CORE_SKILLS` is an explicit list — so a
+dimension added by following the docs was installed **without its rubric**, and the reviewer
+would answer with no criteria and report nothing. The doc is corrected, and
+`tests/test_config.py` now fails if a dimension's rubric is missing from the core list (in
+either direction).
+
+## The VM test runs in CI, and it did not used to
+
+`.#vm-test` is a `packages` output, so `nix flake check` does not run it — correct, because the
+gate must not require KVM of every contributor. But nothing else ran it either: the strongest
+claim in `docs/MILESTONES.md` was exercised only when a human remembered the command. The `e2e`
+job runs `nix build -L .#vm-test` on every push.
+
+GitHub-hosted runners do not expose `/dev/kvm`, so QEMU falls back to software emulation (TCG)
+there. The assertions are identical; the run is slower. Measured on a machine **with** KVM:
+**52 seconds** for the whole test. Anyone with KVM should expect that, not the TCG figure.
 
 ## Why the gate is hosted, not self-hosted
 

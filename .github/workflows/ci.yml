@@ -129,3 +129,29 @@ jobs:
         run: nix develop -c pytest tests/ -q
       - name: lint under the pinned toolchain
         run: nix develop -c ruff check scripts tests
+
+  # The end-to-end proof, and the one job that executes the product as a MACHINE
+  # rather than as a tree: a NixOS VM boots, the council is installed into it, a
+  # review runs against a stub Hermes, and the gate produces a verdict. It also
+  # executes docs/EXTENDING.md's "add a reviewer" procedure and requires the new
+  # dimension to move the aggregate.
+  #
+  # Why not in `nix flake check`: a VM needs /dev/kvm, and a contributor without it
+  # would fail the gate for a reason that is not their change. Why it is here at
+  # all: until this job existed, `.#vm-test` ran only when a human remembered it,
+  # so the strongest claim in docs/MILESTONES.md (M9's acceptance) was the least
+  # exercised thing in the repository.
+  #
+  # GitHub-hosted runners do not expose /dev/kvm, so QEMU falls back to software
+  # emulation (TCG). The assertions are identical and the run is simply slower;
+  # `nix build -L` is used so the per-step log is visible in the job output.
+  e2e:
+    name: e2e (NixOS VM)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: cachix/install-nix-action@448cde739abec1eaf0646249e3d25bb8d9bc7702 # v31.11.2
+      - name: the council end to end, in a real machine
+        run: nix build -L .#vm-test

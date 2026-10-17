@@ -18,7 +18,28 @@ All notable changes to this project. Format follows
   history, the other a record of a moment, and both are supposed to name versions that are
   no longer current.
 
+- **The VM test now executes M9's acceptance criterion, and CI runs it.** `.#vm-test` already
+  proved "fresh machine → documented install → green end-to-end run"; it now also executes
+  "a new reviewer can be added following the docs alone" — the framework is copied to a
+  writable path, `docs/EXTENDING.md` is applied, the bots are reinstalled, and the round must
+  carry the new dimension **and move the aggregate**: from `[100.0]` to **95.8**, the
+  rebalanced weighted mean `0.93*100 + 0.07*40`. The Hermes stub takes the round's dimension
+  set from `COUNCIL_STUB_DIMS` and can score one dimension low with `COUNCIL_STUB_LOW`, so
+  "the dimension is part of the score" is measurable rather than "the file exists". A new
+  `e2e` CI job runs `nix build -L .#vm-test` on every push: before it, the strongest claim in
+  this repository was exercised only when a human remembered the command. Two mutations prove
+  the assertions have teeth — skipping the `CORE_SKILLS` edit fails the run, and scoring the
+  new dimension 100 fails with "did not move the aggregate".
+
 ### Fixed
+
+- **`EXTENDING.md` described an installer that does not exist.** It said the rubric directory
+  was globbed, so a new reviewer needed no edit. `CORE_SKILLS` is an explicit list, so a
+  dimension added by following the docs was installed **without its rubric** — and the
+  reviewer then answers with no criteria and reports nothing, which reads as a quiet review
+  rather than a misconfiguration. The doc now names the step, and `tests/test_config.py`
+  fails if a dimension's rubric is missing from the core list, or if a core rubric names no
+  dimension.
 
 - **`council setup skill --check` no longer reports bytecode as drift.** The copier deletes
   `__pycache__` and `.pytest_cache` after a write, so those files can never be "in sync" —

@@ -338,6 +338,28 @@ the LLM's. The test has teeth: making `statix` report `ran: true` when it cannot
 fails it. It runs in the pytest matrix, so the claim is now checked on Linux, macOS and
 Windows on every push — which is the part of "green on all three OSes" that was never
 tested. What remains unexecuted there is the *pinned toolchain*, exactly as stated above.
+
+**The acceptance criterion is now executed, not asserted.** Both clauses — "fresh machine →
+documented install → green end-to-end run" and "a new reviewer can be added following the docs
+alone" — are claims about a running machine, and the second had no test at all. `.#vm-test` now
+does both, and the `e2e` CI job runs it on every push; until that job existed the test ran only
+when a human remembered the command, which made the strongest claim in this file the least
+exercised thing in the repository. Measured in the VM: boot, `doctor` moving from `no-profiles`
+to `ready`, a review with **11 probes actually ran**, `satisfied [100.0]`, one open **high**
+finding refusing a pass whose aggregate was still `[100.0]`, `next-steps.md` naming that
+finding — and then `docs/EXTENDING.md` applied to a writable copy, which installs **6** skills
+and moves the aggregate to **95.8**, the rebalanced weighted mean `0.93*100 + 0.07*40`. Two
+mutations prove the assertions have teeth: skipping the `CORE_SKILLS` edit fails the run with
+"is not in CORE_SKILLS['reviewer']", and scoring the new dimension 100 fails with "did not move
+the aggregate". 52 seconds on a machine with KVM.
+
+Writing it found the defect that made the second clause false: `EXTENDING.md` said the installer
+globbed `reviewer-*/SKILL.md` and needed no edit, but `CORE_SKILLS` is an explicit list, so a
+dimension added by following the docs was installed **without its rubric** and the reviewer
+would answer with no criteria and report nothing. The doc is corrected, and
+`tests/test_config.py` now fails in both directions — a dimension without its core skill, and a
+core rubric no dimension names.
+
 `v1.0` is tagged `v1.0.0` in both repositories. The container is attached to the release as a `docker load` tarball instead of being pushed to a registry: a release asset is downloadable **anonymously** (verified 200 with no token) while an Actions artifact is not (401 unauthenticated), and a registry is a service to run and a permission to hold — see `docs/CONTAINER.md`.
 **Size** M · **Depends** M8
 
