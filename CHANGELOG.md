@@ -6,6 +6,29 @@ All notable changes to this project. Format follows
 
 ## [Unreleased]
 
+## [1.3.1] — 2026-10-17
+
+### Added
+
+- **The no-toolchain path is tested, not asserted.** M9's acceptance was "fresh machine
+  → documented install → green end-to-end run on all three OSes", and the first half was
+  never exercised: the suite always ran with the pinned toolchain on PATH, so the
+  degradation path — the entire reason the built-in probes exist — was prose.
+  `tests/test_fresh_machine.py` runs the real `probes.py` and `doctor.py` in a subprocess
+  with `REVIEW_COUNCIL_TOOLCHAIN` removed **and `PATH` set to an empty directory**. The
+  second half is the part that makes it a fresh machine: `toolchain.env()` resolves the
+  toolchain itself when `nix` is on PATH, so unsetting the variable alone still runs
+  every analyzer.
+
+  Measured on that path: **6 of 20 probes run** (the stdlib set), **13 report
+  `ran: false` with a reason**, **zero report a signal they did not measure**, and
+  `doctor` reports **beta 0.32** rather than 1.00 — so the score degrades visibly
+  instead of quietly becoming the LLM's judgement, which is the β defect M8.5 shipped
+  once already.
+
+  The test has teeth: making `statix` report `ran: true` when it cannot run fails it,
+  checked by injection and reverted. Because it runs in the pytest matrix, the claim is
+  now verified on Linux, macOS and Windows on every push.
 ## [1.3.0] — 2026-10-17
 
 ### Added

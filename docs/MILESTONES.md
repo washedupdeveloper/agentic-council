@@ -295,6 +295,20 @@ Two constraints on any injection, both learned by having a corpus fail them:
 **The image is verified by the gate too**: `checks.container` builds `.#container`, so a broken image fails `nix flake check` instead of a workflow of its own. `image.yml` is now tags-only and does the one thing a check cannot — publish.
 **Darwin is declared and its declaration is checked, but not built.** `systems` includes `aarch64-darwin`, and the gate evaluates every declared system with `--all-systems --no-build` — a command shown to have teeth (a canary referencing Linux-only `pkgs.systemd` made it exit 1 while a plain `nix flake check` exited 0). What is deliberately not paid for is a **macOS runner that builds the darwin toolchain**: macOS minutes count tenfold, the closure is 239 fetched paths and 5 built ones, and the author uses no Mac. So execution on darwin is left to the user, documented in `docs/NIX.md`, where one `nix flake check` settles it. `x86_64-darwin` cannot be declared at all — nixpkgs 26.11 dropped it upstream.
 **The accepted gap** is that the analyzers are never *executed* on darwin or Windows: CI builds Linux, and the pinned toolchain is a nix closure, so a Windows nix job would be a second toolchain to keep working.
+
+**What IS executed on all three OSes is the no-toolchain path**, and it is now tested
+rather than asserted. `tests/test_fresh_machine.py` runs the real `probes.py` and
+`doctor.py` in a subprocess with `REVIEW_COUNCIL_TOOLCHAIN` removed **and `PATH` pointing
+at an empty directory** — the second half matters, because `toolchain.env()` resolves the
+toolchain itself when `nix` is on PATH, so unsetting the variable alone still runs every
+analyzer. Measured on that path: **6 of 20 probes run** (the stdlib set), **13 report
+`ran: false` with a reason**, **zero report a signal they did not measure**, and
+`doctor` reports **beta 0.32** rather than 1.00. So a machine with Python and nothing
+else can still run a review, and the score degrades visibly instead of quietly becoming
+the LLM's. The test has teeth: making `statix` report `ran: true` when it cannot run
+fails it. It runs in the pytest matrix, so the claim is now checked on Linux, macOS and
+Windows on every push — which is the part of "green on all three OSes" that was never
+tested. What remains unexecuted there is the *pinned toolchain*, exactly as stated above.
 `v1.0` is tagged `v1.0.0` in both repositories. The container is attached to the release as a `docker load` tarball instead of being pushed to a registry: a release asset is downloadable **anonymously** (verified 200 with no token) while an Actions artifact is not (401 unauthenticated), and a registry is a service to run and a permission to hold — see `docs/CONTAINER.md`.
 **Size** M · **Depends** M8
 
