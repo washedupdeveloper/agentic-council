@@ -218,7 +218,14 @@ criteria* checkable by a command or an observable artifact. `Size` is relative e
 **Goal.** Prove it works and tune it on evidence, not intuition. **Research inputs.** `sota` §8.5, §6.5; `deterministic-quality-tooling.md` §7.
 **Deliverables.** Labeled **eval set** (seeded defects + known-clean diffs) with ground truth; a metrics harness (precision, recall, F1, **SNR**, usefulness rate, acceptance rate, % comments addressed, avg iterations/PR); **calibration** of `d*`, `k`, `x_bad/x_good`, `α_t`, `β`, threshold, recorded in the manifest; an A/B harness for prompt/rubric/weight changes; a golden end-to-end regression suite in CI.
 **Acceptance.** Metrics reported on the eval set and thresholds calibrated and stored in the manifest ✅; the regression suite catches a deliberate rubric/weight regression ✅ — demonstrated, not asserted: seven tests each break one input (a dimension weight, a severity weight, the tool table, the invocation aliases, `halflife_k`, a `d*`, the threshold) and require the suite to notice.
-**Status.** Partially delivered.
+**Status.** Delivered, with one parameter deliberately left at its default and the reason
+measured rather than asserted. Every deliverable is built: calibration of `d*`, `k` and
+the threshold; the labelled eval set; the metrics harness in both halves — finding-level
+(SNR, usefulness) and interactive (`council metrics`: acceptance, addressed, iterations);
+the A/B harness (M8.5); the golden end-to-end suite; and `α_t` sensitivity, which shows
+the weights cannot flip a verdict on any input available. What is *not* claimed: the
+threshold still rests on one known-good sample, the LLM half is uncalibrated, and `α_t`
+is a policy choice because a weight encodes consequence cost rather than accuracy.
 - ✅ **Calibration of `d*`, `k` and the threshold** — `scripts/calibrate.py` + `scripts/calibration.json` (`docs/CALIBRATION.md`); also fixed a real defect where the findings term used a raw *count* where §3 requires a *density*.
 - ✅ **Labeled eval set** — a graded defect ladder (rungs 0/1/2/4/8/16) built deterministically from a seed, so ground truth is known by construction.
 - ✅ **Metrics harness, finding-level half** — `score_arm` now reports the signal-quality pair beside recall: `signal`, `noise`, **`snr`** (signal/noise over *findings*) and **`usefulness_rate`** (share of findings that describe something real), for every arm, persisted in the run's `scores.json` and printed in the `council ablate report` table. This is the reading M8.5 could not make: its rule compares `true` (distinct planted defects found), which recall can be bought for with volume — and the research names that a trust hazard (CR-Bench measured recall 27.01% → 32.76% while SNR fell 5.11 → 1.95, `sota` §3.6). Both are **floors**, not point estimates: the matcher is location-based, so a true finding pointing where the manifest names nothing counts as noise, and CR-Bench's second signal class (a valid suggestion that is not a bug) has no representation in a planted-defect manifest.
