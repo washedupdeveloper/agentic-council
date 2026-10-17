@@ -6,6 +6,48 @@ All notable changes to this project. Format follows
 
 ## [Unreleased]
 
+## [1.6.0] — 2026-10-18
+
+### Changed
+
+- **The clean baseline was re-measured at the shipped default, and it changes the
+  conclusion.** The earlier evaluation ran `--samples 1`; the default is **5**, and
+  sampling buys recall, so one sample under-reports findings and *inflates* the score.
+  At the default (`runs/clean-baseline-5-samples-2026-10-18.md`):
+
+  | repo | aggregate | blocking | verdict |
+  |---|---:|---:|---|
+  | treefmt-nix | **90.22** | **0** | passes |
+  | clan-infra | 75.06 | 22 | fails |
+  | devshell | 61.41 | 28 | fails |
+  | zero-to-nix | 53.55 | 54 | fails |
+  | flake-utils | 48.89 | 20 | fails |
+
+  **Five of six well-regarded repositories have real blocking findings** — unpinned
+  actions in write-capable jobs, a Gitea workflow pinned to `@pull/119`, four tracked
+  encrypted `terraform.tfstate` files — each verified by reading it.
+
+  The consequence is that **the blocking gate decides these verdicts, not the aggregate**:
+  clan-infra fails at *every* threshold, including one below its own aggregate. So the
+  aggregate threshold is only load-bearing for a repository with no blocking findings, and
+  exactly one exists in the sample.
+
+- **The threshold is recorded as consistent-with-the-data rather than derived from it.**
+  treefmt-nix passes at `90.22` and fails at `90.23`, so any threshold `<= 90.22` is
+  consistent. A floor would need a blocking-clean repository that should fail on
+  aggregate, and none exists — the band is `(-inf, 90.22]`, unbounded below. That is a
+  weaker claim than "calibrated" and it is the true one.
+
+### Reverted
+
+- **A reviewer-side density anchor, after measuring that it makes everything worse.** The
+  density term scores the *reviewer's* findings while `d*` is calibrated from *probe*
+  densities, so applying §7's rule `d* = known-good density` looked like the fix. It
+  drops every score and nothing passes — treefmt-nix 90.22 → 75.95, devshell 61.41 →
+  34.40 — because that rule puts a *pristine* repository at **50/100 on the density term
+  by construction**, capping `det` near 81. So §7's `d*` rule is a **discrimination**
+  rule, not an absolute-scale rule. Reverted in `e2b5439`; the measurement is recorded so
+  it is not re-attempted.
 ### Added
 
 - **A check for prose that names a superseded release.** `docs/MILESTONES.md` advertised

@@ -224,6 +224,11 @@ because the gate compares `aggregate >= threshold`: measured with the shipped ga
 
 ### They are not exact, and that breaks the band
 
+> **Superseded.** This subsection measured at `--samples 1`. The shipped default is 5, and
+> at 5 samples devshell has **28 real blocking findings** and scores 61.41 — it was never
+> clean. See "The threshold's real constraint" below for the re-measurement; the
+> reasoning here still stands, the numbers do not.
+
 Four repeat runs of **devshell** at the same settings, same commit, same toolchain:
 
 | run | score | security findings | security `det` |
@@ -254,6 +259,49 @@ At one sample the noise (3.57) is comparable to the distance between the classes
 threshold cannot be made reliable by moving it: any value low enough to pass devshell reliably is
 close enough to zero-to-nix to risk passing it. The lever is the sample count, not the threshold —
 which is what the 5-sample measurement below exists to settle.
+
+## The threshold's real constraint, measured at the shipped default
+
+Earlier sections measured at `--samples 1`. The shipped default is **5**, and sampling buys
+recall, so one sample under-reports findings and *inflates* the score. Re-measured at the
+default (`runs/clean-baseline-5-samples-2026-10-18.md`):
+
+| repo | aggregate | blocking | verdict |
+|---|---:|---:|---|
+| treefmt-nix | **90.22** | **0** | passes |
+| clan-infra | 75.06 | 22 | fails |
+| devshell | 61.41 | 28 | fails |
+| zero-to-nix | 53.55 | 54 | fails |
+| flake-utils | 48.89 | 20 | fails |
+
+**Five of six have real blocking findings** — unpinned actions in write-capable jobs, a
+Gitea workflow pinned to `@pull/119`, four tracked encrypted `terraform.tfstate` files.
+Verified by reading them.
+
+### The blocking gate decides these verdicts, not the aggregate
+
+clan-infra fails at **every** threshold, including `75.05` — below its own aggregate —
+because it has open high/critical findings. The same holds for the other three. So the
+aggregate threshold is only load-bearing for a repository with **no** blocking findings,
+and exactly one such repository exists in the sample.
+
+**The data therefore gives an upper bound and no lower bound.** Verified with the shipped
+gate: treefmt-nix passes at `90.22` and fails at `90.23`, so any threshold `<= 90.22`
+passes it. A floor would need a clean-of-blocking repository that should fail on
+aggregate, and none exists. The band is `(-inf, 90.22]` — unbounded below, so not a
+calibration. **87.1141 is consistent with the data; it is not derived from it.**
+
+That is a weaker claim than "the threshold is calibrated", and it is the true one. What
+would close it: a second and third repository with no blocking findings.
+
+### A rule I tried, and why it is wrong
+
+The density term scores the **reviewer's** findings while `d*` is calibrated from **probe**
+densities. Adding a reviewer-side anchor that applies §7's rule (`d*` = known-good density)
+made every score worse and nothing pass — because that rule puts a *pristine* repository at
+**50/100 on the density term by construction**, capping `det` near 81. So §7's `d*` rule is
+a **discrimination** rule, not an absolute-scale rule. Reverted; the measurement is in the
+run record.
 
 ## Reproducing
 

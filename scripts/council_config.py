@@ -95,9 +95,10 @@ CORE_SKILLS: Dict[str, tuple] = {
 DEFAULTS: Dict[str, Any] = {
     "schema_version": SCHEMA_VERSION,
     "review": {
-        # The gate. Lower is stricter. PROVISIONAL — the band that follows from the
-        # measured scores, (80.63, 89.23), assumes they are exact, and they are not:
-        # four repeat runs of one clean repo spread 3.57 points. docs/CALIBRATION.md.
+        # The gate. Lower is stricter. PROVISIONAL — consistent with every
+        # measurement but not derived from them: at --samples 5 only one of six
+        # well-regarded repos is clean of blocking findings, which bounds this
+        # above rather than below. docs/CALIBRATION.md.
         "threshold": 87.1141,
         # How many reviewer samples per round. More is more recall, more time.
         "samples": 5,
@@ -285,9 +286,10 @@ def render(cfg: Dict[str, Any]) -> str:
         "",
         "[review]",
         "# The gate. A run must score at least this to be SATISFIED.",
-        "# Lower is stricter. PROVISIONAL: the band that follows from the measured",
-        "# scores, (80.63, 89.23), assumes they are exact -- and they are not. Four",
-        "# repeat runs of one clean repo spread 3.57 points. docs/CALIBRATION.md.",
+        "# Lower is stricter. PROVISIONAL: consistent with every measurement but",
+        "# not derived from them -- at --samples 5 only one of six well-regarded",
+        "# repos is clean of blocking findings, which bounds this above, not below.",
+        "# docs/CALIBRATION.md.",
         f"threshold = {review.get('threshold')}",
         "# Reviewer samples per round. More samples find more, and cost more time.",
         f"samples = {review.get('samples')}",

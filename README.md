@@ -174,14 +174,13 @@ re-sync. The copier remains for hosts without Nix.
 ## Before you trust a score
 
 The shipped threshold (**87.1141**) was calibrated on *this* repository from **one**
-known-good sample, and `scripts/calibration.json` calls it `PROVISIONAL`. Five
-well-regarded repositories were then reviewed end-to-end on the hybrid scale: **three pass
-it unchanged** and two fail for real reasons. The classes overlap, so no point estimate is
-recoverable — and the **equivalence band**, which looked derivable at 8.60 points wide, does
-not survive measurement: four repeat runs of one clean repo spread **3.57 points** and one
-failed this threshold outright. The calibration used `--samples 1`; the shipped default is
-**5**. `docs/CALIBRATION.md` records the spread and what it means. On your repository it is still not a pass mark — read the score as
-a relative signal, or set your own with `--threshold`.
+known-good sample, and `scripts/calibration.json` calls it `PROVISIONAL`. At the shipped
+default (`--samples 5`), five of six well-regarded repositories have **real blocking
+findings** and fail on those at *every* threshold — only treefmt-nix is clean (90.22), and
+it passes. That bounds the threshold above and leaves no floor, so 87.1141 is
+**consistent** with the measurements rather than **derived** from them
+(`runs/clean-baseline-5-samples-2026-10-18.md`). On your repository it is not a pass mark —
+read the score as a relative signal, or set your own with `--threshold`.
 
 **The findings are the portable output; the score is a local yardstick.**
 

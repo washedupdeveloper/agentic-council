@@ -326,10 +326,10 @@ def calibration_note(repo: Path) -> List[str]:
     out.extend(
         textwrap.wrap(
             "The threshold came from that repository's own defect ladder, from ONE "
-            "known-good sample, and calibration.json calls it PROVISIONAL. The band that "
-            "follows from the measured scores (80.63, 89.23) assumes those scores are "
-            "exact, and they are not: four repeat runs of one clean repository spread "
-            "3.57 points, and one failed this threshold. If you are reviewing "
+            "known-good sample, and calibration.json calls it PROVISIONAL. At the "
+            "shipped default five of six well-regarded repositories have real blocking "
+            "findings and fail on those at every threshold; only one is clean, which "
+            "bounds this value above and leaves no floor. If you are reviewing "
             "review-council the number is "
             "meaningful; for anything else it is not a pass mark. Read the score as a "
             "relative signal, or set your own bar with --threshold <n>. The FINDINGS "
