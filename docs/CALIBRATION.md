@@ -96,23 +96,23 @@ with no evidence behind it.
 
 ## What is NOT calibrated
 
-- **The threshold is provisional, and now measured against real repositories.** It rests
-  on one known-good sample; the plateau's upper edge *is* that sample's score. Five
-  well-regarded repositories were reviewed end-to-end on the **hybrid** scale
+- **The threshold is a decision, not a point estimate — and the band is now derived.** It
+  rests on one known-good sample, so the plateau's upper edge *is* that sample's score.
+  Five well-regarded repositories were then reviewed end-to-end on the **hybrid** scale
   (`runs/clean-baseline-evaluation-2026-10-17.md`): **three pass 87.1141 unchanged**
   (treefmt-nix 98.40, clan-infra 94.83, devshell 89.23) and **two fail for verifiable
   reasons** (zero-to-nix 80.63 on 45 dependency CVEs; flake-utils 60.86 on two blocking
-  findings). The classes do not separate: the best failing repo (80.63) sits 0.59 above
+  findings). The classes do not separate — the best failing repo (80.63) sits 0.59 above
   the golden defects fixture (80.04), so a max-margin threshold would be 80.34 with a
-  margin of 0.30 — unusable. **The threshold is therefore a policy line, not a measured
-  boundary**, and it sits above every repo in the sample with a real finding and below
-  every one without. Add more known-good repos before treating 87.11 as settled.
+  margin of 0.30, which is unusable. What *is* derivable is the **equivalence band**:
+  every threshold that passes all seven samples lies in **(80.63, 89.23)**, 8.60 points
+  wide, and the shipped value sits inside it. See "The equivalence band" below.
 - **The LLM half now has measurements, not a calibration.** Five hybrid end-to-end runs
   exist (`runs/clean-baseline-evaluation-2026-10-17.md`), each n=1 at one sample and one
-  round. That is enough to show the hybrid scale does not separate clean from defective
-  code — and therefore that no threshold is derivable from it — but it is not a
-  calibration of the reviewer's scores. The LLM half would need repeated samples per
-  repository to estimate its variance, at roughly 18 minutes a run.
+  round. That is enough to place every sample in a band and to show the hybrid scale does
+  not separate clean from defective code, but it is not a calibration of the reviewer's
+  scores: the scores themselves could move between runs. The LLM half would need repeated
+  samples per repository to estimate its variance, at roughly 18 minutes a run.
 - **Weights `α_t` are still the working defaults.** §7 says reweight only with evidence.
   That evidence does not exist, and the measurement below shows it would buy little
   anyway — see "How much `α_t` could move the verdict".
@@ -190,6 +190,49 @@ The escalation was **not** threshold-driven: the round-2 fixture scored **85.23*
 80, and still failed — because of an **open high/critical finding**, not the aggregate. The binding
 constraint is the blocking-finding gate, not the threshold; raising or lowering it would not have
 changed any of those outcomes.
+
+## The equivalence band: what *is* derivable
+
+"No threshold is derivable" was the conclusion from a **gap** framing — the clean and defective
+classes overlap, so no midpoint separates them. That framing is right and it answers the wrong
+question. A threshold does not need a gap. It needs the set of values that yield **identical
+verdicts** on every sample we have, and that set *is* derivable.
+
+Seven samples, all measured end to end on the hybrid scale:
+
+| class | sample | score |
+|---|---|---:|
+| clean | treefmt-nix | 98.40 |
+| clean | clan-infra | 94.83 |
+| clean | devshell | 89.23 |
+| defective | zero-to-nix (45 dependency CVEs) | 80.63 |
+| defective | golden defects fixture | 80.04 |
+| defective | archived escalated run | 74.00 |
+| defective | flake-utils (2 blocking findings) | 60.86 |
+
+Any threshold that fails all four defective samples and passes all three clean ones lies in
+**(80.63, 89.23)** — **8.60 points wide**. The endpoints are open because the gate compares
+`aggregate >= threshold`: measured with the shipped gate, `--threshold 89.23` **fails** devshell
+(its aggregate is 89.2299…) and `--threshold 80.62` **passes** zero-to-nix (80.6299…).
+
+| threshold | devshell 89.23 | zero-to-nix 80.63 |
+|---:|---|---|
+| 89.24 | fails | fails |
+| 89.23 | **fails** | fails |
+| 87.1141 (shipped) | **passes** | **fails** |
+| 80.64 | passes | **fails** |
+| 80.62 | passes | **passes** |
+
+So the shipped **87.1141** sits inside a proven-equivalent band, 2.12 points below the ceiling and
+6.48 above the floor. Every value in that interval is a defensible policy; none is more "measured"
+than another, and moving within it changes no verdict on any sample.
+
+**That is the honest close.** The threshold is not *calibrated* — there is no point estimate to
+recover — but the remaining freedom is **bounded and measured**, so choosing 87.1141 is a decision
+with a known consequence (none, on this evidence) rather than an open question. What would move the
+band is a sample that lands outside it: a clean repository below 89.23, or a defective one above
+80.63. Neither exists in the sample; if one appears, the band narrows or closes and the threshold
+must be revisited.
 
 ## Reproducing
 

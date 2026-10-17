@@ -6,6 +6,42 @@ All notable changes to this project. Format follows
 
 ## [Unreleased]
 
+## [1.5.2] — 2026-10-17
+
+### Changed
+
+- **The threshold's ⚠️ closes, because the equivalence band is derivable.** "The classes
+  overlap, so no threshold is derivable" answered the wrong question. A threshold does not
+  need a gap — it needs the set of values that yield **identical verdicts** on every
+  sample, and that set is derivable. Across seven samples (three clean: 98.40, 94.83,
+  89.23; four defective: 80.63, 80.04, 74.00, 60.86) every threshold in the open interval
+  **(80.63, 89.23)** — **8.60 points wide** — passes every clean sample and fails every
+  defective one. Verified with the shipped gate at both endpoints: `--threshold 89.23`
+  fails devshell (its aggregate is 89.2299…) and `--threshold 80.62` passes zero-to-nix
+  (80.6299…), which is why both ends are open.
+
+  The shipped **87.1141** sits inside, 2.12 below the ceiling and 6.48 above the floor. So
+  it is a policy choice whose consequence is **measured** — none, on this evidence — rather
+  than an open question. What would reopen it is a sample outside the band: a clean
+  repository below 89.23, or a defective one above 80.63.
+
+- **The `α_t` ⚠️ closes as a measured policy choice.** Reweighting needs consequence-cost
+  evidence from incidents, which does not exist; `council calibrate --sensitivity` measures
+  what it could have bought, and it is nothing — sweeping each weight 0→3× flips no verdict
+  on any input, and zeroing security entirely still leaves the defects fixture at 82.92
+  against an 87.11 threshold.
+
+- **`docs/MILESTONES.md` now reports its own surface honestly.** The status block called M8
+  "partial" and listed **7 user verbs** where `council --help` has **12** — `baseline`,
+  `metrics`, `goal`, `cron` and `pr` were missing, as were `version` and `inventory` from
+  the dev set.
+
+### Fixed
+
+- **The code still told users the old story.** `council doctor`, `council setup init`, the
+  generated `review-council.toml` comment and `scripts/calibration.json`'s first caveat all
+  said the threshold was provisional "from one sample" with no band. All four now state the
+  measured interval, so the tool and `docs/CALIBRATION.md` cannot disagree.
 ## [1.5.1] — 2026-10-17
 
 ### Fixed

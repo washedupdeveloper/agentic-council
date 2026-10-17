@@ -8,10 +8,10 @@ run stalls) — using as few moving parts as the job needs.
 **M3**, **M4**'s deterministic gate (`scripts/score_reviews.py`), **M5** (the orchestrator sets each
 round's goals and judges the round against them; the harness convenes the reviewer), **M6**
 (`runs/fixture-fixround-2026-10-06.md`), **M7** (durable swarm, dispatcher, cron, PR path), **M8**,
-**M8.5** (the ablation that decided the architecture), **M9**. Two parameters are recorded as ⚠️
-rather than ✅, both with the measurement that justifies the state: the **threshold** is a policy
-line because the classes do not separate on the hybrid scale, and the **`α_t` weights** are
-immaterial because sweeping them flips no verdict. Current release **v1.5.0**. The pass threshold
+**M8.5** (the ablation that decided the architecture), **M9**. Two parameters that once read ⚠️ are
+now **closed as decisions with their uncertainty measured**: the **threshold** is a policy choice
+inside a proven 8.60-point equivalence band, and the **`α_t` weights** are a policy choice measured
+to flip no verdict. Current release **v1.5.0**. The pass threshold
 is read from `scripts/calibration.json` (see `docs/CALIBRATION.md`), so the number the loop enforces
 and the number the calibration recommends cannot drift.
 
@@ -47,7 +47,7 @@ still describe the original intent):
    `src/review_council/` adapter tree would rewrite a system that works as `scripts/`; their
    deterministic tooling exists as `council probes` plus the pinned `flake.nix` toolchain.
 
-**M9 is delivered, with one gap.** Cross-platform CI runs green on Linux, macOS and Windows for the *framework*, and the nix gate runs on Linux — checking the **darwin declaration** by *evaluation* (`nix flake check --all-systems --no-build`, proven to catch a darwin-only error) rather than by a macOS runner, which is a deliberate cost decision recorded in `docs/CI.md` and, from the user's side, in `docs/NIX.md`. The **analyzer matrix** (`checks.probes`) and the **image build** (`checks.container`) are checks rather than separate workflows, so `nix flake check` verifies both on every push, and `v1.0.0` is tagged and published in both repositories. The gap: the **analyzers are not executed on darwin or Windows** — the pinned toolchain is a nix closure, CI builds Linux only, and darwin execution is left to whoever runs the flake on a Mac (`nix flake check`, the same command). The container is attached to the release as a `docker load` tarball rather than pushed to a registry (`docs/CONTAINER.md`). **M8 is delivered**, with two parameters recorded as ⚠️ rather than ✅: the threshold and the `α_t` weights. Calibration, a labelled eval set and the golden end-to-end regression suite all exist; the A/B harness was built as M8.5; and the metrics are complete — the finding-level pair (SNR, usefulness rate) sits beside recall, and `council metrics` computes acceptance rate, addressed rate and iterations per run from the `status` field. What that verb cannot supply is the judgement itself — a human or the forge must set `status`, and until one does it reports `no data` rather than a number. The **threshold** is a policy line, not a measured boundary: five real repositories were reviewed on the hybrid scale, three pass it unchanged and two fail for verifiable reasons, but the best failing one sits 0.59 points above the known-bad fixture, so no gap exists to derive a line from (`runs/clean-baseline-evaluation-2026-10-17.md`). The **`α_t` weights** stay uncalibrated until evidence justifies reweighting, and `council calibrate --sensitivity` measures that the evidence would change no verdict on any available input, so the defaults stand as a stated policy choice. The M4 *evidence matrix* and *SNR term* are rubric-level, not code.
+**M9 is delivered, with one gap.** Cross-platform CI runs green on Linux, macOS and Windows for the *framework*, and the nix gate runs on Linux — checking the **darwin declaration** by *evaluation* (`nix flake check --all-systems --no-build`, proven to catch a darwin-only error) rather than by a macOS runner, which is a deliberate cost decision recorded in `docs/CI.md` and, from the user's side, in `docs/NIX.md`. The **analyzer matrix** (`checks.probes`) and the **image build** (`checks.container`) are checks rather than separate workflows, so `nix flake check` verifies both on every push, and `v1.0.0` is tagged and published in both repositories. The gap: the **analyzers are not executed on darwin or Windows** — the pinned toolchain is a nix closure, CI builds Linux only, and darwin execution is left to whoever runs the flake on a Mac (`nix flake check`, the same command). The container is attached to the release as a `docker load` tarball rather than pushed to a registry (`docs/CONTAINER.md`). **M8 is delivered**, with two parameters closed as **decisions whose uncertainty is measured** rather than as calibrated values. Calibration, a labelled eval set and the golden end-to-end regression suite all exist; the A/B harness was built as M8.5; and the metrics are complete — the finding-level pair (SNR, usefulness rate) sits beside recall, and `council metrics` computes acceptance rate, addressed rate and iterations per run from the `status` field. What that verb cannot supply is the judgement itself — a human or the forge must set `status`, and until one does it reports `no data` rather than a number. The **threshold** is a policy choice inside a proven **8.60-point equivalence band** `(80.63, 89.23)` — seven samples, verified with the shipped gate at both endpoints — so the shipped 87.1141 changes no verdict relative to any other value in that band (`docs/CALIBRATION.md`). The **`α_t` weights** stay at their defaults because sweeping them 0→3× flips no verdict on any available input, and the evidence that would justify reweighting (consequence cost, from incidents rather than defect labels) does not exist. The M4 *evidence matrix* and *SNR term* are rubric-level, not code.
 
 **How to read.** Each milestone has a *Goal*, *Research inputs*, *Deliverables* and *Acceptance
 criteria* checkable by a command or an observable artifact. `Size` is relative effort (S/M/L);
@@ -238,26 +238,27 @@ is a policy choice because a weight encodes consequence cost rather than accurac
   the metrics are `no data` by construction.
 - ✅ **A/B harness** — built as M8.5 (`scripts/ablate.py`): four arms at equal cost against a pre-registered rule; the answer was **collapse** (M8.5).
 - ✅ **Golden end-to-end regression suite** — `scripts/golden.py` + `tests/golden/`, run by `council golden --check` and by `pytest`. Two layers, because the pipeline fails differently in each: a **round** layer (reviewer files → hybrid verdict, pinning det, β, the Hill density, the aggregate and pass/fail) and a **merge** layer (samples + probes → per-dimension files, pinning the `tools_run` union and the probe seed). `tests/test_golden.py` is the criterion executed: each test mutates one scoring input, asserts the check fails, restores it, asserts it passes. Built because the β defect shipped with **210 green tests** — every merge test supplied its own fixture and nothing asserted a number end to end, so two halves could both drop `tools_run` while the suite stayed green and the score quietly became the LLM's judgement (see M8.5).
-- ⚠️ **The threshold is provisional, and the hybrid scale cannot settle it.** It rests on
-  one known-good sample. Five well-regarded repositories were reviewed end-to-end on the
-  hybrid scale (`runs/clean-baseline-evaluation-2026-10-17.md`): **three pass 87.1141
-  unchanged** (98.40, 94.83, 89.23) and **two fail for verifiable reasons** — zero-to-nix
-  at 80.63 on 45 dependency CVEs, flake-utils at 60.86 on two blocking findings. The
-  classes overlap (best failing repo 80.63 vs golden defects fixture 80.04), so no
-  threshold is derivable: a max-margin line would be 80.34 with a margin of 0.30. The
-  shipped value is therefore a **policy line** that happens to sit above every repo in the
-  sample with a real finding and below every one without. Nothing argues for moving it;
-  what would is a larger sample.
-- ⚠️ **`α_t` weights are uncalibrated, and measured to be immaterial.** §7 says reweight
-  only with evidence. The evidence does not exist — a weight encodes *consequence cost*
-  per dimension, which needs incident data, not defect labels — and
-  `council calibrate --sensitivity` shows it would change nothing on any input
-  available: sweeping each weight from 0 to 3× moves the defects fixture at most 8.63
-  points and flips **no verdict**, and zeroing security entirely still leaves it at 82.92
-  against an 87.11 threshold. So the working defaults stand as a documented policy
-  choice rather than an uncalibrated guess. Recorded in `docs/CALIBRATION.md`, with the
-  caveat that a score near the threshold with a large spread could still be
-  weight-sensitive — which the tool reports rather than assumes away.
+- ✅ **The threshold is a decision inside a measured equivalence band, not a point estimate.**
+  The earlier framing — "the classes overlap, so no threshold is derivable" — answered the
+  wrong question. A threshold needs the set of values that yield *identical verdicts* on
+  every sample, and that set is derivable. Across seven samples (three clean: 98.40, 94.83,
+  89.23; four defective: 80.63, 80.04, 74.00, 60.86) any threshold in the open interval
+  **(80.63, 89.23)** — **8.60 points wide** — passes every clean sample and fails every
+  defective one. Verified with the shipped gate at both endpoints: `--threshold 89.23`
+  fails devshell (its aggregate is 89.2299…) and `--threshold 80.62` passes zero-to-nix
+  (80.6299…). The shipped **87.1141** sits inside, 2.12 below the ceiling and 6.48 above
+  the floor, so every value in the band is a defensible policy and none is more measured
+  than another. Recorded in `docs/CALIBRATION.md`. What would reopen it is a sample outside
+  the band — a clean repository below 89.23 or a defective one above 80.63.
+- ✅ **`α_t` weights are a policy choice, and the choice is measured to be immaterial.** §7
+  says reweight only with evidence, and the evidence that would justify a weight —
+  *consequence cost* per dimension, from incident data rather than defect labels — does not
+  exist. `council calibrate --sensitivity` measures what the missing evidence could have
+  bought: sweeping each weight from 0 to 3× moves the defects fixture at most 8.63 points
+  and flips **no verdict** on any input, and zeroing security entirely still leaves it at
+  82.92 against an 87.11 threshold. The defaults therefore stand as a documented policy, not
+  an uncalibrated guess, with the caveat that a score near the threshold *with* a large
+  spread could still be weight-sensitive — which the tool reports rather than assumes away.
 **Size** M · **Depends** M5, M6
 
 ---

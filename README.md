@@ -176,10 +176,12 @@ re-sync. The copier remains for hosts without Nix.
 The shipped threshold (**87.1141**) was calibrated on *this* repository from **one**
 known-good sample, and `scripts/calibration.json` calls it `PROVISIONAL`. Five
 well-regarded repositories were then reviewed end-to-end on the hybrid scale: **three pass
-it unchanged** and two fail for real reasons, but the best failing one sits **0.59 points**
-above the known-bad fixture — so the threshold is a policy line, not a measured boundary
-(`runs/clean-baseline-evaluation-2026-10-17.md`). On your repository it is not a pass mark
-— read the score as a relative signal, or set your own with `--threshold`.
+it unchanged** and two fail for real reasons. The classes overlap, so no point estimate is
+recoverable — but the **equivalence band is**: every threshold that passes all seven
+samples lies in **(80.63, 89.23)**, 8.60 points wide, and 87.1141 sits inside it. So the
+value is a policy choice with a *measured* consequence: none, on this evidence
+(`docs/CALIBRATION.md`). On your repository it is still not a pass mark — read the score as
+a relative signal, or set your own with `--threshold`.
 
 **The findings are the portable output; the score is a local yardstick.**
 
