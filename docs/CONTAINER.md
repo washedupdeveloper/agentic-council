@@ -103,6 +103,14 @@ file is written. And a **complete scored review runs inside it** — fan-out, bu
 beta measurement and the gate — with Hermes mounted, producing a verdict rather than
 an environment check.
 
+**The published release asset is checked separately**, because the VM test exercises the
+image derivation and a downloader gets whatever CI attached. Unpacking v1.5.0's
+`review-council.tar.gz` confirms what `docker load` examines before it starts: one manifest
+entry tagged `review-council:latest`, a config naming the entrypoint, `Cmd = ["--help"]`,
+`User = 1000:1000`, `WorkingDir = /repo`, and all **99 layers present** totalling
+1,090,508,800 bytes. That is structure, not execution — the execution evidence is the VM
+test above.
+
 On your own host, the same assertions are one command:
 
 ```bash

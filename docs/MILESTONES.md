@@ -7,17 +7,22 @@ run stalls) — using as few moving parts as the job needs.
 **Status.** Research complete (4 parallel reports, `research/`). Built, tested and verified: **M0**,
 **M3**, **M4**'s deterministic gate (`scripts/score_reviews.py`), **M5** (the orchestrator sets each
 round's goals and judges the round against them; the harness convenes the reviewer), **M6**
-(`runs/fixture-fixround-2026-10-06.md`), **M7** (durable swarm + dispatcher), **M8** partial,
-**M8.5** complete — the ablation that decided the architecture. The pass threshold is read from
-`scripts/calibration.json` (see `docs/CALIBRATION.md`), so the number the loop enforces and the
-number the calibration recommends cannot drift.
+(`runs/fixture-fixround-2026-10-06.md`), **M7** (durable swarm, dispatcher, cron, PR path), **M8**,
+**M8.5** (the ablation that decided the architecture), **M9**. Two parameters are recorded as ⚠️
+rather than ✅, both with the measurement that justifies the state: the **threshold** is a policy
+line because the classes do not separate on the hybrid scale, and the **`α_t` weights** are
+immaterial because sweeping them flips no verdict. Current release **v1.5.0**. The pass threshold
+is read from `scripts/calibration.json` (see `docs/CALIBRATION.md`), so the number the loop enforces
+and the number the calibration recommends cannot drift.
 
 **Architecture.** The repo ships **zero shell scripts**: every operation is a Python module under
-`scripts/`, reached through one CLI, `council <verb>` — user verbs `review`, `gate`, `doctor`,
-`probes`, `swarm`, `sample`, `merge`; dev-only verbs (devshell) `calibrate`, `ablate`, `golden`,
-`corpus`; and `council setup {skill|bots|toolchain|dispatcher}`, once per machine.
-`scripts/council.py` owns the verb table and dispatch; the flake generates one launcher, so
-`nix run .#council -- <verb>` is the entry point.
+`scripts/`, reached through one CLI, `council <verb>`. User verbs: `review`, `gate`, `doctor`,
+`probes`, `swarm`, `sample`, `merge`, `baseline`, `metrics`, `goal`, `cron`, `pr`. Dev-only verbs
+(devshell): `calibrate`, `ablate`, `golden`, `version`, `corpus`, `inventory`. Plus
+`council setup {init|skill|bots|toolchain|dispatcher}`, once per machine. `scripts/council.py` owns
+the verb table and dispatch; the flake generates one launcher, so `nix run .#council -- <verb>` is
+the entry point. `council --help` is the authoritative list — `checks.commands` asserts the shipped
+tree matches it.
 
 `toolchain.py` replaced `nix-toolchain.sh` + `nix-toolchain-inner.sh`; `install_bots.py` replaced
 `install-bots.sh`; `install_dispatcher.py` replaced `install-dispatcher.sh`; `sync_to_skill.py`
@@ -42,17 +47,7 @@ still describe the original intent):
    `src/review_council/` adapter tree would rewrite a system that works as `scripts/`; their
    deterministic tooling exists as `council probes` plus the pinned `flake.nix` toolchain.
 
-**M9 is delivered, with one gap.** Cross-platform CI runs green on Linux, macOS and Windows for the *framework*, and the nix gate runs on Linux — checking the **darwin declaration** by *evaluation* (`nix flake check --all-systems --no-build`, proven to catch a darwin-only error) rather than by a macOS runner, which is a deliberate cost decision recorded in `docs/CI.md` and, from the user's side, in `docs/NIX.md`. The **analyzer matrix** (`checks.probes`) and the **image build** (`checks.container`) are checks rather than separate workflows, so `nix flake check` verifies both on every push, and `v1.0.0` is tagged and published in both repositories. The gap: the **analyzers are not executed on darwin or Windows** — the pinned toolchain is a nix closure, CI builds Linux only, and darwin execution is left to whoever runs the flake on a Mac (`nix flake check`, the same command). The container is attached to the release as a `docker load` tarball rather than pushed to a registry (`docs/CONTAINER.md`). **M8 remains partial**: calibration, a
-labeled eval set and the golden end-to-end regression suite all exist, the A/B harness was
-built as M8.5, and the metrics are complete: the finding-level pair (SNR, usefulness
-rate) sits beside recall, and `council metrics` computes acceptance rate, addressed rate
-and iterations per run from the `status` field. What that verb cannot supply is the
-judgement itself — a human or the forge must set `status`, and until one does it reports
-`no data` rather than a number. The `α_t` weights stay
-uncalibrated until evidence justifies reweighting — and `council calibrate --sensitivity`
-now measures that the evidence would change no verdict on any available input, so the
-defaults stand as a stated policy choice. The M4
-*evidence matrix* and *SNR term* are rubric-level, not code.
+**M9 is delivered, with one gap.** Cross-platform CI runs green on Linux, macOS and Windows for the *framework*, and the nix gate runs on Linux — checking the **darwin declaration** by *evaluation* (`nix flake check --all-systems --no-build`, proven to catch a darwin-only error) rather than by a macOS runner, which is a deliberate cost decision recorded in `docs/CI.md` and, from the user's side, in `docs/NIX.md`. The **analyzer matrix** (`checks.probes`) and the **image build** (`checks.container`) are checks rather than separate workflows, so `nix flake check` verifies both on every push, and `v1.0.0` is tagged and published in both repositories. The gap: the **analyzers are not executed on darwin or Windows** — the pinned toolchain is a nix closure, CI builds Linux only, and darwin execution is left to whoever runs the flake on a Mac (`nix flake check`, the same command). The container is attached to the release as a `docker load` tarball rather than pushed to a registry (`docs/CONTAINER.md`). **M8 is delivered**, with two parameters recorded as ⚠️ rather than ✅: the threshold and the `α_t` weights. Calibration, a labelled eval set and the golden end-to-end regression suite all exist; the A/B harness was built as M8.5; and the metrics are complete — the finding-level pair (SNR, usefulness rate) sits beside recall, and `council metrics` computes acceptance rate, addressed rate and iterations per run from the `status` field. What that verb cannot supply is the judgement itself — a human or the forge must set `status`, and until one does it reports `no data` rather than a number. The **threshold** is a policy line, not a measured boundary: five real repositories were reviewed on the hybrid scale, three pass it unchanged and two fail for verifiable reasons, but the best failing one sits 0.59 points above the known-bad fixture, so no gap exists to derive a line from (`runs/clean-baseline-evaluation-2026-10-17.md`). The **`α_t` weights** stay uncalibrated until evidence justifies reweighting, and `council calibrate --sensitivity` measures that the evidence would change no verdict on any available input, so the defaults stand as a stated policy choice. The M4 *evidence matrix* and *SNR term* are rubric-level, not code.
 
 **How to read.** Each milestone has a *Goal*, *Research inputs*, *Deliverables* and *Acceptance
 criteria* checkable by a command or an observable artifact. `Size` is relative effort (S/M/L);

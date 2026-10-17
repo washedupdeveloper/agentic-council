@@ -6,6 +6,24 @@ All notable changes to this project. Format follows
 
 ## [Unreleased]
 
+## [1.5.1] — 2026-10-17
+
+### Fixed
+
+- **`docs/MILESTONES.md` described a system that no longer exists.** Its status block
+  called **M8 "partial"** and listed **7 user verbs** where `council --help` has **12** —
+  `baseline`, `metrics`, `goal`, `cron` and `pr` were all missing, as were `version` and
+  `inventory` from the dev set. The header now states the real surface, names M8 as
+  delivered with its two ⚠️ parameters, and records the current release.
+
+- **The release image is now checked as an artifact, not just as a derivation.**
+  `checks.container` loads the image into a real docker daemon inside a VM, but that
+  exercises the *derivation*; a downloader gets whatever CI attached to the release. The
+  published tarball was unpacked and validated against what `docker load` examines first:
+  one manifest entry tagged `review-council:latest`, a config naming the entrypoint,
+  `Cmd = ["--help"]`, `User = 1000:1000`, `WorkingDir = /repo`, and all **99 layers
+  present** (1,090,508,800 bytes). Structure only — the execution evidence remains the VM
+  test, and `docs/CONTAINER.md` now says which is which.
 ## [1.5.0] — 2026-10-17
 
 ### Added
