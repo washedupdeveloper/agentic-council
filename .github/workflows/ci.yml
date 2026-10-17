@@ -8,6 +8,14 @@ on:
 permissions:
   contents: read
 
+# Supersede rather than queue. Two pushes in quick succession otherwise run BOTH to
+# completion on three OSes plus the nix gate, and the older one's result is thrown away
+# when it lands. Grouped by pull-request number where there is one, so each PR cancels
+# only its own older runs and never someone else's.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   # The framework is stdlib-only and ships to Windows, macOS and Linux, so the
   # suite must pass on all three with nothing installed but pytest. This job IS
