@@ -6,6 +6,25 @@ All notable changes to this project. Format follows
 
 ## [Unreleased]
 
+## [1.3.3] — 2026-10-17
+
+### Added
+
+- **`calibrate --good` is repeatable, and `calibrate_many` scores every baseline.**
+  One known-good repo makes the threshold's upper edge that repo's own score, so a
+  second clean repo that is merely less tidy fails the gate. Each `--good` now
+  contributes its own labelled point, and `d*` anchors on the **worst** density seen
+  per tool across the whole set — `d*` is the density at which a tool scores 50, so
+  anchoring on the tidiest repo would mark every other clean repo as failing.
+
+### Fixed
+
+- **`calibrate.run_probes` measured nothing when called as a library.** `probes.py`
+  refuses a bare invocation and prints usage instead of JSON, and `run_probes` treated
+  any non-JSON answer as "no probes" — so a calibration invoked outside
+  `council calibrate` produced **zero points** and reported "no labels" instead of the
+  truth. It now sets `REVIEW_COUNCIL_DISPATCHED` for the child, and raises with the
+  probe's own message rather than returning an empty list.
 ## [1.3.2] — 2026-10-17
 
 ### Added
