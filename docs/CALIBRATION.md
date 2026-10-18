@@ -293,8 +293,10 @@ calibration.
 
 ### The clean class is empty, and that settles what the threshold is for
 
-Nine well-regarded Nix repositories were examined at the shipped default. **One is clean**
-(`runs/clean-class-is-empty-2026-10-18.md`):
+Eight well-regarded Nix repositories were reviewed at the shipped default
+(`--samples 5`). **One is clean.** A ninth, `disko`, was pre-screened for blocking
+findings only — 7 high from `zizmor` — and never scored, so it is not counted in the
+table or the arithmetic below. (`runs/clean-class-is-empty-2026-10-18.md`):
 
 | repo | aggregate | blocking |
 |---|---:|---:|

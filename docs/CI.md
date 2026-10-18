@@ -111,8 +111,16 @@ claim in `docs/MILESTONES.md` was exercised only when a human remembered the com
 job runs `nix build -L .#vm-test` on every push.
 
 GitHub-hosted runners do not expose `/dev/kvm`, so QEMU falls back to software emulation (TCG)
-there. The assertions are identical; the run is slower. Measured on a machine **with** KVM:
-**52 seconds** for the whole test. Anyone with KVM should expect that, not the TCG figure.
+there. The assertions are identical and the run is simply slower. Measured both ways:
+
+| where | accelerator | wall clock |
+|---|---|---|
+| this workstation | KVM | **52 s** for `nix build .#vm-test` |
+| `ubuntu-latest`, GitHub-hosted | TCG | **78 s** for the whole `e2e` job, including checkout and the nix install (23:57:04 → 23:58:22, run 39080941747) |
+
+So the fallback costs about 26 seconds here, not a timeout. That figure is now a measurement
+rather than an assumption: the job was added on the strength of it being *possible*, and the
+first run on a hosted runner settled whether it was *practical*.
 
 ## Why the gate is hosted, not self-hosted
 

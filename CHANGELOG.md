@@ -6,6 +6,31 @@ All notable changes to this project. Format follows
 
 ## [Unreleased]
 
+### Added
+
+- **A test for the rewrite `council version bump` performs.** `version.rewrite_prose_versions`
+  is called from `cmd_bump` and nowhere else, and it shipped with no test — the behaviour that
+  makes the prose check survivable was itself unproven, in a release whose subject was that
+  check. Two tests now pin it: every claim moves in both spellings with the emphasis kept, a
+  historical mention is left alone, the returned list is exactly the files that changed (by
+  POSIX path, so a Windows checkout reports the same names), and `stale_prose_claims` is empty
+  afterwards. Proved to fail when the write is removed.
+
+### Fixed
+
+- **`docs/CALIBRATION.md` and `calibration.json` counted nine reviewed repositories; eight were
+  reviewed.** `disko` was pre-screened for blocking findings only (7 high from `zizmor`) and
+  never scored, which the run record says plainly — `| disko | not reviewed |`. The caveat and
+  the section summary had both promoted it to a full review, and the same section contradicted
+  itself two paragraphs later with "finds a real defect in 7 of 8 respected repos". The
+  conclusion is unaffected (the clean class is still one repository of eight), but the number a
+  reader would quote was wrong in two shipped copies.
+
+- **`docs/CI.md` recorded the KVM figure as the only measurement.** The `e2e` job has now run on
+  a GitHub-hosted runner: TCG, **78 s** for the whole job against **52 s** here with KVM. The
+  docs said the fallback was unmeasured; it is measured now, and the fallback costs ~26 s
+  rather than a timeout.
+
 ## [1.7.1] — 2026-10-18
 
 ### Fixed
