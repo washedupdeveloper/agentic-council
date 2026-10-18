@@ -6,6 +6,40 @@ All notable changes to this project. Format follows
 
 ## [Unreleased]
 
+## [1.8.2] — 2026-10-18
+
+### Fixed
+
+- **Every zizmor finding cited the line above its own.** `start_point.row` is 0-based
+  (tree-sitter coordinates) and the probe used it unshifted, so a `uses:` on line 45 was
+  reported as line 44 — pointing a reviewer at the preceding comment and making a true
+  finding look false. Measured on this repository's own `ci.yml`: `row=44`, real line 45.
+  The row is now converted, and the test that had pinned `"7"` for `row: 7` (i.e. pinned
+  the bug) asserts `"8"`.
+
+- **A path lost its leading dot on the way into a finding.** Nine call sites used
+  `str(x).lstrip("./")`, which strips a **character set**, not a prefix: `.env` became
+  `env`, `.review-council/run/council.log` became `review-council/...`, and
+  `.github/workflows/ci.yml` became `github/...` — a path that exists nowhere, cited as the
+  location of a real finding. All of them now call `_shared.norm_path`, the helper that
+  already stripped the prefix only, and a structural test greps the module so the
+  character-set form cannot come back.
+
+- **`gitleaks` scanned the harness's own scratch, so the review reported its own log as
+  findings.** `gitleaks detect --source .` walks the whole tree: it does not honour
+  `.gitignore` and knows nothing about `SKIP_DIRS`, which the framework's own probes honour.
+  Measured on a 377-file repository: **274 hits, 270 of them under `.review-council`** — the
+  run's own quoted gitleaks output — burying the three real fixtures and deflating the
+  security signal for a reason the code could not see. The probe now writes a
+  `[extend] useDefault` config whose allowlist is built from `SKIP_DIRS`, so the shipped rule
+  set still applies and only non-source paths are skipped: same repository, **3 findings**,
+  and a structural test fails if a new `SKIP_DIRS` entry is not mirrored in the allowlist.
+
+- **The standalone test runner invented failures.** `python tests/test_probes.py` calls each
+  `test_*` with no arguments, so every test taking `tmp_path` was reported as `ERROR` while
+  pytest ran it green — a runner that reports phantom failures teaches a reader to ignore it.
+  Fixture-taking tests are now reported as skipped, with a pointer to pytest.
+
 ## [1.8.1] — 2026-10-18
 
 ### Fixed
