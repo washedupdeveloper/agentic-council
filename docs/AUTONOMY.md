@@ -268,8 +268,8 @@ performance .10. With β = 0 the det term is inert by construction, so a vacuous
 deterministic signal cannot inflate a score — the failure mode where a zero-Nix repo
 makes Nix-pattern greps trivially "clean".
 
-**The threshold is calibrated to this repository from one sample** — `87.1141`,
-marked `PROVISIONAL` in `scripts/calibration.json` — and the `α_t` weights remain
+**The threshold is re-derived at β=1** — `80.0`, 2.31 under the measured clean baseline of
+82.31, with its provenance in `scripts/calibration.json` — and the `α_t` weights remain
 uncalibrated defaults. On another repository neither is a pass mark.
 
 ## The deterministic toolchain (β)
@@ -355,6 +355,9 @@ deterministic signal even on a machine with no Nix:
 | `flake-check` | correctness | `nix flake check --no-build --keep-going` (hard gate, §2) |
 | `nix-eval` | correctness | `nix-instantiate --parse` per file (§2) |
 | `nix-eval-time` | performance | `nix eval` wall-clock, as a ratio vs a pinned baseline (§3) |
+| `ifd` | performance | `nix flake check --no-build --option allow-import-from-derivation false`; IFD breaks eval caching |
+| `ci-cache` | performance | workflows that build Nix but configure no store cache (pure text) |
+| `ci-concurrency` | performance | workflows with no `concurrency:` key (pure text) |
 
 ```bash
 council probes --all --repo <repo>

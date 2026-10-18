@@ -253,10 +253,19 @@ is a policy choice because a weight encodes consequence cost rather than accurac
   repositories) and the **aggregate threshold cannot be absolute**. It is a regression
   detector — which is what `--baseline auto` already implements and what the docs already
   said in one line, *"the findings are the portable output; the score is a local
-  yardstick"*. **87.1141 stays**; its stated role is the default bar for a repository's
-  first run and a regression line thereafter. Verified bound: treefmt-nix passes at `90.22`
-  and fails at `90.23`, so `(-inf, 90.22]` is consistent — no floor exists, and that is now
-  explained rather than pending.
+  yardstick"*. The threshold's role is the default bar for a repository's first run and a
+  regression line thereafter.
+
+  **The value moved to `80.0` after β reached 1** (`docs/CALIBRATION.md`). `87.1141` was
+  calibrated when β < 1, so the reviewer's self-assigned score entered the aggregate
+  through `(1−β)` and pulled it up; fixing stack relevance drove β to **1.0 on every
+  dimension** of both measured repositories, which removes that term. The same clean
+  repository — treefmt-nix, **0 blocking findings** — now scores **82.31**, below the old
+  number. A default that fails the only clean repository it has is a bug, not a policy, so
+  the bar sits 2.31 under the measured clean baseline (1.4× the measured 1.64 run-to-run
+  stdev at 1 sample; the shipped configuration uses 5, where noise is smaller). The
+  provenance, both measured points and the follow-up are recorded in
+  `scripts/calibration.json`.
 - ✅ **§7's `d*` rule is a discrimination rule, not an absolute-scale rule.** The density
   term scores the reviewer's findings while `d*` is calibrated from probe densities, so
   adding a reviewer-side anchor that applies `d* = known-good density` looked like the
@@ -338,14 +347,15 @@ rather than asserted. `tests/test_fresh_machine.py` runs the real `probes.py` an
 `doctor.py` in a subprocess with `REVIEW_COUNCIL_TOOLCHAIN` removed **and `PATH` pointing
 at an empty directory** — the second half matters, because `toolchain.env()` resolves the
 toolchain itself when `nix` is on PATH, so unsetting the variable alone still runs every
-analyzer. Measured on that path: **6 of 20 probes run** (the stdlib set), **13 report
-`ran: false` with a reason**, **zero report a signal they did not measure**, and
-`doctor` reports **beta 0.32** rather than 1.00. So a machine with Python and nothing
-else can still run a review, and the score degrades visibly instead of quietly becoming
-the LLM's. The test has teeth: making `statix` report `ran: true` when it cannot run
-fails it. It runs in the pytest matrix, so the claim is now checked on Linux, macOS and
+analyzer. Measured on that path: **8 of 23 probes run** (the stdlib set, now including the
+two CI text probes), **15 report `ran: false` with a reason**, **zero report a signal they
+did not measure**, and `doctor` reports **beta 0.32** rather than 1.00. So a machine with
+Python and nothing else can still run a review, and the score degrades visibly instead of
+quietly becoming the LLM's. The test has teeth: making `statix` report `ran: true` when it
+cannot run fails it. It runs in the pytest matrix, so the claim is checked on Linux and
 Windows on every push — which is the part of "green on all three OSes" that was never
-tested. What remains unexecuted there is the *pinned toolchain*, exactly as stated above.
+tested, with macOS one repository variable away (`docs/CI.md`). What remains unexecuted
+there is the *pinned toolchain*, exactly as stated above.
 
 **The acceptance criterion is now executed, not asserted.** Both clauses — "fresh machine →
 documented install → green end-to-end run" and "a new reviewer can be added following the docs
@@ -409,5 +419,5 @@ question is kept so a reader can see what was asked.
 | 2 | **Integration target** — local, PR bot, or CI? | **Local CLI first**, and it is the only surface built. The GitHub PR path is left unbuilt rather than built and unverified (`docs/MILESTONES.md` M7). |
 | 3 | **Model tiers** — cheap for tooling, strong for judgement? | Expressed as **config, not a hardcoded choice**: every member carries `model`/`provider` and `None` inherits the profile's, so a user pins tiers in `$HERMES_HOME/review-council.toml` rather than this repository picking models for them. |
 | 4 | **Budget guardrails** — per-run ceiling? | `max_rounds` (default **3**), `min_rounds`, and `budget_seconds`; `council_loop.out_of_budget` enforces the wall clock and `decide_stop` the round count. |
-| 5 | **Threshold + weights** | Threshold **87.1141** from `scripts/calibration.json`, weights in `score_reviews.WEIGHTS` (security .30, correctness .25, readability .20, architecture .15, performance .10). Both calibrated in M8, not guessed (`docs/CALIBRATION.md`). |
+| 5 | **Threshold + weights** | Threshold **80.0** from `scripts/calibration.json` (re-derived at β=1: 2.31 under the measured clean baseline of 82.31 — `docs/CALIBRATION.md`), weights in `score_reviews.WEIGHTS` (security .30, correctness .25, readability .20, architecture .15, performance .10). |
 | 6 | **Bot transport** | The **file bus**: reviewers write one JSON file per dimension and the gate reads them. No group chat, no orchestrator-mediated message passing — a file is deterministic, git-versionable, and readable after the fact. |

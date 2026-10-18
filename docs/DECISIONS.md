@@ -76,10 +76,46 @@ research. Everything below is **locked** unless listed under "Still open".
   β defect of the same session was the opposite failure: β stuck at 0, so the deterministic half was
   ignored and the LLM's number decided everything, with nothing reporting it.
 
+- **Only security and correctness carry a `high`-severity veto.** Nine real repositories produced
+  **93 of 94** blocking findings in security and correctness; readability and architecture produced
+  none, performance produced one (naersk's IFD). The other three dimensions therefore held an
+  untested veto over merges, while the two that are the hard requirements never needed one.
+  `BLOCKING_SEVERITIES` is now per-dimension — `high`/`critical` for security and correctness,
+  `critical` elsewhere, `critical` for a dimension nobody classified — so a `critical` anywhere still
+  blocks and no dimension lost its floor. **Ratified after measurement** (2026-10-18): re-scoring
+  eight stored runs changed no verdict.
+
+- **β counts the tools for the languages a repository is MADE OF, by source-line share.** A stack
+  detected from two files made `pytest`, `ruff`, `mypy` and `bandit` *expected* on `nix-direnv`, a
+  Nix + shell project: β fell to 0.667 and the deterministic half was reported incomplete having
+  covered everything that mattered. `detect_stacks` still answers "is this language present" for
+  display; `relevant_stacks` (10% line share) is what β uses, and it is applied where stacks are
+  RECORDED (`council_loop` -> `meta.json`) because `resolve_stacks` treats a run's declared stacks
+  as authoritative. **Ratified after measurement** (2026-10-18): `nix-direnv` records `nix` +
+  `shell`, `treefmt-nix` one stack, `zero-to-nix` both.
+
+- **A probe that cannot apply is a vacuous pass, not a missing tool.** `ci-cache` and
+  `ci-concurrency` first returned `ran: false` when a repository has no workflows, which counted
+  them as *missing* and depressed β on a repo with no CI to fix — `treefmt-nix` tracks zero files
+  under `.github/`. "Every Nix-building workflow has a cache" is true when there are none, so the
+  probes now report `ran: true, signal: 100` with the reason. Same class of error as an incidental
+  language stack: an inapplicable obligation must not look like an unmet one.
+
+- **`_SKIP_DIRS` is matched against the path relative to the repository root.** It was matched
+  against the absolute path's parts, so a checkout under `/somewhere/build/my-repo` had every file
+  skipped and stacks came back empty. Fixed in both `detect_stacks` and `stack_shares`.
+
+- **Performance needs an absolute probe, not an informational one.** `nix-eval-time` reports a
+  number with nothing to compare it to, so performance was scored entirely from the reviewer's own
+  findings while looking deterministic. `ifd`, `ci-cache` and `ci-concurrency` are absolute and
+  cheap, and each came from a finding a reviewer actually made. A probe that cannot run reports
+  `ran: false` with the reason — `ifd` on naersk does exactly that, because its flake does not
+  evaluate, and a wrong reason is worse than no answer.
+
 ## Still open (needed at M5 / M8)
 
 | Topic | Working default |
 |-------|-----------------|
 | **Per-run token/cost ceiling** (concrete number) | to set at M5 |
-| **Per-category weights `α_t`** | working defaults; the threshold itself is calibrated (`87.1141`, PROVISIONAL) — see `CALIBRATION.md` |
+| **Per-category weights `α_t`** | working defaults; the threshold itself is re-derived at β=1 (`80.0`, 2.31 under the measured clean baseline of 82.31) — see `CALIBRATION.md` |
 | **Exact judge model** for `auxiliary.goal_judge` | pin at M5 |

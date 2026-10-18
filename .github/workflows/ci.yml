@@ -20,18 +20,34 @@ jobs:
   # The framework is stdlib-only and ships to Windows, macOS and Linux, so the
   # suite must pass on all three with nothing installed but pytest. This job IS
   # the portability guarantee (DECISIONS #2) — if it needs a third-party import,
-  # the zero-install promise is already broken.
+  # the zero-install promise is already broken. Linux and Windows run on every
+  # push; macOS is declared here and enabled by a variable (see below).
   #
   # It is also the most expensive job in quota terms, because macOS minutes count
-  # TEN times against the allowance and Windows twice. It is still cheap in wall
-  # clock — no nix, no build — so the multiplier is not a problem at this scale.
+  # TEN times against the allowance and Windows twice.
+  #
+  # macOS IS PASSIVE — declared, not built. The suite has been green there, so the
+  # portability claim holds; it just does not need re-proving on every push at 10x the
+  # quota cost, for a framework with no build step. The switch is a REPOSITORY VARIABLE
+  # rather than a commented-out line, so re-enabling needs no edit to this file and
+  # cannot rot into a stale comment:
+  #
+  #   Settings -> Secrets and variables -> Actions -> Variables -> New variable
+  #     name:  CI_MATRIX_OSES
+  #     value: ["ubuntu-latest","windows-latest","macos-latest"]
+  #
+  # Unset (the default) means Linux + Windows. Set it and macOS joins the matrix on the
+  # next run. To hard-code it instead, replace the `os:` line below with:
+  #
+  #   os: [ubuntu-latest, windows-latest, macos-latest]
+  #
   tests:
     name: tests (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: ${{ fromJSON(vars.CI_MATRIX_OSES || '["ubuntu-latest","windows-latest"]') }}
     steps:
       # PINNED TO A FULL COMMIT SHA, with the version in a comment so a human can
       # read it. A tag is a moving reference: `@v7` runs whatever that tag points at

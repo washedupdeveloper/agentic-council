@@ -5,7 +5,7 @@ gate) and `.github/workflows/image.yml` (the image).
 
 | Job | Runner | What it proves |
 |---|---|---|
-| `tests` (ci.yml) | `ubuntu` + `macos` + `windows` | The framework is stdlib-only and runs on all three. This job **is** the portability guarantee (DECISIONS #2). |
+| `tests` (ci.yml) | `ubuntu` + `windows`; macOS passive | The framework is stdlib-only and runs on all three. This job **is** the portability guarantee (DECISIONS #2). macOS is declared and one repository variable away — see *macOS is passive*. |
 | `gate` (ci.yml) | `ubuntu-latest` | `nix flake check` under the pinned toolchain, on a machine that shares nothing with yours — **including the darwin declaration**, evaluated by `--all-systems --no-build` at no macOS cost. |
 | `release` (image.yml) | `ubuntu-latest` | On a `v*` tag: builds the image and attaches it to that release as `review-council.tar.gz`. Tags only — the gate already builds the image on every push and pull request. |
 
@@ -22,17 +22,30 @@ nix flake check --all-systems --no-build
 error — a tool that does not exist for the platform — in seconds, for no macOS minutes.
 
 **Building on darwin is what is not paid for.** macOS minutes count tenfold, the darwin
-closure is 239 fetched paths and 5 built ones, and the author uses no Mac: execution there
+closure is 209 fetched paths and 5 built ones, and the author uses no Mac: execution there
 is left to whoever runs the flake — `nix flake check`, the same command this gate runs on
-Linux (`docs/NIX.md` states this from the user's side). To add the runner back, restore the
-matrix:
+Linux (`docs/NIX.md` states this from the user's side).
 
-```yaml
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest]
+## macOS is passive
+
+The `tests` job declares macOS but does not build it. The switch is a **repository
+variable**, not a commented-out line, so re-enabling needs no edit to the workflow and
+cannot rot into a stale comment:
+
+```text
+Settings -> Secrets and variables -> Actions -> Variables -> New variable
+  name:  CI_MATRIX_OSES
+  value: ["ubuntu-latest","windows-latest","macos-latest"]
 ```
+
+Unset (the default) is `["ubuntu-latest","windows-latest"]`. The matrix reads it as
+`fromJSON(vars.CI_MATRIX_OSES || '["ubuntu-latest","windows-latest"]')`, so setting the
+variable adds the runner on the next run and clearing it removes it. To hard-code instead,
+replace that one line with the literal list.
+
+Why it is passive: the suite has been green on macOS, so the portability claim holds — it
+does not need re-proving on every push at ten times the quota cost, for a framework with no
+build step. The cost of being wrong is one workflow run, not a broken release.
 
 ## The container image job
 
@@ -294,17 +307,17 @@ before deduction:
 | Windows | 2× |
 | macOS | 10× |
 
-The `tests` matrix — three OSes — costs roughly 20 quota-minutes per push, about 15 of them
-macOS. The `gate` job is **Linux-only** and adds the closure download plus a few minutes of
-checks, including the darwin declaration's evaluation (seconds, no macOS minutes). The
-`image` workflow runs only on a **tag**, so it adds nothing per push. Call it **~25–30 per
-push** for `tests` + `gate`, or **~70 pushes a month** on the free tier; if the repo goes
-public, hosted minutes become unlimited.
+The `tests` matrix without macOS costs roughly **5 quota-minutes per push instead of 20** —
+macOS was about three quarters of it, which is why it is now passive. The `gate` job is
+**Linux-only** and adds the closure download plus a few minutes of checks, including the
+darwin declaration's evaluation (seconds, no macOS minutes). The `image` workflow runs only
+on a **tag**, so it adds nothing per push. Call it **~10–15 per push** for `tests` + `gate`,
+or **~130–200 pushes a month** on the free tier; if the repo goes public, hosted minutes
+become unlimited.
 
-The macOS line in `tests` is the remaining 10× cost. It is kept because it is a different
-claim from the gate's — the framework's stdlib portability (DECISIONS #2), not the flake's
-darwin support — and it is cheap in wall-clock. Drop it the same way the gate's macOS leg
-was dropped if quota bites: one line out of the `os:` list.
+macOS remains a **declared** claim, not a deleted one: the suite passes there, the switch is
+one repository variable (`CI_MATRIX_OSES`), and the gate still evaluates `aarch64-darwin` on
+every push at no macOS cost.
 
 ## Failure modes worth knowing
 

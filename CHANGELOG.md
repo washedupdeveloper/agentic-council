@@ -6,7 +6,59 @@ All notable changes to this project. Format follows
 
 ## [Unreleased]
 
+### Changed
+
+- **A `high` finding blocks only in security and correctness.** Those two are the hard
+  requirements; performance, readability and architecture now block only at `critical`, and
+  a `critical` anywhere still blocks, so no dimension lost its floor. Measured across nine
+  repositories: **93 of 94** blocking findings were already security or correctness, so this
+  removes an untested veto rather than loosening the rule that fired. `BLOCKING_SEVERITIES`
+  is per-dimension, and an unrecognised dimension gets the strict floor. The golden defects
+  fixture shows it exactly: it blocked on **3** findings and now blocks on **2** —
+  `ARC-0001` (architecture, `high`) no longer vetoes, while `SEC-0001` still blocks at both
+  `high` and `critical`.
+
+- **`β` measures the code the repository is made of.** `detect_stacks` fired at two files,
+  so `nix-direnv` — a Nix + shell project — had `pytest`, `ruff`, `mypy` and `bandit`
+  *expected*, β fell to 0.667, and the deterministic half was reported incomplete having
+  covered everything that mattered. `stack_shares` weights each stack by its share of source
+  lines and `relevant_stacks` keeps those above 10%. `treefmt-nix` goes from six stacks to
+  one (98% nix); `zero-to-nix` keeps both (49% nix, 43% js); `nix-direnv` records
+  `nix` + `shell`. The fix is applied where stacks are **recorded** (`council_loop` writes
+  `meta.json`), because `resolve_stacks` treats a run's declared stacks as authoritative —
+  correct for reproducibility. `docs/CALIBRATION.md` records why re-scoring old runs
+  cannot measure this, and what the apparent movement actually was.
+
+- **macOS is passive in CI.** The `tests` matrix no longer builds macOS by default: the
+  suite has been green there, so the portability claim holds, and it does not need
+  re-proving on every push at ten times the quota cost. The switch is a **repository
+  variable** (`CI_MATRIX_OSES`), not a commented-out line, so re-enabling needs no edit to
+  the workflow and cannot rot. Unset means Linux + Windows. `docs/CI.md` also carried a
+  stale claim that this had already been done — it had not, and the "restore the matrix"
+  snippet it offered was for a gate matrix that no longer exists.
+
+- **The shipped threshold moved from `87.1141` to `80.0`.** `87.1141` was calibrated when
+  β < 1, so the reviewer's self-assigned score entered the aggregate through `(1−β)` and
+  pulled it up. With stack relevance fixed, β reaches **1.0 on every dimension** of both
+  re-reviewed repositories, which removes that term: the clean one — treefmt-nix, **0
+  blocking findings** — now scores **82.31**, below the old bar. A default that fails the
+  only clean repository it has is a bug, not a policy, so the bar sits **2.31 under the
+  measured clean baseline** (1.4× the measured 1.64 run-to-run stdev at 1 sample; the
+  shipped configuration uses 5, where noise is smaller). Both measured points, the
+  superseded calibration and the follow-up are recorded in `scripts/calibration.json`.
+  The blocking gate is untouched and remains the absolute judgement.
+
 ### Added
+
+- **Three performance probes, each taken from a real finding.** Performance had no measured
+  input at all — its only Nix tool, `nix-eval-time`, is informational without a pinned
+  baseline, so `det` fell back to the reviewer's own findings. `ifd` asks Nix to evaluate
+  with `--option allow-import-from-derivation false` (naersk reads `Cargo.toml` during
+  evaluation) and reports `ran: false` with the reason when the flake does not evaluate at
+  all; `ci-cache` and `ci-concurrency` are pure-text checks over the workflows (nix-direnv
+  builds Nix in CI with no store cache and no `concurrency:` key). Verified on a live
+  review: all three ran, `tools_missing` became empty, and the reviewer independently ran
+  the same two `grep`s.
 
 - **A test for the rewrite `council version bump` performs.** `version.rewrite_prose_versions`
   is called from `cmd_bump` and nowhere else, and it shipped with no test — the behaviour that
