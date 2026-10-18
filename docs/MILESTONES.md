@@ -12,7 +12,7 @@ round's goals and judges the round against them; the harness convenes the review
 are closed by measurement rather than by assertion: the **threshold** is a regression detector
 because nine well-regarded repositories produced **one** clean sample — the absolute-bar framing
 had no class to calibrate against — and the **`α_t` weights** are a policy choice measured to flip
-no verdict. Current release **v1.8.2**. The pass threshold
+no verdict. Current release **v1.8.3**. The pass threshold
 is read from `scripts/calibration.json` (see `docs/CALIBRATION.md`), so the number the loop enforces
 and the number the calibration recommends cannot drift.
 

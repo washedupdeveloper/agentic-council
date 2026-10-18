@@ -6,6 +6,35 @@ All notable changes to this project. Format follows
 
 ## [Unreleased]
 
+## [1.8.3] — 2026-10-18
+
+### Fixed
+
+- **`tests/golden/expect.json` could be re-pinned by running a review against the
+  fixture, and a test did the re-pinning.** `hash_inputs()` walks `tests/golden/` and
+  hashes every file, so a run directory written inside `tests/golden/target/` became a
+  "fixture input": one `council review tests/golden/target` added **14** run artefacts to
+  the pinned payload, after which `--check` failed on a tree nobody had edited — and
+  `test_the_cli_update_refuses_to_rewrite_when_nothing_changed`, which invoked the real
+  `--update`, **re-pinned the tracked file as a side effect** and then failed its own
+  assertion. The next run was green against a contaminated fixture. `.review-council` now
+  joins `__pycache__` in `NON_INPUT_DIRS` (the same defect the `__pycache__` comment
+  already described, one directory over), and that test runs against a temp copy of the
+  payload instead of the tracked one. Verified: with a fake run directory planted in the
+  fixture, `golden --check` still exits 0 and `expect.json` pins nothing from it.
+
+### Changed
+
+- **The skill documents how to act on a finding, not just how to produce one.** New
+  `Acting on findings` section: reproduce with the finding's own `falsifiable_check`
+  before editing, reject in the commit rather than silently, recognise a finding that is
+  an artifact of the reviewer's own output encoding (a quoted `\"` the file does not
+  contain — the "fix" would create the defect), fix the source then sync then test the
+  deployment, and measure convergence by the finding count in the files you fixed rather
+  than by the aggregate. It also names `REVIEW_COUNCIL_AUDIENCE=dev`, without which the
+  CLI answers `not a verb, and no such path` for `version`, which reads like a missing
+  module rather than a hidden verb.
+
 ## [1.8.2] — 2026-10-18
 
 ### Fixed
