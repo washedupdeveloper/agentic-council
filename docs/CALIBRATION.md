@@ -365,8 +365,9 @@ reproducible and moved no verdict.
 produced none, and performance produced one (naersk's IFD). So the strictest rule was
 enforced by the two dimensions that are the hard requirements anyway, and the other three
 carried an untested veto. `BLOCKING_SEVERITIES` now reads: `high`/`critical` for security
-and correctness, `critical` for everything else, `critical` for a dimension nobody
-classified. A `critical` anywhere still blocks, so no dimension lost its floor.
+and correctness, `critical` for everything else, and `high`/`critical` for a dimension
+nobody classified — the strict floor, so an unclassified dimension cannot pass on a
+`high`. A `critical` anywhere still blocks, so no dimension lost its floor.
 
 **2. Beta measures the code the repository is MADE OF.** `detect_stacks` answers "is this
 language present", which is right for display and wrong for beta: it fired at two files.

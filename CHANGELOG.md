@@ -6,6 +6,36 @@ All notable changes to this project. Format follows
 
 ## [Unreleased]
 
+## [1.8.1] — 2026-10-18
+
+### Fixed
+
+- **The strict floor for an unclassified dimension was lenient.** `DEFAULT_BLOCKING` read
+  `{"critical"}`, so a `high` finding in a dimension nobody classified did **not** block —
+  while the code comment beside it, the 1.8.0 commit message and the test's own docstring all
+  said "strict floor: a dimension nobody classified should not be able to pass on a `high`".
+  The test asserted `not open_blocking(... "high")`, i.e. it had been written to match the code
+  rather than the intent, which is why a green suite carried the contradiction. Three
+  statements of intent against one line of code: the code moved to `{"high", "critical"}`, and
+  the test now asserts what its docstring says, plus that a `medium` still passes.
+
+- **A blocking finding was offered as an improvement opportunity.** Section 4 of
+  `improvement_opportunities` skipped findings section 1 already lists as required, but the
+  skip was `sev in BLOCKING_SEVERITIES` — a **severity** tested against a dict keyed by
+  **dimension**, so it was false for every finding and never fired. Measured on a
+  security/`high` finding, the plan carried two entries naming `SEC-0001`: "Fix … must be
+  fixed before this can pass" and "Address … improves the review". A reader told both things
+  about one finding cannot tell which is true. The lookup is now per dimension, and a
+  non-blocking finding in the same dimension is still offered.
+
+- **The blocking analysis covers nine repositories, not eight.** `scripts/score_reviews.py`
+  (two places), `tests/test_score_reviews.py` and `skills/council/SKILL.md` said "eight
+  well-regarded repositories produced 93 of 94 blocking findings"; `docs/CALIBRATION.md` names
+  the nine and the 1.8.0 commit message says nine. The nine are the correct set — treefmt-nix,
+  clan-infra, devshell, zero-to-nix, flake-utils, crane, naersk, nix-direnv, flake-compat —
+  and it is a different set from the clean-class evaluation, which has disko and no crane.
+  All four copies now say nine.
+
 ## [1.8.0] — 2026-10-18
 
 ### Changed
