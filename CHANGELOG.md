@@ -6,6 +6,8 @@ All notable changes to this project. Format follows
 
 ## [Unreleased]
 
+## [1.8.0] — 2026-10-18
+
 ### Changed
 
 - **A `high` finding blocks only in security and correctness.** Those two are the hard
