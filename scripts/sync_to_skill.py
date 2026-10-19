@@ -14,8 +14,8 @@ from pathlib import Path
 
 from hermes_home import resolve as resolve_hermes_home
 
-# `_shared` by path, like every sibling here -- see its own docstring for why a
-# plain import would not be safe.
+# `_shared` by path, like every sibling -- see its docstring for why a plain
+# import would not be safe.
 _SHARED_SPEC = _shared_util.spec_from_file_location(
     "_shared", Path(__file__).resolve().parent / "_shared.py")
 assert _SHARED_SPEC is not None and _SHARED_SPEC.loader is not None, "_shared.py"
@@ -23,8 +23,6 @@ _shared = _shared_util.module_from_spec(_SHARED_SPEC)
 _SHARED_SPEC.loader.exec_module(_shared)
 
 ROOT = Path(__file__).resolve().parent.parent
-
-# --help is byte-identical to what the shell version printed.
 USAGE = """\
 Sync the repo's scripts + bot definitions + rubrics + tests + the council
 SKILL.md INTO the skill LIBRARY — the source of truth — so the skill the agent
@@ -50,7 +48,7 @@ Usage:
   DEST_SKILL=/path/to/skills/.../council council setup skill
 """
 
-# The shell's globals: the resolved destination, --check, and the drift flag.
+# Globals: the resolved destination, --check, and the drift flag.
 DEST = ""
 CHECK_ONLY = False
 DRIFT = False
@@ -121,12 +119,9 @@ def lf_bytes(data: bytes) -> bytes:
                     for line in lines)
 
 
-# Host-specific caches, never content. The copier deletes these after a write, so
-# they can never be "in sync": in CHECK mode every one of them was reported EXTRA
-# and set DRIFT, which made `--check` permanently red after the documented way of
-# verifying a deployment -- running its suite in place. 40 `.pyc` files from one
-# pytest run were enough. Filtering here covers both the comparison and the golden
-# copy, because both walk through find_files.
+# Host-specific caches, never content. Unfiltered, CHECK mode reported each one
+# EXTRA and left `--check` permanently red after a suite run in place: 40 `.pyc`
+# files were enough. find_files filters, so comparison and copy both skip them.
 _CACHE_DIRS = {"__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache"}
 _CACHE_SUFFIXES = (".pyc", ".pyo")
 
@@ -301,26 +296,15 @@ def main(argv: list[str] | None = None) -> int:
         for src in find_files(golden):
             place(src, f"{DEST}/tests/golden/{os.path.relpath(src, golden)}")
 
-    # Bytecode caches are host-specific and meaningless. `.pytest_cache` too: it
-    # was reaching the deployment and is a cache, not content.
+    # Caches the copy can have carried over; see _CACHE_DIRS.
     if not CHECK_ONLY:
         for cache in (f"{DEST}/scripts/__pycache__", f"{DEST}/tests/__pycache__",
                       f"{DEST}/.pytest_cache", f"{DEST}/tests/.pytest_cache"):
             shutil.rmtree(cache, ignore_errors=True)
 
-    # The pinned toolchain definition, so a machine with only the skill can build
-    # it (`toolchain.py`'s fallback). NOT optional: without these the deployment
-    # cannot resolve a toolchain on its own.
-    #
-    # This used to be `if os.path.isfile(src): place(...)` with no else, and a sync
-    # run from a nix framework tree -- which by design carries no flake.nix -- then
-    # skipped BOTH files silently. The deployment's flake.nix stayed at whatever it
-    # was, a user who ran `nix build <skill>#toolchain` got the old toolchain, and
-    # nothing anywhere said so. Measured: a deployment 489 lines and two major
-    # changes behind, reporting "in sync" apart from one line of drift.
-    #
-    # The source comes from REVIEW_COUNCIL_FLAKE_DIR when the launcher set it (the
-    # nix app, the container), else from the checkout beside us.
+    # NOT optional: without these the deployment cannot resolve a toolchain on its
+    # own. A sync from a nix tree (no flake.nix by design) skipped BOTH silently once:
+    # measured, 489 lines of drift reported "in sync". Source: REVIEW_COUNCIL_FLAKE_DIR.
     flake_dir = os.environ.get("REVIEW_COUNCIL_FLAKE_DIR") or root
     missing = [n for n in FLAKE_FILES if not os.path.isfile(os.path.join(flake_dir, n))]
     if missing:
@@ -333,11 +317,9 @@ def main(argv: list[str] | None = None) -> int:
     for name in FLAKE_FILES:
         place(os.path.join(flake_dir, name), f"{DEST}/{name}")
 
-    # The flake MODULES, which the flake.nix just installed IMPORTS. A flake's
-    # `imports` are eager, so without these the deployed flake evaluates to NOTHING --
-    # `.#toolchain` included, which is the one thing this install exists to provide.
-    # The same silent-skip trap as the two files above, one level down: the file
-    # installs, the flake looks complete, and nothing resolves.
+    # The flake MODULES the installed flake.nix IMPORTS. `imports` are eager, so
+    # without these the deployed flake evaluates to NOTHING -- `.#toolchain`
+    # included, which is what this install exists to provide. Same trap, one level down.
     nix_dir = Path(flake_dir, "nix")
     if not nix_dir.is_dir():
         print(f"council setup skill: cannot install nix/ -- not found in\n"

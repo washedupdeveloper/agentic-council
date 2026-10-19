@@ -2,9 +2,8 @@
   description = "A flake that reviews itself with agentic-council";
 
   # Written by `nix flake init -t github:washedupdeveloper/agentic-council`.
-  #
-  # Importing `flakeModules.default` yields the same packages, formatter and app
-  # this project builds for itself — not a copy of them.
+  # `flakeModules.default` yields the same packages, formatter and app this
+  # project builds for itself — not a copy.
   inputs = {
     review-council.url = "github:washedupdeveloper/agentic-council";
 
