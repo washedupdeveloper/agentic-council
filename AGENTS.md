@@ -85,3 +85,10 @@ Say so. This repository prefers a stated gap to a plausible number: `docs/MILEST
 records several accepted gaps, and the unbuilt interactive metrics are unbuilt precisely
 because the data does not exist. A measurement in a document names the command that
 produced it, or it says it cannot be re-derived.
+
+## Specs (OpenSpec)
+
+A behavior change starts in `openspec/changes/<name>/` (proposal, spec delta, tasks), not in
+code. `openspec list --specs` before proposing; `openspec validate <name> --strict` before
+applying and before archive; `openspec archive <name> --yes` when the work lands.
+Procedure: the `openspec` skill. Pure refactors and dependency bumps set `skip_specs: true`.
