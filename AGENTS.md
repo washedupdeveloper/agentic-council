@@ -44,8 +44,10 @@ procedure.
 A dev verb's module must not be in `runtimeModules`, and a user verb's must be. `version`
 is dev, because it edits `pyproject.toml` and the shipped tree carries no build metadata.
 
-**Prompts travel in a file, never in argv.** A reviewer prompt is ~400 KB and
-`MAX_ARG_STRLEN` is 65,536 bytes. `council_loop` passes `--query-file`.
+**Prompts travel in a file, never in argv.** `MAX_ARG_STRLEN` is 65,536 bytes, so
+`council_loop` passes `--query-file`. The prompt itself is boundeded by
+`probe_digest` (tens of KB, `PROMPT_PROBE_BUDGET_BYTES`): an unbounded one was 518 KB,
+almost all of it probe output, and the endpoint answered it with a 504.
 
 **Bundled skills are not edited here.** `skills/` in this repository is the source;
 `~/.hermes/skills/` and the mirror in `hermes-skills` are generated copies. Edit the

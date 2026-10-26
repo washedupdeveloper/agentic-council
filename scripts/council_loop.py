@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 import threading
@@ -146,7 +147,12 @@ scored, and a finding with no valid dimension cannot be scored at all.
 Review ONLY the changed set ({scope}).
 {carry_block}
 Deterministic probe results for this repository. This is the same data every
-reviewer is given, so use it as evidence rather than re-deriving it:
+reviewer is given, so use it as evidence rather than re-deriving it. It is SUMMARISED:
+findings are ranked by severity and capped per rule, and every entry states
+`findings_total` and `omitted_by_rule`, which is how you say "hundreds more of this
+kind" without inventing detail. Treat this digest as the probe evidence you were
+given: `probes.json` holds the same data unsummarised, so reading it wholesale adds
+nothing — open it only to check one finding.
 
 {probe_json}
 
@@ -1017,6 +1023,116 @@ def carry_block(ctx: Optional[Dict[str, Any]]) -> str:
     return "\n".join(lines) + "\n"
 
 
+# ── the reviewer's view of the probes ────────────────────────────────────────
+# The prompt gets a BOUNDED digest; `probes.json` keeps every finding. The two consumers have
+# different budgets: the gate and the next incremental run read the file, and only the prompt
+# has to fit a model's context window. Measured on a Python repository, the full probe JSON was
+# 515,487 of a 518,550-byte prompt — 1,013 ruff findings over 60 files, 975 of them `low`, 603
+# of one rule — and the configured endpoint answered that request with a 504 at both a 240 s and
+# a 900 s timeout, while the same profile answered a small prompt in 20 s.
+PROMPT_PROBE_BUDGET_BYTES = 24_000
+PROMPT_FINDINGS_PER_PROBE = 25
+PROMPT_FINDINGS_PER_RULE = 3
+PROMPT_CLAIM_CHARS = 180
+PROMPT_CHECK_CHARS = 120
+
+_SEVERITY_ORDER = {"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}
+_SEVERITY_UNKNOWN = 9
+
+
+def _rule_code(finding: Dict[str, Any]) -> str:
+    """The rule a finding came from: `ruff UP006: ...` -> `UP006`, else the claim's head."""
+    claim = str(finding.get("claim") or "")
+    m = re.match(r"^\S+\s+([A-Za-z]+[0-9]+)\b", claim)
+    if m:
+        return m.group(1).upper()
+    return claim[:24] or "(unlabelled)"
+
+
+def _trim_finding(finding: Dict[str, Any], repo: Path) -> Dict[str, Any]:
+    """One finding with the fat removed: a repo-relative path and short strings.
+
+    Measured on the 1,013-finding probe, `location` was 41.5% of the bytes because every path
+    was absolute and `falsifiable_check` another 34.9% because it repeated that path inside a
+    command. Neither gets more useful by being shown in full.
+    """
+    out = dict(finding)
+    loc = dict(out.get("location") or {})
+    path = str(loc.get("path") or "")
+    if path:
+        try:
+            loc["path"] = str(Path(path).relative_to(repo))
+        except ValueError:
+            pass  # outside the repo: leave it alone rather than mangle it
+    out["location"] = loc
+    for key, limit in (("claim", PROMPT_CLAIM_CHARS),
+                       ("falsifiable_check", PROMPT_CHECK_CHARS)):
+        value = out.get(key)
+        if isinstance(value, str) and len(value) > limit:
+            out[key] = value[:limit].rstrip() + "\u2026"
+    return out
+
+
+def probe_digest(probes: List[Dict[str, Any]], repo: Path,
+                 budget_bytes: int = PROMPT_PROBE_BUDGET_BYTES) -> str:
+    """Render the probe results for the reviewer prompt, bounded, without mutating *probes*.
+
+    Findings are ranked by severity, then capped per rule code and per probe, because the volume
+    is repetition rather than observation: 603 `UP006` and 138 `UP045` are two facts, not 741.
+    Each entry reports `findings_total`, `findings_omitted` and `omitted_by_rule`, so the reviewer
+    can say "600 more of this kind" instead of inferring silence.
+
+    The list passed in is the record — this function reads it and returns a string. It is never
+    the place a finding is dropped from disk: `probes.json` is written from the original list, and
+    the incremental diff compares against that.
+    """
+    digest: List[Dict[str, Any]] = []
+    for probe in probes:
+        findings = list(probe.get("findings") or [])
+        ranked = sorted(
+            findings,
+            key=lambda f: _SEVERITY_ORDER.get(
+                str(f.get("severity") or "").lower(), _SEVERITY_UNKNOWN),
+        )
+        kept: List[Dict[str, Any]] = []
+        per_rule: Dict[str, int] = {}
+        omitted: Dict[str, int] = {}
+        for finding in ranked:
+            rule = _rule_code(finding)
+            too_many = per_rule.get(rule, 0) >= PROMPT_FINDINGS_PER_RULE
+            if len(kept) >= PROMPT_FINDINGS_PER_PROBE or too_many:
+                omitted[rule] = omitted.get(rule, 0) + 1
+                continue
+            per_rule[rule] = per_rule.get(rule, 0) + 1
+            kept.append(_trim_finding(finding, repo))
+
+        entry: Dict[str, Any] = {k: v for k, v in probe.items() if k != "findings"}
+        entry["findings"] = kept
+        entry["findings_total"] = len(findings)
+        entry["findings_omitted"] = len(findings) - len(kept)
+        if omitted:
+            entry["omitted_by_rule"] = dict(
+                sorted(omitted.items(), key=lambda kv: (-kv[1], kv[0])))
+        digest.append(entry)
+
+    rendered = json.dumps(digest, indent=2, ensure_ascii=False)
+    if len(rendered) <= budget_bytes:
+        return rendered
+
+    # Still over: keep the counts, drop the bodies. A prompt past the model's window produces no
+    # review at all, which is strictly worse than a thin one that still names what it omitted.
+    # The counts have to agree with what is actually shown: a body-less entry claiming three
+    # findings were kept is a lie of the same kind the budget exists to avoid.
+    bare = []
+    for entry in digest:
+        slim = {k: v for k, v in entry.items() if k != "findings"}
+        slim["findings"] = []
+        slim["findings_omitted"] = slim.get("findings_total", 0)
+        slim["findings_dropped_for_budget"] = True
+        bare.append(slim)
+    return json.dumps(bare, indent=2, ensure_ascii=False)
+
+
 def generalist_prompt(repo: Path, scope: str, round_no: int, sha: str,
                       stacks: List[str], probes: List[Dict[str, Any]],
                       goals: Dict[str, Any], out_path: Path,
@@ -1044,7 +1160,7 @@ def generalist_prompt(repo: Path, scope: str, round_no: int, sha: str,
         goal_acceptance=(goal.get("acceptance")
                          or DEFAULT_GOALS[DIMENSIONS[0]]["acceptance"]),
         goal_focus=", ".join(goal.get("focus") or []) or "(wherever the rubrics point)",
-        probe_json=json.dumps(probes, indent=2),
+        probe_json=probe_digest(probes, Path(repo)),
         carry_block=carry_block(carry_ctx),
         out_path=out_path, profile=GENERALIST_PROFILE, prefix="GEN",
     )
