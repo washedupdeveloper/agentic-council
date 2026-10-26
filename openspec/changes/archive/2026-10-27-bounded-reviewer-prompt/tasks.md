@@ -23,4 +23,4 @@
 - [x] 3.1 `nix flake check --keep-going` passes (suite, ruff, mypy, the command surface).
 - [x] 3.2 A real prompt for `hermes-agent` renders inside the budget — measured, not assumed.
 - [x] 3.3 `openspec validate bounded-reviewer-prompt --strict` passes.
-- [ ] 3.4 The full council runs on `hermes-agent` and produces readable reviewer files.
+- [x] 3.4 The full council runs on `hermes-agent` and produces readable reviewer files.
