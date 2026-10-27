@@ -1871,6 +1871,22 @@ def write_outcome(run_root: Path, outcome: str, reason: str, scores: List[float]
     print("=" * 60)
 
 
+def fix_plan(handover: Optional[Dict[str, Any]], verdict: Dict[str, Any],
+             threshold: float) -> str:
+    """The plan the fixer works: the change's tasks when there is one, else the gate digest.
+
+    One plan for the reader and another for the fixer is the same defect as two plans in the
+    reader's own file — the turn that edits the tree must be working what the change says.
+    """
+    if handover and handover.get("valid") and handover.get("path"):
+        plan = read_handover_plan(Path(handover["path"]))
+        if plan.get("tasks"):
+            head = (f"Work the OpenSpec change `{plan['change']}` at `{handover['path']}`. "
+                    "Its tasks, in order:")
+            return head + "\n" + "\n".join(plan["tasks"])
+    return priority_digest(verdict, threshold)
+
+
 def priority_digest(verdict: Dict[str, Any], threshold: float,
                     limit: int = 12) -> str:
     """A compact, ordered work list for the fix turn, from the gate verdict."""
@@ -2111,7 +2127,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             binary, repo,
             FIX_PROMPT.format(
                 repo=repo, gate_output=gate_out, mode=args.mode,
-                next_steps=priority_digest(verdict, args.threshold),
+                next_steps=fix_plan(handover, verdict, args.threshold),
             ),
             args.timeout, log,
         )

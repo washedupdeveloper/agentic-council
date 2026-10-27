@@ -90,6 +90,22 @@ def test_read_handover_plan_skips_the_archive_and_reads_requirements_and_tasks()
     assert len(plan["tasks"]) == 2, plan["tasks"]
 
 
+def test_the_fix_turn_is_handed_the_change_tasks():
+    """The turn that edits the tree must work the same plan the reader is given."""
+    root = pathlib.Path(tempfile.mkdtemp())
+    change = _change(root)
+    handover = {"found": True, "valid": True, "path": str(change.parent), "changes": [],
+                "problems": []}
+    text = loop.fix_plan(handover, RESULT, 80.0)
+    assert "OpenSpec change `close-the-findings`" in text, text
+    assert "- [ ] 1.1 Rewrite the path." in text, text
+
+
+def test_the_fix_turn_falls_back_without_a_change():
+    text = loop.fix_plan({}, RESULT, 80.0)
+    assert "OpenSpec change" not in text
+
+
 def test_the_console_verdict_names_the_change():
     import argparse
     import io
