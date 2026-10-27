@@ -73,6 +73,8 @@ def test_severity_beats_position():
 
 
 def test_paths_under_the_repo_become_relative_and_outside_ones_are_left():
+    # POSIX on every host: this assertion is what caught the Windows form in CI.
+
     repo = Path(tempfile.mkdtemp())
     inside = _finding("E501", "low", str(repo / "scripts" / "x.py"), 1)
     outside = _finding("E501", "low", "/nix/store/abc/site-packages/y.py", 1)

@@ -1205,7 +1205,10 @@ def _trim_finding(finding: Dict[str, Any], repo: Path) -> Dict[str, Any]:
     path = str(loc.get("path") or "")
     if path:
         try:
-            loc["path"] = str(Path(path).relative_to(repo))
+            # as_posix(), not str(): on Windows `str(relative_to(...))` yields `scripts\\x.py`,
+            # and the reviewer is told to cite `path:line`. The digest must read the same
+            # whichever host ran the council — CI caught this on windows-latest.
+            loc["path"] = Path(path).relative_to(repo).as_posix()
         except ValueError:
             pass  # outside the repo: leave it alone rather than mangle it
     out["location"] = loc
