@@ -845,6 +845,37 @@ def validate_handover(changes_root: Path) -> Dict[str, Any]:
     return result
 
 
+def read_handover_plan(changes_root: Path) -> Dict[str, Any]:
+    """The change as a reader needs it: its name, its requirements, its tasks.
+
+    Shape only — `validate_handover` owns whether the change is well formed, and this only
+    renders it. Tasks come back verbatim, because the checkbox list is the plan.
+    """
+    plan: Dict[str, Any] = {"change": None, "requirements": [], "tasks": []}
+    if not changes_root.is_dir():
+        return plan
+    changes = sorted(p for p in changes_root.iterdir()
+                     if p.is_dir() and p.name != "archive")
+    if not changes:
+        return plan
+    change = changes[0]
+    plan["change"] = change.name
+
+    specs = sorted((change / "specs").rglob("spec.md")) if (change / "specs").is_dir() else []
+    for spec in specs:
+        text = spec.read_text(encoding="utf-8", errors="replace")
+        for name in re.findall(r"^### Requirement: (.+)$", text, re.M):
+            plan["requirements"].append({"capability": spec.parent.name, "name": name.strip()})
+
+    tasks = change / "tasks.md"
+    if tasks.is_file():
+        plan["tasks"] = [
+            line.rstrip() for line in tasks.read_text(encoding="utf-8", errors="replace").splitlines()
+            if re.match(r"^\s*- \[[ xX]\] ", line)
+        ]
+    return plan
+
+
 def _finding_key(finding: Dict[str, Any]) -> str:
     """Identity for dedupe across samples: location plus normalised claim."""
     loc = finding.get("location") or {}
@@ -1643,7 +1674,8 @@ def decide_stop(*, round_no: int, max_rounds: int, min_rounds: int,
 def render_next_steps(*, result: Dict[str, Any], history: List[Dict[str, Any]],
                       outcome: str, reason: str, threshold: float, repo: Path,
                       mode: str, rounds_used: int,
-                      budget_seconds: float = 0.0) -> str:
+                      budget_seconds: float = 0.0,
+                      handover: Optional[Dict[str, Any]] = None) -> str:
     """The handover plan: what to do next, required first, then by priority.
 
     Produced on EVERY termination, satisfied or not. When the loop stops early —
@@ -1700,6 +1732,44 @@ def render_next_steps(*, result: Dict[str, Any], history: List[Dict[str, Any]],
                 lines.append(f"Net movement across the run: **{last - first:+.2f}** "
                              f"aggregate points.")
                 lines.append("")
+
+    # A validated change IS the plan. The A/B digest below is the fallback for a run that
+    # produced none, because two plans that can disagree is the defect this replaces.
+    if handover and handover.get("valid"):
+        plan = read_handover_plan(Path(handover["path"]))
+        lines.append("## The change")
+        lines.append("")
+        lines.append(f"`{plan['change']}` — an OpenSpec change the council wrote at "
+                     f"`{handover['path']}`. Requirements first, then its tasks; work them in "
+                     "order and archive it when they are done.")
+        lines.append("")
+        if plan["requirements"]:
+            lines.append("### Requirements")
+            lines.append("")
+            for req in plan["requirements"][:12]:
+                lines.append(f"- `{req['capability']}` — {req['name']}")
+            if len(plan["requirements"]) > 12:
+                lines.append(f"- _{len(plan['requirements']) - 12} more in the change_")
+            lines.append("")
+        if plan["tasks"]:
+            lines.append("### Tasks")
+            lines.append("")
+            lines.extend(plan["tasks"])
+            lines.append("")
+        lines.append("### How to resume")
+        lines.append("")
+        resume = f'python scripts/council_loop.py "{repo}" --mode {mode}'
+        if budget_seconds:
+            resume += f" --budget-seconds {int(budget_seconds)}"
+        lines.append("```bash")
+        lines.append(resume)
+        lines.append("```")
+        lines.append("")
+        return "\n".join(lines)
+
+    lines.append("_No validated change was written this round; the plan below is derived from "
+                 "the gate, not from a change._")
+    lines.append("")
 
     required = [o for o in opportunities if o.get("required")]
     desirable = [o for o in opportunities if not o.get("required")]
@@ -1791,6 +1861,9 @@ def write_outcome(run_root: Path, outcome: str, reason: str, scores: List[float]
     print(f"scores:  {scores}")
     if plan_path:
         print(f"next:    {plan_path}")
+    if handover and handover.get("found"):
+        state = "valid" if handover.get("valid") else "INVALID"
+        print(f"change:  {handover.get('path')} ({state})")
     print(f"run dir: {run_root}")
     print("=" * 60)
 
@@ -2050,6 +2123,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                 result=verdict, history=history, outcome=outcome, reason=reason,
                 threshold=args.threshold, repo=repo, mode=args.mode,
                 rounds_used=rounds_used, budget_seconds=args.budget_seconds,
+                handover=handover or None,
             ),
             encoding="utf-8",
         )
