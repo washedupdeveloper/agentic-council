@@ -82,6 +82,31 @@ def test_a_well_formed_change_validates():
     assert result["changes"][0]["name"] == "fix-the-path"
 
 
+def test_the_archive_directory_is_not_treated_as_a_change():
+    """Scaffolding a handover creates `changes/archive/`; it is bookkeeping, not a change.
+
+    Found by the first live run: a correct scaffold failed validation because the archive was
+    read as an empty change.
+    """
+    root = pathlib.Path(tempfile.mkdtemp())
+    changes = _change(root, name="close-round-1-findings")
+    (changes / "archive" / "some-old-change").mkdir(parents=True)
+    result = loop.validate_handover(changes)
+    assert result["found"] and result["valid"], result["problems"]
+    assert [c["name"] for c in result["changes"]] == ["close-round-1-findings"]
+
+
+def test_an_empty_scaffold_is_invalid():
+    """`.openspec.yaml` alone is an empty change, and must be reported as one."""
+    root = pathlib.Path(tempfile.mkdtemp())
+    change = root / "changes" / "scaffolded-but-empty"
+    change.mkdir(parents=True)
+    (change / ".openspec.yaml").write_text("schema: spec-driven\n", encoding="utf-8")
+    result = loop.validate_handover(root / "changes")
+    assert result["found"] and not result["valid"]
+    assert any("proposal.md missing" in p for p in result["problems"]), result["problems"]
+
+
 def test_no_change_is_reported_as_absent_not_valid():
     result = loop.validate_handover(pathlib.Path(tempfile.mkdtemp()) / "changes")
     assert result["found"] is False

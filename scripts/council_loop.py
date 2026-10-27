@@ -299,6 +299,20 @@ source; the format is not restated here. Concretely:
 - **tasks.md** — `- [ ] <n>.<m> ...` checkboxes, one commit each, ordered so the blocking
   findings come first, and a final verification task naming the command that settles it.
 
+How to use the templates, exactly:
+
+1. `openspec new change <slug>` in the handover root creates the change directory. If the skill is
+   not available, create `proposal.md`, `specs/<capability>/spec.md` and `tasks.md` yourself.
+2. Run `openspec instructions <artifact> --change <slug>` and USE the output to fill that artifact.
+   Do NOT save the instructions to a file — a `.instructions.txt` in the handover is not a
+   handover, and a change directory holding only `.openspec.yaml` is an empty change.
+3. Write, in this order: `proposal.md`, then `specs/<capability>/spec.md`, then `tasks.md`.
+4. `openspec instructions tasks` warns that `specs` and `design` are missing. That warning is
+   expected here: THIS prompt replaces the specs step, and `design.md` is optional — do not write
+   one unless the change is cross-cutting. Proceed to write `tasks.md` anyway.
+5. The change is not done until all three paths above exist and hold real content. Stop after
+   writing them.
+
 Derive the requirements from the gate output above and the reviewer files; do not invent
 findings. If the round produced no findings, write the change with one requirement per goal that
 was PARTIAL or NOT MET.
@@ -774,7 +788,10 @@ def validate_handover(changes_root: Path) -> Dict[str, Any]:
     }
     if not changes_root.is_dir():
         return result
-    changes = sorted(p for p in changes_root.iterdir() if p.is_dir())
+    # `archive/` is OpenSpec's own bookkeeping, not a change: scaffolding a handover
+    # creates it, and treating it as a malformed change fails a correct run.
+    changes = sorted(p for p in changes_root.iterdir()
+                     if p.is_dir() and p.name != "archive")
     if not changes:
         return result
 
