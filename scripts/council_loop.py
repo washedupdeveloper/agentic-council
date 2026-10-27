@@ -274,11 +274,40 @@ was not met, say what the next round should target. Where a reviewer produced no
 file, that dimension's goal is UNVERIFIED — say so rather than calling it met.
 
 The gate has already decided acceptance. You explain the result; you do not decide
-it. Then reply with the control message your rubric specifies.
+it.
 
-Reply tersely: per goal, the verdict, the evidence as an id or `path:line`, and what
-remains. Do not restate the gate output — the reader has it. The `caveman` skill is
-the voice.
+## The handover: an OpenSpec change, written to disk
+
+Your top-level output to the reader is not prose — it is an OpenSpec change, written under the
+run directory (a review is a read: write here, never into the target repository):
+
+  {run_dir}/../handover/openspec/changes/<kebab-slug>/
+    proposal.md
+    specs/<capability>/spec.md
+    tasks.md
+
+Follow the `openspec` skill. `openspec instructions proposal|specs|tasks` is the only template
+source; the format is not restated here. Concretely:
+
+- **proposal.md** — `## Why` (the verdict, and why the open findings matter), `## What Changes`,
+  `## Capabilities` (name the capability you modify or introduce), `## Impact`.
+- **specs/<capability>/spec.md** — one `### Requirement:` per CLASS of open finding, not per
+  finding and not per file; each carries at least one `#### Scenario:` with `**WHEN**` and
+  `**THEN**`. A requirement states observable behaviour plus how it is verified, never "fix
+  GEN-0002". If the target repository already has `openspec/specs/`, reuse its capability path
+  and write the delta as ADDED or MODIFIED against the requirement text you can read there.
+- **tasks.md** — `- [ ] <n>.<m> ...` checkboxes, one commit each, ordered so the blocking
+  findings come first, and a final verification task naming the command that settles it.
+
+Derive the requirements from the gate output above and the reviewer files; do not invent
+findings. If the round produced no findings, write the change with one requirement per goal that
+was PARTIAL or NOT MET.
+
+Then reply with the control message your rubric specifies.
+
+Reply tersely: per goal, the verdict and the evidence as an id or `path:line`, then one line
+naming the change directory you wrote. Do not restate the gate output — the reader has it. The
+`caveman` skill is the voice.
 """
 
 FIX_PROMPT = """Continue toward the standing goal: make this repository clear its
@@ -730,6 +759,73 @@ def review_goals(binary: str, repo: Path, round_dir: Path, round_no: int,
         timeout, log,
     )
     return rc
+
+
+# ── the handover, as an OpenSpec change ──────────────────────────────────────
+# The runtime image has no Node, so `openspec validate` cannot run inside a review. The shape is
+# therefore checked here, encoding the rules `openspec instructions` states: a proposal with its
+# Why and What Changes, at least one requirement per capability with at least one scenario, and
+# scenarios that carry WHEN and THEN. The check is deliberately structural — `validate --strict`
+# checks shape, not truth, and so does this.
+def validate_handover(changes_root: Path) -> Dict[str, Any]:
+    """Validate the OpenSpec change the orchestrator wrote. Never raises."""
+    result: Dict[str, Any] = {
+        "found": False, "path": None, "changes": [], "valid": False, "problems": [],
+    }
+    if not changes_root.is_dir():
+        return result
+    changes = sorted(p for p in changes_root.iterdir() if p.is_dir())
+    if not changes:
+        return result
+
+    result["found"] = True
+    result["path"] = str(changes_root)
+
+    for change in changes:
+        problems: List[str] = []
+        proposal = change / "proposal.md"
+        specs = sorted((change / "specs").rglob("spec.md")) if (change / "specs").is_dir() else []
+        tasks = change / "tasks.md"
+
+        if not proposal.is_file():
+            problems.append("proposal.md missing")
+        else:
+            text = proposal.read_text(encoding="utf-8", errors="replace")
+            for heading in ("## Why", "## What Changes"):
+                if heading not in text:
+                    problems.append(f"proposal.md: no `{heading}` section")
+
+        if not specs:
+            problems.append("no specs/<capability>/spec.md")
+        for spec in specs:
+            rel = spec.relative_to(change).as_posix()
+            text = spec.read_text(encoding="utf-8", errors="replace")
+            if not re.search(r"^### Requirement: \S", text, re.M):
+                problems.append(f"{rel}: no `### Requirement:` block")
+            for block in re.split(r"^### Requirement: ", text, flags=re.M)[1:]:
+                name = block.splitlines()[0].strip() or "(unnamed)"
+                scenarios = re.split(r"^#### Scenario: ", block, flags=re.M)[1:]
+                if not scenarios:
+                    problems.append(f"{rel}: requirement '{name}' has no scenario")
+                for scenario in scenarios:
+                    title = scenario.splitlines()[0].strip() or "(unnamed)"
+                    if "**WHEN**" not in scenario or "**THEN**" not in scenario:
+                        problems.append(
+                            f"{rel}: scenario '{title}' needs both **WHEN** and **THEN**")
+
+        if not tasks.is_file():
+            problems.append("tasks.md missing")
+        elif not re.search(r"^\s*- \[[ xX]\] \S", tasks.read_text(encoding="utf-8",
+                                                          errors="replace"), re.M):
+            # Checked or not: a handover that has landed has every task ticked, so
+            # requiring an open box would reject archived work as malformed.
+            problems.append("tasks.md: no checkbox task")
+
+        result["changes"].append({"name": change.name, "problems": problems})
+        result["problems"].extend(f"{change.name}: {p}" for p in problems)
+
+    result["valid"] = all(not c["problems"] for c in result["changes"])
+    return result
 
 
 def _finding_key(finding: Dict[str, Any]) -> str:
@@ -1658,7 +1754,8 @@ def render_next_steps(*, result: Dict[str, Any], history: List[Dict[str, Any]],
 def write_outcome(run_root: Path, outcome: str, reason: str, scores: List[float],
                   args: argparse.Namespace, repo: Path, *,
                   plan_path: Optional[Path] = None,
-                  met_minimum: bool = False) -> None:
+                  met_minimum: bool = False,
+                  handover: Optional[Dict[str, Any]] = None) -> None:
     (run_root / "outcome.json").write_text(
         json.dumps({"outcome": outcome, "reason": reason, "scores": scores,
                     "threshold": args.threshold, "mode": args.mode,
@@ -1667,7 +1764,8 @@ def write_outcome(run_root: Path, outcome: str, reason: str, scores: List[float]
                     "min_rounds": args.min_rounds,
                     "max_rounds": args.max_rounds,
                     "budget_seconds": args.budget_seconds,
-                    "next_steps": str(plan_path) if plan_path else None},
+                    "next_steps": str(plan_path) if plan_path else None,
+                    "handover": handover if handover else None},
                    indent=2), encoding="utf-8")
 
     print("\n" + "=" * 60)
@@ -1769,6 +1867,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     outcome = "escalate"
     reason = "round cap reached"
     verdict: Dict[str, Any] = {}
+    handover: Dict[str, Any] = {}
     rounds_used = 0
 
     # Facts the harness owns, resolved once: the revision under review, the
@@ -1891,6 +1990,16 @@ def main(argv: Optional[List[str]] = None) -> int:
             print("  orchestrator timed out during the goal review "
                   "(the gate verdict stands)")
 
+        # The handover the orchestrator was asked to write, checked rather than trusted.
+        handover = validate_handover(run_root / "handover" / "openspec" / "changes")
+        if handover["found"]:
+            state = "valid" if handover["valid"] else "INVALID"
+            print(f"  handover: openspec change, {state}")
+            for problem in handover["problems"]:
+                print(f"    - {problem}")
+        else:
+            print("  handover: no openspec change written this round")
+
         stop = decide_stop(
             round_no=round_no, max_rounds=args.max_rounds,
             min_rounds=args.min_rounds, met_minimum=met_minimum,
@@ -1927,9 +2036,22 @@ def main(argv: Optional[List[str]] = None) -> int:
             ),
             encoding="utf-8",
         )
+        if handover.get("found"):
+            with plan_path.open("a", encoding="utf-8") as fh:
+                fh.write("\n## The change\n\n")
+                fh.write(f"The handover is an OpenSpec change at `{handover['path']}`.\n\n")
+                if handover["valid"]:
+                    fh.write("It validates against the container's shape: a proposal with Why "
+                             "and What Changes, requirements with WHEN/THEN scenarios, and "
+                             "tasks as checkboxes.\n")
+                else:
+                    fh.write("**It does not validate.** Structural problems:\n\n")
+                    for problem in handover["problems"]:
+                        fh.write(f"- {problem}\n")
 
     write_outcome(run_root, outcome, reason, scores, args, repo,
-                  plan_path=plan_path, met_minimum=(outcome == "satisfied"))
+                  plan_path=plan_path, met_minimum=(outcome == "satisfied"),
+                  handover=handover or None)
     return 0 if outcome == "satisfied" else 1
 
 
