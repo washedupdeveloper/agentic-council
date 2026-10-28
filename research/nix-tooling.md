@@ -103,7 +103,7 @@ evaluation and type-checking signals.
 
 | Tool | Invocation | Output | Signal | Runtime | False positives |
 |---|---|---|---|---|---|
-| **`nix flake check`** | `nix flake check --no-build --keep-going` | text; exit code | **hard gate** `flake_check ∈ {0,1}` | seconds–minutes (eval) | None for evaluation; may report unrelated warnings as failures. Use `--keep-going` to collect all errors, not just the first. |
+| **`nix flake check`** | `nix flake check --no-build --keep-going`, then `nix flake check --keep-going` | text; exit code | **hard gate** `flake_check ∈ {0,1}` (eval-only is not a pass — a run-tier check is a derivation, and `--no-build` never builds it) | seconds–minutes (eval) | None for evaluation; may report unrelated warnings as failures. Use `--keep-going` to collect all errors, not just the first. |
 | **`nix flake check` (build)** | `nix flake check --keep-going` | text; exit code | builds every `checks.<system>.*` and `nixosConfigurations.*.config.system.build.toplevel` | minutes–hours | None, but expensive; run nightly. |
 | **`nix eval --json`** | `nix eval .#nixosConfigurations.host.config.system.build.toplevel.drvPath` | JSON/raw | evaluates the full NixOS config; exit 0 = option typecheck passes | seconds–minutes | None. |
 | **`nixos-rebuild build --flake .#<host>`** | `nixos-rebuild build --flake .#host --no-build` (or without for full build) | text; `result` symlink | build success | minutes | None; needs a Linux host. |
