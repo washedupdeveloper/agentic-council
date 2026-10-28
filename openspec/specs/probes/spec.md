@@ -1,7 +1,10 @@
 # probes Specification
 
 ## Purpose
-TBD - created by archiving change a-pass-requires-the-build. Update Purpose after archive.
+
+What a probe may claim. Every finding this repository produces is only as good as the probe behind
+it, so each probe states what it measured — and reports no signal, never a pass, where it could not
+measure at all.
 
 ## Requirements
 
