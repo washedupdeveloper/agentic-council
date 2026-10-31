@@ -179,6 +179,14 @@ def validate(cfg: Dict[str, Any]) -> List[str]:
     """Every problem, not the first. Empty list means usable."""
     problems: List[str] = []
 
+    # Before the field checks: a file from a newer build may carry keys this one
+    # would silently ignore, so the version is the first thing to report.
+    version = cfg.get("schema_version")
+    if version != SCHEMA_VERSION:
+        problems.append(
+            f"schema_version: this build reads version {SCHEMA_VERSION}, the file says "
+            f"{version!r} — a newer file may set keys this build would ignore")
+
     review = cfg.get("review")
     if not isinstance(review, dict):
         problems.append("review: must be a mapping")

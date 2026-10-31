@@ -18,6 +18,15 @@ All notable changes to this project. Format follows
   they said `advisory`/`3` where the CLI and its contract test promise `full`/`8` — and
   now agree with it; four tests pin both directions (config used, flag wins).
 
+- **Three more declared surfaces that nothing read.** `schema_version` was written and
+  never compared, so a file from a newer build loaded silently. `council review` never
+  called `validate()` — the three verbs that did were not the one that runs. And
+  `swarm.py` hardcoded `DEFAULT_SAMPLES = 5` without reading the config, so
+  `samples = 2` changed `council review` and not `council swarm`. All three now read the
+  config: the version is the first thing `validate()` reports, the loop stops with every
+  problem named before it resolves anything, and swarm takes its worker count from
+  `[review].samples` with the flag as an override. 596 tests.
+
 ## [1.8.3] — 2026-10-18
 
 ### Fixed

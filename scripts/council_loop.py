@@ -1960,6 +1960,12 @@ def main(argv: Optional[List[str]] = None) -> int:
     args = build_parser().parse_args(argv)
 
     cfg, cfg_path = _council_config.load()
+    problems = _council_config.validate(cfg)
+    if problems:
+        print(f"review-council.toml: {len(problems)} problem(s), nothing run:", file=sys.stderr)
+        for problem in problems:
+            print(f"  - {problem}", file=sys.stderr)
+        return 2
     args.mode, args.samples, args.max_rounds, args.threshold = resolve_review_defaults(
         args.mode, args.samples, args.max_rounds, args.threshold, cfg)
 

@@ -328,3 +328,29 @@ def test_the_documented_default_mode_is_what_a_bare_run_uses():
 
     assert cfg_mod.DEFAULTS["review"]["mode"] == "full"
     assert council_loop.resolve_review_defaults(None, None, None, None, {})[0] == "full"
+
+
+def test_a_schema_version_from_the_future_is_reported():
+    """The field existed and nothing read it: a file from a newer build loaded clean."""
+    cfg, _ = cfg_mod.load(hermes_home="/nonexistent-hermes-home-xyz")
+    newer = dict(cfg)
+    newer["schema_version"] = cfg["schema_version"] + 1
+    problems = cfg_mod.validate(newer)
+    assert any("schema_version" in p for p in problems), problems
+
+
+def test_the_review_refuses_a_config_it_cannot_use(tmp_path: Path):
+    """The loop is the main entry point and did not validate what it loaded."""
+    import os
+    import subprocess
+
+    home = tmp_path / "hermes"
+    home.mkdir()
+    (home / "review-council.toml").write_text(
+        '[review]\nthreshold = 80.0\nsamples = 0\nmode = "full"\nmax_rounds = 8\n',
+        encoding="utf-8")
+    env = {**os.environ, "HERMES_HOME": str(home)}
+    r = subprocess.run([sys.executable, str(SCRIPTS / "council_loop.py"), str(REPO), "--dry-run"],
+                       env=env, capture_output=True, text=True, timeout=180)
+    assert r.returncode == 2, (r.returncode, r.stdout[-300:], r.stderr[-300:])
+    assert "samples" in r.stderr, r.stderr
