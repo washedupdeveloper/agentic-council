@@ -90,10 +90,11 @@ DEFAULTS: Dict[str, Any] = {
         "threshold": 80.0,
         # Reviewer samples per round: more recall, more time.
         "samples": 5,
-        # advisory = report only; semi = fix with confirmation; full = fix and
-        # re-review until the gate passes or it stops improving.
-        "mode": "advisory",
-        "max_rounds": 3,
+        # full = fix and re-review until the gate passes or it stops improving
+        # (the default: autonomy is the point, semi/advisory are opt-in);
+        # semi = fix with confirmation; advisory = report only.
+        "mode": "full",
+        "max_rounds": 8,
     },
     "members": {
         "council-generalist": {
@@ -278,7 +279,7 @@ def render(cfg: Dict[str, Any]) -> str:
         f"threshold = {review.get('threshold')}",
         "# Reviewer samples per round. More samples find more, and cost more time.",
         f"samples = {review.get('samples')}",
-        "# advisory = report and stop (cheapest, the default)",
+        "# full = fix and re-review (the default); semi = ask; advisory = report only",
         "# semi     = fix, asking before each change",
         "# full     = fix and re-review until the gate passes or it stops improving",
         f"mode = {_toml_string(str(review.get('mode')))}",

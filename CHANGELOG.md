@@ -6,6 +6,18 @@ All notable changes to this project. Format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- **The configuration was a control surface that controlled nothing.** `council_loop.py`
+  never loaded `review-council.toml`, so `[review]` `mode`, `samples`, `max_rounds` and
+  `threshold` were inert: a file saying `mode = "advisory"` still ran `full`, and
+  `max_rounds = 3` still allowed 8 rounds. The loop now loads the config and treats
+  `[review]` as the defaults, with a command-line flag overriding it. The dry-run plan
+  prints the resolved values and the file it read, so the behaviour is checkable without
+  paying for a run. The shipped defaults were also out of step with the tested contract —
+  they said `advisory`/`3` where the CLI and its contract test promise `full`/`8` — and
+  now agree with it; four tests pin both directions (config used, flag wins).
+
 ## [1.8.3] — 2026-10-18
 
 ### Fixed
