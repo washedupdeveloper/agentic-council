@@ -6,6 +6,66 @@ All notable changes to this project. Format follows
 
 ## [Unreleased]
 
+## [1.9.0] — 2026-11-05
+
+### Added
+
+- **M10 — the proof ladder.** A finding is a claim until a check settles it.
+  `protocol/proofs.json` declares seven proof kinds and is the only declaration
+  site; `scripts/proofs.py` executes them, synthesises the control that must fail,
+  and carries a three-state self-test (`0` all exercised, `3` INCOMPLETE naming the
+  lane, `1` a kind ran and failed) — because a browserless host once reported
+  `10/10 passed` while the `dom` lane was skipped. `scripts/adjudicate.py` records
+  four states, and only `refuted` clears a block. `scripts/claims.py` is the claim
+  ladder: every rung is allowed or blocked with the reason and what would open it.
+  Claims-derived scoring is capped by any confirmed defect (critical 30, high 60,
+  medium 85), since β = 1.00 on a fully-probed run multiplied the claims term by
+  zero: a confirmed committed credential left `security` at det 71.75 until the cap
+  moved it to 30.00 and the aggregate 89.73 -> 77.21.
+
+- **`scripts/calibration.claims.json` — the threshold, derived rather than chosen.**
+  A six-run corpus (three clean rungs, three with a seeded credential) gives
+  `87.33`, plateau `76.83–97.83`, `provisional: false`. Every defective rung was
+  detected `1/1`; every clean rung certified (97.83 · 97.83 · 100.00) and every
+  defective one did not (73.46 · 76.83 · 73.46) — `verdicts separate every rung`.
+  The gate now compares claims-scored runs against it instead of reporting
+  `uncalibrated`, and the file ships in the framework so a packaged build enforces
+  it.
+
+- **The Dockerfile image has the browser lane.** `mkImageRoot` now carries
+  `chromium` and `dejavu_fonts` with a staged font config, exactly as
+  `mkContainer` already did. Measured inside the materialised rootfs:
+  `council proofs --self-test` reports `10/10 exercised and passed`, `dom`
+  included, exit 0.
+
+### Fixed
+
+- **One image was built two ways and behaved differently.** `mkContainer` shipped
+  chromium; `mkImageRoot` — the rootfs the Dockerfile materialises — did not, so
+  the `dom` proof lane ran in the OCI image and was unrunnable in the other build
+  of the same product, while the Dockerfile's comment claimed the two could not
+  drift apart.
+- **The rootfs had no `/dev`, `/proc`, `/sys` or `/tmp`.** A runtime mounts over
+  those paths; an image without them cannot even be mounted over, and a browser
+  without `/dev/null` cannot render.
+- **`council calibrate` could not run from a build.** `corpus.py` was in neither
+  the user nor the dev module list while `calibrate.py` imports it, so
+  `--collect-corpus` died with `ModuleNotFoundError: No module named 'corpus'` in
+  every packaged build, devshell included.
+- **`calibrate --from-runs` wrote to a read-only store path** when run through the
+  installed `council`: it resolved the calibration beside its own module. It now
+  prefers a checkout in the working directory, and the file ships in the build.
+- **A correct reviewer was scored `unprovable`.** `coverage_gap` counted every
+  probe finding, so `deadnix: unused lambda` and "no AGENTS.md" — both `low` —
+  made a silent reviewer on a clean tree uncertifiable, and cost a real corpus a
+  rung. Only findings that could block (`high`/`critical`, or unlabelled) count
+  now.
+- **A test read the working tree.** `test_a_claims_verdict_does_not_need_a_threshold`
+  resolved the repo's own `scripts/calibration.claims.json`, so committing a
+  calibration would silently change what it asserted.
+- Five ruff findings (import order, unused imports) in the M10 modules.
+
+
 ### Fixed
 
 - **The configuration was a control surface that controlled nothing.** `council_loop.py`

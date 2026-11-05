@@ -70,7 +70,8 @@ the analyzer set, the rubrics and the calibration. So:
 - a minor release that moves them records the movement under `### Changed` in
   `## [Unreleased]`, with the direction and the fixture it was measured on
 - a release that moves them must show the shipped threshold still yields the same
-  verdicts on the golden fixtures — `council golden --check` pins both. If it does not,
+  verdicts on the golden fixtures — `council golden --check` pins both (a maintainer verb: `nix develop`, or
+  `REVIEW_COUNCIL_AUDIENCE=dev`). If it does not,
   the release either ships a recalibrated `scripts/calibration.json` or is **major**,
   because then the user has to recalibrate a threshold of their own
 

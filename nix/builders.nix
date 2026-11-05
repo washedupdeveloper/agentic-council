@@ -90,13 +90,14 @@ let
     "_shared.py" # shared: the helpers more than one module needs
     "hermes.py" # shared: locate the launcher, report what can be known
     "calibration.json" # the threshold + curves
+    "calibration.claims.json" # the claims threshold, derived from a corpus
     "eval-baseline.json" # the nix-eval-time baseline
   ];
 
   devModules = [
     "ablate.py" # dev/ablate
     "calibrate.py" # dev/calibrate
-      "corpus.py" # dev/corpus — the graded ladder: plan, sample, collect, derive
+    "corpus.py" # dev/corpus — the graded ladder: plan, sample, collect, derive
     "golden.py" # dev/golden
     "inject_defects.py" # dev/corpus
     "version.py" # dev/version — the release policy, docs/VERSIONING.md

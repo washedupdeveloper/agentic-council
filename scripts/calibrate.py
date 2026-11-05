@@ -958,7 +958,17 @@ def main(argv: Optional[List[str]] = None) -> int:
         except CorpusError as exc:
             print(f"calibrate: {exc}", file=sys.stderr)
             return 2
-        destination = Path(args.out) if args.out else _scorer().calibration_path("claims")
+        if args.out:
+            destination = Path(args.out)
+        else:
+            # The installed framework is a read-only store path, so the module-relative
+            # default can only fail there: `OSError: [Errno 30] Read-only file system`.
+            # The calibration belongs to the project whose corpus was derived, so a
+            # checkout in the working directory wins over the module's own directory.
+            checkout = Path.cwd() / "scripts"
+            destination = (checkout / "calibration.claims.json"
+                           if (checkout / "council.py").is_file()
+                           else _scorer().calibration_path("claims"))
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8",
                                newline="\n")

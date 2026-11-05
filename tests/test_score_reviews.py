@@ -801,3 +801,45 @@ def test_a_checkout_under_a_skipped_name_still_counts(tmp_path):
     assert "nix" in mod.detect_stacks(root), "absolute path parts leaked into the skip check"
     shares = mod.stack_shares(root)
     assert shares and shares.get("nix") == 1.0, shares
+
+
+def test_threshold_from_scale_reads_every_shipped_shape():
+    """`calibration.json` nests the value; a corpus derivation writes a number."""
+    mod = _gate_mod()
+    assert mod.threshold_from_scale({"threshold": 69.175}) == 69.175
+    assert mod.threshold_from_scale({"threshold": {"recommended": 87.1}}) == 87.1
+    assert mod.threshold_from_scale({"recommended_threshold": {"threshold": 55.5}}) == 55.5
+    assert mod.threshold_from_scale(None) is None
+    assert mod.threshold_from_scale({}) is None
+    assert mod.threshold_from_scale({"threshold": "high"}) is None
+
+
+def test_a_claims_run_is_enforced_against_the_claims_threshold(tmp_path, monkeypatch):
+    """The scale decides the number.
+
+    The CLI used to resolve the threshold with `calibrated_threshold()` — the
+    deterministic manifest — and pass it into `evaluate`, so a derived
+    `calibration.claims.json` was loaded, reported as `calibrated`, and never
+    enforced: a claims run was judged against 80.0.
+    """
+    mod = _gate_mod()
+    run = _write_run(tmp_path, {"security": 70, "correctness": 70, "readability": 70,
+                                "architecture": 70, "performance": 70})
+    (run / "proofs.json").write_text(
+        json.dumps({"schema_version": 1, "round": "round-1", "findings": [], "summary": {}}),
+        encoding="utf-8")
+    monkeypatch.setattr(mod, "load_scale_calibration",
+                        lambda scale: {"scale": "claims", "threshold": 69.175})
+    monkeypatch.setattr(mod, "calibrated_threshold", lambda: 80.0)
+    result = mod.evaluate(run, None)
+    assert result.get("score_source") == "claims", result.get("score_source")
+    assert result["threshold"] == 69.175, result["threshold"]
+
+
+def test_an_explicit_threshold_still_wins_over_the_scale(tmp_path):
+    """A caller can still force a number; the scale only supplies the default."""
+    mod = _gate_mod()
+    run = _write_run(tmp_path, {"security": 95, "correctness": 95, "readability": 95,
+                                "architecture": 95, "performance": 95})
+    result = mod.evaluate(run, 50.0)
+    assert result["threshold"] == 50.0

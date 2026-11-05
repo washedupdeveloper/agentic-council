@@ -18,15 +18,21 @@ One **adjudicated run directory** — the thing the gate scores:
 
 A corpus without proofs is a reviewer's opinion with a label attached, and it calibrates nothing.
 
-## Three steps
+## Four steps
+
+`calibrate` is a maintainer verb: `nix develop` exposes it (the wrapper there is built
+for the dev audience), and outside the devshell `REVIEW_COUNCIL_AUDIENCE=dev` does the same.
 
 ```sh
-# 1. build the ladder and its manifest
-council calibrate --plan-corpus /tmp/corpus --base <repo> --levels 0,1,2,4,8,16
+export REVIEW_COUNCIL_AUDIENCE=dev
 
-# 2. review each rung (the expensive half) — one run per level
-#    run directory must be /tmp/corpus/runs/level-<N>/
-council review <tree> --out /tmp/corpus/runs/level-4
+# 1. plan the ladder. Three runs per class is the minimum the derivation accepts,
+#    so a six-level plan at the default --repeats 1 has ONE clean run and refuses.
+council calibrate --plan-corpus /tmp/corpus --base <repo> --levels 0,1 --repeats 3
+
+# 2. run every rung (the expensive half). The sampler creates <runs>/<rung id>/;
+#    retries cover a provider outage rather than hiding it.
+council calibrate --sample-corpus /tmp/corpus/corpus.json --runs /tmp/corpus/runs --retries 3
 
 # 3. score every rung and record what was actually proved
 council calibrate --collect-corpus /tmp/corpus/corpus.json --runs /tmp/corpus/runs
@@ -34,6 +40,9 @@ council calibrate --collect-corpus /tmp/corpus/corpus.json --runs /tmp/corpus/ru
 # 4. derive the threshold, or refuse
 council calibrate --from-runs /tmp/corpus/corpus.json
 ```
+
+`review` has no `--out`; a run's directory is the rung's `id` under `--runs`, and
+`--sample-corpus` is what creates it.
 
 The generator is `build_eval_ladder`: level 0 is the base repo untouched, every higher level seeds a
 known number of defects drawn deterministically from the seed. Ground truth is known by construction

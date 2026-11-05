@@ -276,6 +276,32 @@ def test_a_run_that_proves_nothing_where_the_probes_found_something_is_unprovabl
     assert verdict["aggregate"] == 100.0, "the number is still 100 — that is the hole"
 
 
+def test_a_low_severity_probe_nit_does_not_make_a_silent_run_unprovable():
+    """A clean tree yields low-severity probe findings — an unused lambda, no AGENTS.md.
+
+    A reviewer that says nothing about them is right, not blind. Counting them made a
+    clean rung `unprovable` and cost a real corpus a rung.
+    """
+    with tempfile.TemporaryDirectory() as tmp:
+        run = make_run(Path(tmp), 0)
+        probes = json.loads((run / "probes.json").read_text(encoding="utf-8"))
+        probes[0]["findings"] = [{"path": "flake.nix", "severity": "low", "claim": "unused lambda"}]
+        (run / "probes.json").write_text(json.dumps(probes), encoding="utf-8")
+        verdict = score.evaluate(run, 0.0)
+    assert verdict["coverage_gap"] is None
+    assert verdict["certification"] in ("certified", "uncalibrated"), verdict["certification"]
+
+
+def test_a_high_severity_probe_finding_still_makes_a_silent_run_unprovable():
+    with tempfile.TemporaryDirectory() as tmp:
+        run = make_run(Path(tmp), 0)
+        probes = json.loads((run / "probes.json").read_text(encoding="utf-8"))
+        probes[0]["findings"] = [{"path": "flake.nix", "severity": "high", "claim": "bad"}]
+        (run / "probes.json").write_text(json.dumps(probes), encoding="utf-8")
+        verdict = score.evaluate(run, 0.0)
+    assert verdict["certification"] == "unprovable"
+
+
 def test_a_run_that_settled_a_claim_has_no_gap():
     with tempfile.TemporaryDirectory() as tmp:
         run = make_run(Path(tmp), 1, severities=["critical"], probe_defects=1)

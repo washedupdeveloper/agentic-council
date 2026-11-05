@@ -13,7 +13,7 @@ is a claim, and only a refuted proof clears it). Both parameters that were once 
 are closed by measurement rather than by assertion: the **threshold** is a regression detector
 because nine well-regarded repositories produced **one** clean sample — the absolute-bar framing
 had no class to calibrate against — and the **`α_t` weights** are a policy choice measured to flip
-no verdict. Current release **v1.8.3**. The pass threshold
+no verdict. Current release **v1.9.0**. The pass threshold
 is read from `scripts/calibration.json` (see `docs/CALIBRATION.md`), so the number the loop enforces
 and the number the calibration recommends cannot drift.
 
@@ -404,22 +404,28 @@ opt-out; a run that proves nothing where the probes saw a defect cannot certify;
 refuses to derive a threshold from rungs it has not run, from mixed scales, from an undetected bad
 rung, from fewer than three runs per class, or from classes that do not separate.
 
-**Status.** Delivered, with one open parameter. **The closed part is measured, not asserted:** the
-self-test is three-state (`0` all exercised and passed, `3` INCOMPLETE naming the lane, `1` a kind ran
-and failed) because a browserless host once reported `10/10 passed` while the `dom` lane was skipped;
-inside the rebuilt image it reports `10/10 exercised and passed`, including `dom`. Adjudication has
-four states (`confirmed`, `refuted`, `unsettled`, `unrunnable`) and only `refuted` clears a block. The
-score is claims-derived and **capped** by any confirmed defect (critical 30, high 60, medium 85) — the
-cap exists because measurement showed β = 1.00 on every dimension of a fully-probed run, so the claims
-term was multiplied by zero: on a real round a confirmed committed credential left `security` at
-det 71.75 under either scoring mode until the cap moved it to 30.00 and the aggregate 89.73 → 77.21.
-The suite was 787 tests at delivery, green on x86_64 and on aarch64 under emulation.
+**Status.** Delivered. The self-test is three-state (`0` all exercised and passed, `3`
+INCOMPLETE naming the lane, `1` a kind ran and failed) because a browserless host once
+reported `10/10 passed` while the `dom` lane was skipped; inside the materialised image
+rootfs it reports `10/10 exercised and passed`, `dom` included, exit 0. Adjudication has
+four states (`confirmed`, `refuted`, `unsettled`, `unrunnable`) and only `refuted` clears a
+block. The score is claims-derived and **capped** by any confirmed defect (critical 30,
+high 60, medium 85) — the cap exists because measurement showed β = 1.00 on every dimension
+of a fully-probed run, so the claims term was multiplied by zero: on a real round a
+confirmed committed credential left `security` at det 71.75 under either scoring mode until
+the cap moved it to 30.00 and the aggregate 89.73 → 77.21. The suite is 860 tests.
 
-**The open parameter is the threshold.** Claims-scored runs are on a different scale from the one
-`calibration.json` was derived on, so the gate reports `uncalibrated` rather than comparing them, and
-`scripts/calibration.claims.json` does not exist yet. Everything needed to derive it exists; what it
-needs is a corpus — the graded ladder reviewed rung by rung, which is LLM time. Until then the council
-can prove and cannot certify, and says so on every report.
+**The threshold is derived, not chosen.** A six-run corpus — three clean rungs, three with
+a seeded credential, sampled inside the toolchain — gives `87.33`, plateau `76.83–97.83`,
+`provisional: false`, and the gate compares claims-scored runs against it instead of
+reporting `uncalibrated`. The corpus separates: every defective rung detected `1/1`, and
+`verdicts separate every rung` — clean 97.83 · 97.83 · 100.00 certified; defective 73.46 ·
+76.83 · 73.46 not certified. Deriving it found five defects that no unit test had: the
+Dockerfile image shipped no browser while the OCI image did, the rootfs had no `/dev`,
+`corpus.py` was in neither module list, `--from-runs` wrote to a read-only store path, and
+`coverage_gap` counted low-severity probe nits so a correctly silent reviewer was scored
+`unprovable`. All five are fixed and covered. `scripts/calibration.claims.json` ships in the
+framework, so a packaged build enforces the number the corpus produced.
 
 **Size** L · **Depends** M4 (the gate), M8 (calibration)
 

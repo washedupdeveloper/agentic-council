@@ -112,6 +112,11 @@ container image where the test suite is not shipped.
 | `3` | **INCOMPLETE** — a kind was never exercised (no browser for `dom`, no git for `diff`); it names which |
 | `1` | a kind ran and failed |
 
+A host that has one exits **0**, and that is checkable without the image:
+`nix shell nixpkgs#chromium -c council proofs --self-test` reports `10/10 exercised and
+passed`, `dom` included. Measured on a host with chromium on `PATH`; the image ships the
+same browser so the lane runs there too.
+
 A host with no headless browser therefore exits **3**, not 0. That change came from a real failure:
 the self-test used to count a skipped `dom` as a pass and printed `10/10` inside a container whose
 chromium was aborting, so a green summary carried no information about the lane.

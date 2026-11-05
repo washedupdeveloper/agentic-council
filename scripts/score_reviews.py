@@ -995,7 +995,17 @@ def certification(satisfied: bool, blocking: List[Dict[str, Any]],
 
 
 def probe_defect_count(run_dir: Path) -> int:
-    """How many defects the probes themselves observed, from the run's own probes.json."""
+    """How many defects the probes observed — the ones that could have blocked.
+
+    A finding counts when it is `high` or `critical`, or when it names no severity at
+    all: an unlabelled probe finding is not evidence that the reviewer was entitled to
+    ignore it, so it stays conservative. `low` and `medium` findings do not count,
+    because they cannot block on their own, and counting them made a clean tree
+    uncertifiable whenever the reviewer correctly stayed silent. Measured: three clean
+    rungs of one corpus, one silent reviewer, and `deadnix: unused lambda` plus "no
+    AGENTS.md" — both `low` — turned a correct run into `unprovable` and cost the corpus
+    a rung.
+    """
     path = Path(run_dir) / "probes.json"
     if not path.exists():
         return 0
@@ -1005,7 +1015,16 @@ def probe_defect_count(run_dir: Path) -> int:
         return 0
     if not isinstance(payload, list):
         return 0
-    return sum(len(entry.get("findings") or []) for entry in payload if isinstance(entry, dict))
+    total = 0
+    for entry in payload:
+        if not isinstance(entry, dict):
+            continue
+        for finding in entry.get("findings") or []:
+            severity = str((finding or {}).get("severity") or "").strip().lower() \
+                if isinstance(finding, dict) else ""
+            if severity in ("", "high", "critical"):
+                total += 1
+    return total
 
 
 def coverage_gap(run_dir: Path, adjudication: Optional[Dict[str, Any]]) -> Optional[str]:
