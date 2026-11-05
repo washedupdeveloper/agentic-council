@@ -50,9 +50,14 @@ def _write_run(tmp_path: Path, scores: dict, blocking: bool = False) -> Path:
 def _gate(run: Path, *extra: str) -> subprocess.CompletedProcess:
     # score_reviews.py refuses to run without REVIEW_COUNCIL_DISPATCHED; this helper
     # spawns it as a program, which is exactly what the guard is about.
+    #
+    # `--allow-unproven` is explicit here: every test in this file is about the SCORE and
+    # the gate's arithmetic. Certification (a blocking finding that must be refuted by a
+    # proof before it stops blocking) has its own file, tests/test_gate_proofs.py, and the
+    # default in both places is enforcement.
     env = dict(os.environ, REVIEW_COUNCIL_DISPATCHED="1")
     return subprocess.run(
-        [sys.executable, str(GATE), str(run), *extra],
+        [sys.executable, str(GATE), str(run), "--allow-unproven", *extra],
         capture_output=True, text=True, env=env,
     )
 

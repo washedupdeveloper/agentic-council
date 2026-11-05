@@ -31,8 +31,17 @@ except ImportError:  # pragma: no cover
 VERBS: Dict[str, Tuple[str, str, bool, str]] = {
     "review": ("council_loop.py", "user", True, "drive a review to a verdict (the loop)"),
     "gate": ("score_reviews.py", "user", True, "the deterministic gate: score a run directory"),
+    "adjudicate": ("adjudicate.py", "user", True,
+                   "run every finding's proof; say what settled and what did not"),
     "doctor": ("doctor.py", "user", True, "which analyzers ran, and the beta they yield"),
     "probes": ("probes.py", "user", True, "the built-in deterministic probes"),
+    "proofs": ("proofs.py", "user", True,
+               "the closed proof vocabulary: run one proof, or self-test every kind"),
+    "severity": ("severity.py", "user", True,
+                 "the evidence -> severity rules: what makes a finding critical, and why"),
+    # dev, not user: it needs `unshare` on the HOST, which the image itself has no privilege for.
+    "sandbox": ("sandbox.py", "dev", True,
+                "run the council inside its own image, on a host with no container runtime"),
     "swarm": ("swarm.py", "user", True, "the durable council: build a kanban graph"),
     "sample": ("sample.py", "user", True, "run ONE reviewer sample"),
     "merge": ("merge.py", "user", True, "bucket a round's samples into the per-dimension files"),
@@ -44,6 +53,8 @@ VERBS: Dict[str, Tuple[str, str, bool, str]] = {
     "goal": ("goal.py", "user", True, "express a run as a native Hermes /goal + quality gate"),
     "cron": ("cron.py", "user", True, "print or install a scheduled unattended review"),
     "pr": ("pr.py", "user", True, "post a run's verdict to a GitHub pull request"),
+    "claims": ("claims.py", "user", True,
+               "the run's claim ladder: what its evidence supports, and what it does not"),
     "version": ("version.py", "dev", True, "check or bump the release version (docs/VERSIONING.md)"),
     "corpus": ("inject_defects.py", "dev", True, "build a defect corpus with independent truth"),
 }

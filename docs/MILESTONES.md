@@ -8,7 +8,8 @@ run stalls) — using as few moving parts as the job needs.
 **M3**, **M4**'s deterministic gate (`scripts/score_reviews.py`), **M5** (the orchestrator sets each
 round's goals and judges the round against them; the harness convenes the reviewer), **M6**
 (`runs/fixture-fixround-2026-10-06.md`), **M7** (durable swarm, dispatcher, cron, PR path), **M8**,
-**M8.5** (the ablation that decided the architecture), **M9**. Both parameters that were once ⚠️
+**M8.5** (the ablation that decided the architecture), **M9**, **M10** (the proof ladder: a finding
+is a claim, and only a refuted proof clears it). Both parameters that were once ⚠️
 are closed by measurement rather than by assertion: the **threshold** is a regression detector
 because nine well-regarded repositories produced **one** clean sample — the absolute-bar framing
 had no class to calibrate against — and the **`α_t` weights** are a policy choice measured to flip
@@ -17,9 +18,10 @@ is read from `scripts/calibration.json` (see `docs/CALIBRATION.md`), so the numb
 and the number the calibration recommends cannot drift.
 
 **Architecture.** The repo ships **zero shell scripts**: every operation is a Python module under
-`scripts/`, reached through one CLI, `council <verb>`. User verbs: `review`, `gate`, `doctor`,
-`probes`, `swarm`, `sample`, `merge`, `baseline`, `metrics`, `goal`, `cron`, `pr`. Dev-only verbs
-(devshell): `calibrate`, `ablate`, `golden`, `version`, `corpus`, `inventory`. Plus
+`scripts/`, reached through one CLI, `council <verb>`. User verbs: `review`, `gate`,
+`adjudicate`, `proofs`, `claims`, `doctor`, `probes`, `swarm`, `sample`, `merge`, `baseline`,
+`metrics`, `goal`, `cron`, `pr`. Dev-only verbs (devshell): `calibrate`, `ablate`, `golden`,
+`version`, `corpus`, `sandbox`. Plus
 `council setup {init|skill|bots|toolchain|dispatcher}`, once per machine. `scripts/council.py` owns
 the verb table and dispatch; the flake generates one launcher, so `nix run .#council -- <verb>` is
 the entry point. `council --help` is the authoritative list — `checks.commands` asserts the shipped
@@ -383,12 +385,55 @@ core rubric no dimension names.
 
 ---
 
+## M10 — The proof ladder
+**Goal.** A finding is a claim, not a fact. Every blocking claim carries a check the orchestrator can
+run; only a check that **fails** clears it; and the score is earned by what was proven rather than by
+what the reviewer thought of its own work.
+
+**Deliverables.** `protocol/proofs.json` (seven kinds, the only declaration site) and
+`scripts/proofs.py` (executors, `adjudicate()`, a self-test); `scripts/adjudicate.py` (four states and
+`proofs.json`); synthesised controls in `proofs.py`, reached from `council review --base <rev>` and
+`council adjudicate --base-tree`; claims-derived scoring with `CLAIM_CAPS` in `scripts/score_reviews.py`;
+`scripts/corpus.py` and `council calibrate --plan-corpus/--collect-corpus/--from-runs`; the claim ladder
+in `scripts/claims.py`; `docs/PROOFS.md`, `docs/ADJUDICATION.md`, `docs/CORPUS.md`, `docs/CLAIMS.md`.
+The container ships `protocol/` and chromium so the browser lane runs inside the image.
+
+**Acceptance.** Every proof kind executes in both directions; a claim with no control is
+`uncontrolled`, never `proven`; enforcement is the default with `--allow-unproven` as the recorded
+opt-out; a run that proves nothing where the probes saw a defect cannot certify; the corpus pipeline
+refuses to derive a threshold from rungs it has not run, from mixed scales, from an undetected bad
+rung, from fewer than three runs per class, or from classes that do not separate.
+
+**Status.** Delivered, with one open parameter. **The closed part is measured, not asserted:** the
+self-test is three-state (`0` all exercised and passed, `3` INCOMPLETE naming the lane, `1` a kind ran
+and failed) because a browserless host once reported `10/10 passed` while the `dom` lane was skipped;
+inside the rebuilt image it reports `10/10 exercised and passed`, including `dom`. Adjudication has
+four states (`confirmed`, `refuted`, `unsettled`, `unrunnable`) and only `refuted` clears a block. The
+score is claims-derived and **capped** by any confirmed defect (critical 30, high 60, medium 85) — the
+cap exists because measurement showed β = 1.00 on every dimension of a fully-probed run, so the claims
+term was multiplied by zero: on a real round a confirmed committed credential left `security` at
+det 71.75 under either scoring mode until the cap moved it to 30.00 and the aggregate 89.73 → 77.21.
+The suite was 787 tests at delivery, green on x86_64 and on aarch64 under emulation.
+
+**The open parameter is the threshold.** Claims-scored runs are on a different scale from the one
+`calibration.json` was derived on, so the gate reports `uncalibrated` rather than comparing them, and
+`scripts/calibration.claims.json` does not exist yet. Everything needed to derive it exists; what it
+needs is a corpus — the graded ladder reviewed rung by rung, which is LLM time. Until then the council
+can prove and cannot certify, and says so on every report.
+
+**Size** L · **Depends** M4 (the gate), M8 (calibration)
+
+---
+
 ## 1. Dependency graph
 
 ```
 M0 ─▶ M1 ─▶ M2 ─┐
                 ├─▶ M4 ─▶ M5 ─▶ M6 ─▶ M7 ─▶ M9
         M1 ─▶ M3 ┘         └─▶ M8 ──┘
+
+M4 ─▶ M10   (the gate the proofs feed)
+M8 ─▶ M10   (the calibration the claims scale needs)
 ```
 
 ## 2. Research → decision traceability

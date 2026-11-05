@@ -55,7 +55,7 @@ The reviewer is a **leaf**: it never spawns another agent and never edits unless
 
 `β` weights deterministic analyzer signal against LLM judgement per category. Security, readability and correctness have mature analyzers (statix, gitleaks, bandit, `osv-scanner`, ruff, mypy, pytest, `nix flake check`), so β is high. Performance and architecture have **no reliable deterministic signal** — timings are environment-dependent and module design has no linter — so β is low and the model carries the judgement; a low-β reviewer must be *more* explicit about uncertainty.
 
-**The expected tool set is `STACK_TOOLS` in `scripts/score_reviews.py`**, per dimension and per stack. For the stacks the framework ships (`nix`, `python`, `shell`) every expected name has a probe in `scripts/probes.py` the harness runs itself; where the name is an external binary (`EXTERNAL_TOOLS` — `statix`, `gitleaks`, `bandit`, `osv-scanner`, `shellcheck`, `ruff`, `mypy`, `pytest`, …) the toolchain must ship it. `STACK_TOOLS` also lists JavaScript, Rust and Go tools, which the framework does not claim to cover. A tool the gate expects but no probe runs can only be satisfied by the reviewer's own report, making β a measure of diligence, not coverage.
+**The expected tool set is `STACK_TOOLS` in `scripts/score_reviews.py`**, per dimension and per stack. For the stacks the framework ships (`nix`, `python`, `shell`, `web`) every expected name has a probe in `scripts/probes.py` the harness runs itself; where the name is an external binary (`EXTERNAL_TOOLS` — `statix`, `gitleaks`, `bandit`, `osv-scanner`, `shellcheck`, `ruff`, `mypy`, `pytest`, …) the toolchain must ship it. The `web` stack is detected by an entry point (`index.html`, `dist/index.html`, a framework config) and its one expected tool is `browser`: a runtime observation whose DRIVER is host-provided, not shipped. When no driver resolves the probe reports `ran: false` and β falls — the report says the runtime was not observed instead of scoring it as clean. See `docs/WEB.md`. `STACK_TOOLS` also lists JavaScript, Rust and Go tools, which the framework does not claim to cover. A tool the gate expects but no probe runs can only be satisfied by the reviewer's own report, making β a measure of diligence, not coverage.
 
 ## 4. The finding contract
 
@@ -109,15 +109,29 @@ The canonical unit of exchange; the orchestrator validates every one.
 ```
 per category c:
   det[c]   = geometric_mean( normalize(tool_signals_c) )   then apply caps
-  llm[c]   = the reviewer's rubric score (0–100)
-  score[c] = β_c · det[c] + (1 − β_c) · llm[c]
+  llm[c]   = claims[c]  when the round was adjudicated
+             reviewer's rubric score (0–100)  otherwise
+  claims[c]= severity-weighted density of CONFIRMED findings, through the Hill curve
+             (unsettled / refuted / unrunnable findings do not move it)
+  score[c] = β_c · det[c] + (1 − β_c) · llm[c]             then cap by any CONFIRMED defect
   β_c      = tools_ran_and_parsed_c / tools_expected_c     # MEASURED, not asserted
 
 aggregate = Σ weight_c · score_c
 satisfied = aggregate ≥ threshold
             AND no open finding with severity ∈ {high, critical}
             AND minority-veto not engaged
+            AND the threshold was calibrated on the score's scale
 ```
+
+**The number is earned, and the blend cannot carry it alone.** A proven defect also caps its
+dimension — `critical` 30, `high` 60, `medium` 85 — because on a fully-probed run β = 1 on every
+dimension, `score = det`, and the claims term is multiplied by zero. Measured on a real round: a
+confirmed committed credential left `security` at `det` 71.75 under either scoring mode until the
+cap applied. See `docs/ADJUDICATION.md`.
+
+**A score is only comparable to a threshold on its own scale.** `scripts/calibration.json` records
+the `scale` its threshold was derived on (`deterministic` — `calibrate.py` measures probe densities).
+A claims-scored run differs from that and is reported `uncalibrated` rather than compared.
 
 **Normalization.** Findings density → Hill curve `100 / (1 + (x/K)^n)`. Bounded metrics → threshold curve. Within a category → weighted geometric mean, so one failing tool is not diluted by passing ones. Across languages → weighted by KLOC share.
 

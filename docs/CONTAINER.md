@@ -47,6 +47,7 @@ and prints the flag rather than a traceback.
 | the framework | `scripts/`, `bots/`, `skills/`, under `/opt/review-council` — the runtime modules only; the dev verbs are not in the image |
 | the `council` CLI | the same verb table as the flake app, so `doctor`, `gate`, `probes` and the rest work without Hermes |
 | `git` | `--baseline` shells out to it to find what changed |
+| `chromium` | the `dom` proof lane. A claim about what a page *does* cannot be proven from source, and requiring a browser from the host would reintroduce exactly the dependency the image removes. `browser_argv` already passes `--no-sandbox` and `--disable-dev-shm-usage`, so it runs as uid 1000 with no setuid helper |
 | the nix CLI | for the `nix eval` probe, with `/opt/nix/nix.conf` at `NIX_CONF_DIR` |
 | `/repo` | the working directory — mount the project here |
 
@@ -190,6 +191,10 @@ docker run --rm -v "$PWD:/repo" review-council doctor --repo /repo
   deterministic half is. The agent's behaviour depends on the Hermes you mount.
 - **The threshold is calibrated to this repository, from one sample.**
   `scripts/calibration.json` calls it `PROVISIONAL`. Read it as relative.
+- **The browser costs size.** Chromium is the largest thing in the image, and it is there
+  because the alternative is a verdict that cannot speak about runtime behaviour at all.
+  A runtime that cannot mount `/proc` and a `/dev/shm` of a few MB will make `dom` proofs
+  `unrunnable` — the run says so rather than passing (`docker run` supplies both).
 
 ## Building it yourself
 

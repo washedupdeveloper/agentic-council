@@ -136,9 +136,17 @@ def _table(result: Dict[str, Any]) -> List[str]:
 
 
 def _findings_block(result: Dict[str, Any], limit: int = 20) -> Tuple[List[str], int]:
-    """Open blocking findings, worst first, and how many were left out."""
-    blocking = sorted(result.get("blocking") or [],
-                      key=lambda f: SEVERITY_ORDER.get(str(f.get("severity")), 9))
+    """Everything stopping the merge, worst first, and how many were left out.
+
+    With proofs enforced, a blocking claim no proof refuted is reported in `unresolved` rather than
+    `blocking` — it is not a confirmed defect, and it still stops the merge. A comment that says
+    "2 blocking claims" and then lists none is worse than one that says nothing.
+    """
+    def order(finding: Dict[str, Any]) -> int:
+        return SEVERITY_ORDER.get(str(finding.get("severity")), 9)
+
+    blocking = sorted(result.get("blocking") or [], key=order)
+    unsettled = sorted(result.get("unresolved") or [], key=order)
     lines: List[str] = []
     for finding in blocking[:limit]:
         severity = str(finding.get("severity") or "?").upper()
@@ -146,7 +154,15 @@ def _findings_block(result: Dict[str, Any], limit: int = 20) -> Tuple[List[str],
         check = str(finding.get("falsifiable_check") or "").strip()
         if check:
             lines.append(f"  - check: `{check}`")
-    return lines, max(0, len(blocking) - limit)
+    for finding in unsettled[: max(0, limit - len(blocking))]:
+        severity = str(finding.get("severity") or "?").upper()
+        state = str(finding.get("_adjudication") or "unsettled")
+        lines.append(f"- **{severity}** ({state}) {_location(finding)} — "
+                     f"{finding.get('claim') or ''}")
+        reason = str(finding.get("_reason") or "").strip()
+        lines.append(f"  - not settled: {reason}" if reason
+                     else "  - not settled: no proof reproduced for this claim")
+    return lines, max(0, len(blocking) + len(unsettled) - limit)
 
 
 def _change_line(run_dir: Path) -> str:
@@ -167,6 +183,42 @@ def _change_line(run_dir: Path) -> str:
             f"Its requirements and tasks are the plan; this comment is the evidence for it.")
 
 
+def _claims(run_dir: Path, result: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """The claim ladder for this run, or None when claims.py cannot be loaded.
+
+    A missing ladder must not break the post — but it must not be *silent* either, which is why the
+    body says so rather than omitting the section.
+    """
+    try:
+        module = load("claims", HERE / "claims.py")
+        return module.build(run_dir, result=result)
+    except Exception:  # noqa: BLE001 - publishing is not the place to fail on a side read
+        return None
+
+
+def _claims_block(run_dir: Path, result: Dict[str, Any]) -> List[str]:
+    """What this run may say about the world, and the first thing it may not.
+
+    This is the enforcement point for the whole ladder: the comment is generated, so a claim the
+    evidence does not support cannot appear in the text a reviewer reads.
+    """
+    payload = _claims(run_dir, result)
+    if payload is None:
+        return ["### Claims this run supports", "",
+                "_claims.py could not be evaluated for this run; no claim is asserted._", ""]
+    lines = ["### Claims this run supports", "",
+             f"Evidence reaches **{payload.get('claim_label') or payload.get('claim_state')}**.", ""]
+    blocked = payload.get("blocked_claims") or []
+    if blocked:
+        first = blocked[0]
+        label = str(first.get("claim", "")).replace("_", " ")
+        lines += [f"**Not claimed: {label}.** {first.get('reason', '')}", ""]
+    if payload.get("not_applicable"):
+        lines += [f"_Not applicable to this run: {', '.join(payload['not_applicable'])}._", ""]
+    lines += [f"<sub>{payload.get('claim_boundary', '')}</sub>", ""]
+    return lines
+
+
 def body_for(result: Dict[str, Any], run_dir: Path, pr: int) -> str:
     """The review body: the verdict, then the evidence, then the marker."""
     satisfied = result.get("status") == "satisfied"
@@ -174,12 +226,21 @@ def body_for(result: Dict[str, Any], run_dir: Path, pr: int) -> str:
     lines = [
         head,
         "",
-        f"aggregate **{result['aggregate']:.2f}** / threshold {result['threshold']:g} — "
+        f"aggregate **{result['aggregate']:.2f}** / threshold {result['threshold']:g} "
+        f"({result.get('score_source') or 'reviewer'} scale) — "
         f"{result.get('reason') or ''}",
         "",
-        *_table(result),
-        "",
     ]
+    if result.get("calibrated_for_scale") is False:
+        # A number on a scale nobody calibrated reads like a verdict and is not one. Say so above
+        # the table, not in a footnote: the reader's first question is "does this mean anything".
+        lines += [
+            f"> The score is computed from **{result.get('score_source')}** and the threshold was "
+            f"calibrated on **{result.get('calibration_scale')}**. The number is reported; it is not "
+            f"comparable until `council calibrate` derives a threshold for this scale.",
+            "",
+        ]
+    lines += [*_table(result), ""]
 
     findings, omitted = _findings_block(result)
     if findings:
@@ -194,8 +255,7 @@ def body_for(result: Dict[str, Any], run_dir: Path, pr: int) -> str:
         lines += ["### The change", "", change, ""]
 
     stacks = ", ".join(result.get("stacks") or []) or "none detected"
-    lines += [
-        "---",
+    lines += [*_claims_block(run_dir, result), "---",
         f"<sub>review-council · {result.get('size_kloc', 0):.1f} KLOC · "
         f"stacks: {stacks} · run `{run_dir.resolve().name}` · "
         f"recomputed from the reviewer files by the deterministic gate</sub>",
@@ -388,7 +448,36 @@ def main(argv: Optional[List[str]] = None) -> int:
     print(f"  posted review {review_id} to {args.repo}#{args.pr}")
     if url:
         print(f"  {url}")
+
+    # A 2xx is the write being accepted, not the write being visible. Read it back before
+    # recording the receipt: the `published` rung claims a fact, and a claim with no read-back is
+    # the thing this whole ladder exists to stop.
+    receipt = _confirm_published(args, url, review_id, run_dir, token)
+    if receipt is None:
+        print("  read-back failed: the review is not recorded as published "
+              "(the `published` claim stays blocked)", file=sys.stderr)
+        return 0
+    print(f"  read back ok — recorded in {receipt}")
     return 0
+
+
+def _confirm_published(args: argparse.Namespace, url: Optional[str], review_id: Optional[Any],
+                       run_dir: Path, token: str) -> Optional[Path]:
+    """GET the review we just created; write the receipt only when it comes back."""
+    if not url or review_id is None:
+        return None
+    status, payload = request("GET", str(url), token)
+    if status != 200:
+        return None
+    observed = payload.get("html_url") if isinstance(payload, dict) else None
+    if not observed:
+        return None
+    try:
+        module = load("claims", HERE / "claims.py")
+        sha = target_sha(run_dir) or ""
+        return module.record_published(run_dir, str(observed), int(review_id), sha)
+    except Exception:  # noqa: BLE001 - the post stands; only the receipt is lost
+        return None
 
 
 if __name__ == "__main__":

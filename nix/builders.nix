@@ -63,10 +63,14 @@ let
     "council.py" # the dispatcher: the one entry point
     "council_loop.py" # review
     "score_reviews.py" # gate
+    "adjudicate.py" # adjudicate — run the proofs, record what could not be settled
     "doctor.py" # doctor
     "probes.py" # probes
+    "proofs.py" # proofs — the closed vocabulary a claim must speak to be believed
+    "severity.py" # severity — what the tool detected decides the severity, not the reviewer
     "swarm.py" # swarm
     "sample.py" # sample
+    "failures.py" # why a sample produced nothing — recorded, so an outage is visible
     "merge.py" # merge
     "baseline.py" # baseline
     "metrics.py" # metrics — acceptance/address/iterations from judged findings
@@ -79,6 +83,7 @@ let
     "goal.py" # goal — the /goal contract and quality-gate emitter
     "cron.py" # cron — print or install a scheduled unattended review
     "pr.py" # pr — post a run's verdict to a GitHub pull request
+    "claims.py" # claims — the run's claim ladder: evidence, blocked claims, receipts
     "council_config.py" # shared: the one place configuration lives
     "entrypoint.py" # the container ENTRYPOINT
     "hermes_home.py" # shared: where HERMES_HOME is
@@ -94,6 +99,7 @@ let
     "golden.py" # dev/golden
     "inject_defects.py" # dev/corpus
     "version.py" # dev/version — the release policy, docs/VERSIONING.md
+    "sandbox.py" # dev/sandbox — runs the image where no container runtime exists
   ];
 
   # Top-level attrs first, then python3Packages: several tools exist only there.
@@ -198,6 +204,9 @@ let
       ${lib.concatMapStringsSep "\n" (n: "cp ${../scripts}/${n} $out/scripts/${n}") modules}
       cp -r ${../skills} $out/skills
       cp -r ${../bots} $out/bots
+      # The proof vocabulary's only home. Without it proofs.py refuses to run a kind, which is
+      # correct but makes every claim unrunnable — so it ships with the scripts, not with docs.
+      cp -r ${../protocol} $out/protocol
       ${lib.optionalString dev "cp -r ${../tests} $out/tests"}
       chmod -R u+w $out
       rm -rf $out/scripts/__pycache__ $out/tests/__pycache__
@@ -224,6 +233,7 @@ let
       # uncalibrated count-based curve, so the deployment scores differently.
       cp ${../scripts}/calibration.json $out/scripts/calibration.json
       cp ${../scripts}/eval-baseline.json $out/scripts/eval-baseline.json
+      cp -r ${../protocol} $out/protocol
       cp ${../tests}/*.py $out/tests/
       cp -r ${../tests}/golden $out/tests/golden
       cp -r ${../bots}/. $out/assets/bots/
@@ -398,6 +408,11 @@ let
 
       nixConf = mkContainerNixConf pkgs;
 
+      # Chromium renders text through fontconfig, and a minimal image has neither a config nor a
+      # font: the DOM still parses, but the screenshot artefact — the thing a human reads — comes
+      # back as empty boxes. One config, one family, referenced from Env so it stays in the closure.
+      fontsConf = pkgs.makeFontsConf { fontDirectories = [ pkgs.dejavu_fonts ]; };
+
       nixConfAt = pkgs.runCommand "review-council-nix-conf-at-opt" { } ''
         mkdir -p $out/opt/nix
         cp ${nixConf} $out/opt/nix/nix.conf
@@ -420,6 +435,15 @@ let
           # `baseline.py`'s changed_files shells out to git, and the framework's own
           # test check needs it too.
           pkgs.git
+          # The `dom` proof lane needs its driver INSIDE the image. A claim about what a page
+          # does cannot be proven from source, and a host-mounted browser is exactly the
+          # dependency the image exists to remove. `browser_argv` already passes --no-sandbox
+          # and --disable-dev-shm-usage, so it runs as uid 1000 with no setuid helper.
+          pkgs.chromium
+          # `FONTCONFIG_FILE` names a config, not the fonts themselves; without the font dirs in
+          # the closure chromium renders every glyph as a box and the screenshot artefact — the
+          # one a human reads — is a blank rectangle that still "passes".
+          pkgs.dejavu_fonts
         ]
         ++ deps
       );
@@ -440,6 +464,8 @@ let
           # the conf staged by nixConfAt; without it the nix probes fail
           "NIX_CONF_DIR=/opt/nix"
           "PYTHONUNBUFFERED=1"
+          # the dom lane's screenshots render glyphs, not boxes
+          "FONTCONFIG_FILE=${fontsConf}"
         ];
       };
     };
