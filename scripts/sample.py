@@ -20,6 +20,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
 import failures  # noqa: E402 - why a sample produced nothing, classified rather than guessed
+
 LOOP_PATH = HERE / "council_loop.py"
 
 _LOOP = None

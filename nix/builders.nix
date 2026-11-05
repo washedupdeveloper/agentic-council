@@ -96,6 +96,7 @@ let
   devModules = [
     "ablate.py" # dev/ablate
     "calibrate.py" # dev/calibrate
+      "corpus.py" # dev/corpus — the graded ladder: plan, sample, collect, derive
     "golden.py" # dev/golden
     "inject_defects.py" # dev/corpus
     "version.py" # dev/version — the release policy, docs/VERSIONING.md
@@ -504,6 +505,11 @@ let
         entrypoint
         pkgs.bashInteractive
         pkgs.git
+        # `mkContainer` ships these and this rootfs did not, so one image built
+        # two ways had two different runtime contracts: the `dom` proof lane ran
+        # in the OCI image and was unrunnable in the Dockerfile one.
+        pkgs.chromium
+        pkgs.dejavu_fonts
       ]
       ++ deps;
     in
@@ -512,11 +518,20 @@ let
       cd $out
 
       mkdir -p opt/nix bin
+      # Mountpoints a runtime fills: a container runtime needs /dev, /proc and /sys to
+      # exist before it can mount over them, and an image with no /dev is an image whose
+      # browser lane cannot open /dev/null. Empty here; mounted at run time.
+      mkdir -p dev proc sys tmp
       ln -s ${fw} opt/review-council
       cp ${nixConf} opt/nix/nix.conf
       # A symlink, so the Dockerfile can name a stable path in ENV rather than a
       # store hash it cannot know at build time.
       ln -s ${tc} opt/toolchain
+
+      # Fontconfig names a config, not the fonts: without it chromium renders every
+      # glyph as a box and the screenshot artefact still "passes". Exported by the
+      # Dockerfile; `mkContainer` carries the same file in its Env.
+      cp ${pkgs.makeFontsConf { fontDirectories = [ pkgs.dejavu_fonts ]; }} opt/fonts.conf
 
       # Merge the runtime's `bin` into /bin, as dockerTools does with `contents`.
       # Without it the analyzers are reachable only through the entrypoint's PATH,

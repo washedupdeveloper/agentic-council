@@ -312,6 +312,26 @@ def sample_corpus(manifest_path: Path, runs_root: Path, retries: int = 3,
     return manifest
 
 
+def _undetected_note(round_dir: Path) -> str:
+    """Why a seeded defect was not counted.
+
+    "The reviewer proved nothing" and "the proof could not run" are different findings
+    about different things — the reviewer, or the environment it ran in. Reporting the
+    first when the second is true sends a maintainer to tune the reviewer while the
+    repair is to adjudicate inside the toolchain.
+    """
+    try:
+        payload = json.loads((Path(round_dir) / "proofs.json").read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        payload = {}
+    summary = payload.get("summary") if isinstance(payload, dict) else None
+    unrunnable = int((summary or {}).get("unrunnable") or 0)
+    if unrunnable:
+        return (f"undetected: {unrunnable} proof(s) could not run in this environment — "
+                "adjudicate inside the toolchain, or the claims scale reads them as clean")
+    return "undetected: the reviewer proved none of the seeded defects"
+
+
 def collect(manifest_path: Path, runs_root: Path, threshold: float = 0.0) -> Dict[str, Any]:
     """Score every rung that has a run, and record what the reviewer actually proved.
 
@@ -405,7 +425,7 @@ def collect(manifest_path: Path, runs_root: Path, threshold: float = 0.0) -> Dic
         rung["detected"] = sum(1 for m in matches if m["matched"])
         rung["matches"] = matches
         if rung.get("defects_seeded") and not rung["detected"]:
-            rung["note"] = "undetected: the reviewer proved none of the seeded defects"
+            rung["note"] = _undetected_note(_round_with_proofs(run_dir_for(runs_root, rung)))
         else:
             rung["note"] = None
     write(Path(manifest_path), manifest)

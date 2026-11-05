@@ -898,8 +898,9 @@ def main(argv: Optional[List[str]] = None) -> int:
                                in_place=args.in_place, repeats=args.repeats)
         print(corpus.summary(document))
         print(f"\nwrote {Path(args.plan_corpus) / 'corpus.json'}")
-        print("review each rung, then: council calibrate --collect-corpus "
-              f"{Path(args.plan_corpus) / 'corpus.json'} --runs <dir>")
+        manifest = Path(args.plan_corpus) / "corpus.json"
+        print(f"sample every rung: council calibrate --sample-corpus {manifest} --runs <dir>")
+        print(f"then score them:   council calibrate --collect-corpus {manifest} --runs <dir>")
         return 0
 
     if args.agreement:

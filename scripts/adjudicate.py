@@ -39,8 +39,8 @@ ROOT = HERE.parent
 sys.path.insert(0, str(HERE))
 
 import proofs as proof_mod  # noqa: E402 - after sys.path, by design
-import severity as severity_mod  # noqa: E402 - the evidence -> severity rule table
 import score_reviews  # noqa: E402 - the blocking rule lives there and is not duplicated here
+import severity as severity_mod  # noqa: E402 - the evidence -> severity rule table
 
 SCHEMA_VERSION = 1
 IGNORED_FILES = frozenset({"meta.json", "probes.json", "proofs.json", "calibration.json",

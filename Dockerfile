@@ -74,6 +74,7 @@ ENV HOME=/home/council \
     HERMES_HOME=/home/council/.hermes \
     REVIEW_COUNCIL_TOOLCHAIN=/opt/toolchain \
     NIX_CONF_DIR=/opt/nix \
+    FONTCONFIG_FILE=/opt/fonts.conf \
     PYTHONUNBUFFERED=1
 
 # The same contract as `nix build .#container`: uid 1000, /repo as the working

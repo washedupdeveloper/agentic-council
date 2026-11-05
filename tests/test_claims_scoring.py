@@ -120,7 +120,15 @@ def test_a_claims_verdict_does_not_need_a_threshold():
     scale, where the number IS the verdict.
     """
     with tempfile.TemporaryDirectory() as tmp:
-        result = score.evaluate(make(Path(tmp)), 80.0)
+        # Point at a path that cannot exist: this asserts the NO-calibration case, and
+        # reading the repo's own `scripts/calibration.claims.json` made the test change
+        # meaning the moment a corpus-derived file was committed.
+        original = score.calibration_path
+        score.calibration_path = lambda scale: Path(tmp) / "calibration.claims.json"
+        try:
+            result = score.evaluate(make(Path(tmp)), 80.0)
+        finally:
+            score.calibration_path = original
     assert result["score_source"] == "claims"
     assert result["calibration_scale"] == "missing", result["calibration_scale"]
     assert result["calibrated_for_scale"] is False

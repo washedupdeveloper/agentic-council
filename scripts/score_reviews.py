@@ -1029,7 +1029,39 @@ def coverage_gap(run_dir: Path, adjudication: Optional[Dict[str, Any]]) -> Optio
             f"something")
 
 
-def evaluate(run_dir: Path, threshold: float, allow_partial: bool = False,
+def threshold_from_scale(payload: Optional[Dict[str, Any]]) -> Optional[float]:
+    """The threshold a scale's manifest recommends, in either shipped shape.
+
+    `calibration.json` nests it as `threshold.recommended`; a corpus derivation writes
+    `threshold` as a number and repeats it under `recommended_threshold`. Reading only one
+    shape is how a derived threshold ends up loaded, reported as calibrated, and never
+    enforced.
+    """
+    if not payload:
+        return None
+    block = payload.get("threshold")
+    if isinstance(block, dict):
+        for key in ("recommended", "threshold"):
+            value = block.get(key)
+            if value is not None:
+                try:
+                    return float(value)
+                except (TypeError, ValueError):
+                    return None
+        return None
+    if isinstance(block, (int, float)):
+        return float(block)
+    recommended = payload.get("recommended_threshold")
+    if isinstance(recommended, dict) and recommended.get("threshold") is not None:
+        try:
+            return float(recommended["threshold"])
+        except (TypeError, ValueError):
+            return None
+    return None
+
+
+def evaluate(run_dir: Path, threshold: Optional[float] = None,
+             allow_partial: bool = False,
              stacks: Optional[List[str]] = None,
              repo: Optional[Path] = None, require_proof: bool = True) -> Dict[str, Any]:
     """Load every reviewer file and compute the full hybrid verdict.
@@ -1089,6 +1121,13 @@ def evaluate(run_dir: Path, threshold: float, allow_partial: bool = False,
     calibrated_for_scale = scale_payload is not None
     calibration_scale = (str((scale_payload or {}).get("scale") or required_scale)
                          if calibrated_for_scale else "missing")
+
+    # The threshold must come from the scale the score is on. Resolving it in the CLI
+    # always read the deterministic manifest, so a claims run was enforced against a
+    # number derived from densities: the file existed, was reported as calibrated, and
+    # was never applied.
+    if threshold is None:
+        threshold = threshold_from_scale(scale_payload) or calibrated_threshold()
 
     # Renormalize over the dimensions present, so a partial run is not diluted toward
     # zero by the absent ones.
@@ -1405,7 +1444,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                              "(docs/ADJUDICATION.md). Use this to reproduce an old score, not to "
                              "certify a merge.")
     args = parser.parse_args(argv)
-    threshold: float = args.threshold if args.threshold is not None else calibrated_threshold()
+    threshold: Optional[float] = args.threshold
 
     if args.latest:
         # Runs at EVERY turn boundary, so it must stay cheap and never guess: no run yet
