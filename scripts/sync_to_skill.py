@@ -334,7 +334,7 @@ def main(argv: list[str] | None = None) -> int:
             place(str(mod), f"{DEST}/nix/{entry}")
 
     # Without these the gate falls back to the uncalibrated count-based curve.
-    for name in ("calibration.json", "eval-baseline.json"):
+    for name in ("calibration.json", "calibration.claims.json", "eval-baseline.json"):
         src = f"{root}/scripts/{name}"
         if os.path.isfile(src):
             place(src, f"{DEST}/scripts/{name}")

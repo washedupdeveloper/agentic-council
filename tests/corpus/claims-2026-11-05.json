@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "scale": "claims",
+  "base": "a two-file clean base: a flake that evaluates, one NixOS module, one Python file",
+  "seed": 20261006,
+  "rungs": [
+    {
+      "id": "level-0-run-1",
+      "level": 0,
+      "label": "good",
+      "tree": "corpus/level-0",
+      "defects_seeded": 0,
+      "seeded": [],
+      "run": "corpus/runs/level-0-run-1",
+      "score": 97.83,
+      "detected": 0,
+      "score_source": "claims",
+      "certification": "certified"
+    },
+    {
+      "id": "level-0-run-2",
+      "level": 0,
+      "label": "good",
+      "tree": "corpus/level-0",
+      "defects_seeded": 0,
+      "seeded": [],
+      "run": "corpus/runs/level-0-run-2",
+      "score": 97.83,
+      "detected": 0,
+      "score_source": "claims",
+      "certification": "certified"
+    },
+    {
+      "id": "level-0-run-3",
+      "level": 0,
+      "label": "good",
+      "tree": "corpus/level-0",
+      "defects_seeded": 0,
+      "seeded": [],
+      "run": "corpus/runs/level-0-run-3",
+      "score": 100.0,
+      "detected": 0,
+      "score_source": "claims",
+      "certification": "certified"
+    },
+    {
+      "id": "level-1-run-1",
+      "level": 1,
+      "label": "bad",
+      "tree": "corpus/level-1",
+      "defects_seeded": 1,
+      "seeded": [],
+      "run": "corpus/runs/level-1-run-1",
+      "score": 73.46,
+      "detected": 1,
+      "score_source": "claims",
+      "certification": "unsatisfied"
+    },
+    {
+      "id": "level-1-run-2",
+      "level": 1,
+      "label": "bad",
+      "tree": "corpus/level-1",
+      "defects_seeded": 1,
+      "seeded": [],
+      "run": "corpus/runs/level-1-run-2",
+      "score": 76.83,
+      "detected": 1,
+      "score_source": "claims",
+      "certification": "unsatisfied"
+    },
+    {
+      "id": "level-1-run-3",
+      "level": 1,
+      "label": "bad",
+      "tree": "corpus/level-1",
+      "defects_seeded": 1,
+      "seeded": [],
+      "run": "corpus/runs/level-1-run-3",
+      "score": 73.46,
+      "detected": 1,
+      "score_source": "claims",
+      "certification": "unsatisfied"
+    }
+  ],
+  "note": "Scores are the adjudicated aggregates of six runs: three on the untouched base, three on the same base with one credential seeded at level 1. `council calibrate --from-runs` on this file regenerates 87.33; the run directories themselves are not committed (they are LLM output, not source), so `--sample-corpus` is what reproduces them.",
+  "manifest": "tests/corpus/claims-2026-11-05.json"
+}

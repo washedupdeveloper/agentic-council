@@ -58,15 +58,12 @@ All notable changes to this project. Format follows
 - **A correct reviewer was scored `unprovable`.** `coverage_gap` counted every
   probe finding, so `deadnix: unused lambda` and "no AGENTS.md" — both `low` —
   made a silent reviewer on a clean tree uncertifiable, and cost a real corpus a
-  rung. Only findings that could block (`high`/`critical`, or unlabelled) count
+  rung. Only findings that could block (`medium`, `high`/`critical`, or unlabelled) count
   now.
 - **A test read the working tree.** `test_a_claims_verdict_does_not_need_a_threshold`
   resolved the repo's own `scripts/calibration.claims.json`, so committing a
   calibration would silently change what it asserted.
 - Five ruff findings (import order, unused imports) in the M10 modules.
-
-
-### Fixed
 
 - **The configuration was a control surface that controlled nothing.** `council_loop.py`
   never loaded `review-council.toml`, so `[review]` `mode`, `samples`, `max_rounds` and

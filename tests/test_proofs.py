@@ -385,11 +385,14 @@ def test_a_present_browser_that_cannot_render_fails_the_self_test():
         original = probes.browser_driver
         probes.browser_driver = lambda: "/bin/false"  # present, runs, produces no DOM
         try:
-            case = proofs._self_test_dom(root, ctx)
+            cases = proofs._self_test_dom(root, ctx)
         finally:
             probes.browser_driver = original
-    assert case["ok"] is False
-    assert case["got"] == "unrunnable"
+    # Both directions are exercised now, and a browser that runs without rendering proves
+    # neither of them.
+    assert len(cases) == 2
+    assert all(c["ok"] is False for c in cases), cases
+    assert all(c["got"] == "unrunnable" for c in cases), cases
 
 
 def test_an_unexercised_kind_exits_three_and_says_which():
@@ -411,8 +414,47 @@ def test_an_unexercised_kind_exits_three_and_says_which():
     assert code == 3, out
     assert "INCOMPLETE" in out and "dom" in out
     # The summary must say the run was partial — the exact sentence a reader can quote.
-    assert "1 not exercised" in out, out
-    assert "10/10" not in out, out
+    assert "2 not exercised" in out, out
+    assert "18/18" not in out, out
+
+
+def test_a_kind_exercised_in_one_direction_only_is_a_coverage_failure():
+    """The regression that let `diff` ship untested: one direction is not coverage."""
+    one_way = [{"kind": k, "want": "supported", "ok": True} for k in proofs.EXECUTORS]
+    gaps = proofs._coverage_gaps(one_way)
+    assert {g["kind"] for g in gaps} == set(proofs.EXECUTORS)
+    both = one_way + [{"kind": k, "want": "refuted", "ok": True} for k in proofs.EXECUTORS]
+    assert proofs._coverage_gaps(both) == []
+
+
+def test_diff_finds_an_addition_in_the_first_of_two_hunks():
+    """Measured before the fix: only the last hunk matched, so a genuine change at line 2 in a
+    two-hunk diff came back `not added in this change`."""
+    import subprocess as sp
+
+    with tempfile.TemporaryDirectory() as tmp:
+        repo = Path(tmp)
+        sp.run(["git", "init", "-q"], cwd=repo, check=True)
+        sp.run(["git", "config", "user.email", "t@example.invalid"], cwd=repo, check=True)
+        sp.run(["git", "config", "user.name", "t"], cwd=repo, check=True)
+        lines = [f"line{i} = 'original'" for i in range(1, 31)]
+        (repo / "a.py").write_text("\n".join(lines) + "\n", encoding="utf-8")
+        sp.run(["git", "add", "a.py"], cwd=repo, check=True)
+        sp.run(["git", "commit", "-qm", "base"], cwd=repo, check=True)
+        changed = list(lines)
+        changed[1] = "line2 = 'changed'"
+        changed[20] = "line21 = 'changed'"
+        (repo / "a.py").write_text("\n".join(changed) + "\n", encoding="utf-8")
+        ctx = proofs.Context(root=repo, artefact_dir=repo / ".artefacts", diff_base="HEAD")
+
+        def status(line: int) -> str:
+            return proofs.evaluate({"kind": "diff",
+                                    "params": {"path": "a.py", "line": line, "mode": "added"}},
+                                   ctx)["status"]
+
+        first, last = status(2), status(21)
+    assert first == "supported", "the first hunk was refuted"
+    assert last == "supported"
 
 
 def test_the_self_test_passes_on_this_host():

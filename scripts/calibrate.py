@@ -804,6 +804,9 @@ def derive_from_runs(manifest: Dict[str, Any], *, min_per_class: int = MIN_PER_C
         "provisional": provisional,
         "provenance": {
             "corpus": manifest.get("base"),
+            # The manifest that produced the number, so the derivation can be repeated rather than
+            # taken on faith. `corpus` is the base tree; this is the file naming the six rungs.
+            "manifest": manifest.get("manifest"),
             "seed": manifest.get("seed"),
             "rungs": [r["level"] for r in rungs],
             "excluded": sorted(exclude_levels),
@@ -964,10 +967,14 @@ def main(argv: Optional[List[str]] = None) -> int:
             # The installed framework is a read-only store path, so the module-relative
             # default can only fail there: `OSError: [Errno 30] Read-only file system`.
             # The calibration belongs to the project whose corpus was derived, so a
-            # checkout in the working directory wins over the module's own directory.
-            checkout = Path.cwd() / "scripts"
-            destination = (checkout / "calibration.claims.json"
-                           if (checkout / "council.py").is_file()
+            # checkout wins over the module's own directory — searched upwards, because
+            # `council calibrate` is usually run from a subdirectory of the repo.
+            checkout = None
+            for candidate in (Path.cwd(), *Path.cwd().parents):
+                if (candidate / "scripts" / "council.py").is_file():
+                    checkout = candidate / "scripts"
+                    break
+            destination = (checkout / "calibration.claims.json" if checkout is not None
                            else _scorer().calibration_path("claims"))
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8",

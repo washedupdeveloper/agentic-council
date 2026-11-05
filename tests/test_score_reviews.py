@@ -836,6 +836,35 @@ def test_a_claims_run_is_enforced_against_the_claims_threshold(tmp_path, monkeyp
     assert result["threshold"] == 69.175, result["threshold"]
 
 
+def test_a_claims_run_below_the_threshold_is_unsatisfied(tmp_path, monkeypatch):
+    """The gate printed `satisfied: aggregate 84.5 >= 87.33` and exited 0.
+
+    The inequality was reported and never tested: `satisfied` came from the blocking set
+    alone. A run that clears the blocking set but sits under the calibrated number is a
+    fail, and the sentence has to be true at the moment it is printed.
+    """
+    mod = _gate_mod()
+    run = _write_run(tmp_path, {"security": 70, "correctness": 70, "readability": 70,
+                                "architecture": 70, "performance": 70})
+    # A confirmed MEDIUM caps its dimension at 85 and is not blocking, so the run lands under
+    # the threshold with a clean blocking set — exactly the shape the old code passed.
+    (run / "proofs.json").write_text(
+        json.dumps({"schema_version": 1, "round": "round-1", "summary": {},
+                    "findings": [{"id": "SEC-1", "dimension": "security", "severity": "medium",
+                                  "state": "confirmed",
+                                  "location": {"path": "a.py", "line_range": "1"}}]}),
+        encoding="utf-8")
+    monkeypatch.setattr(mod, "load_scale_calibration",
+                        lambda scale: {"scale": "claims", "threshold": 99.0})
+    monkeypatch.setattr(mod, "calibrated_threshold", lambda: 80.0)
+    result = mod.evaluate(run, None)
+    assert result["score_source"] == "claims"
+    assert result["threshold"] == 99.0
+    assert result["aggregate"] < 99.0, result["aggregate"]
+    assert result["status"] != "satisfied", result
+    assert "below the claims threshold" in result["reason"], result["reason"]
+
+
 def test_an_explicit_threshold_still_wins_over_the_scale(tmp_path):
     """A caller can still force a number; the scale only supplies the default."""
     mod = _gate_mod()

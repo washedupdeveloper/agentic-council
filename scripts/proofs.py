@@ -497,21 +497,24 @@ def _run_diff(p: Dict[str, Any], ctx: Context) -> Tuple[Optional[bool], str, Dic
     line = int(p["line"])
     old_line = 0
     new_line = 0
-    in_range = False
+    # `found`, not a per-hunk flag: a diff has one hunk header per region, so resetting at each
+    # header kept only the LAST hunk's answer and refuted every genuine change above it. Measured
+    # on a two-hunk file: the addition at line 2 came back "not added in this change" while the
+    # addition at line 21 matched. The self-test had no `diff` case, which is why it stayed green.
+    found = False
     for raw in proc.stdout.splitlines():
         if raw.startswith("@@"):
             match = re.match(r"@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@", raw)
             if not match:
                 continue
             old_line, new_line = int(match.group(1)), int(match.group(3))
-            in_range = False
         elif raw.startswith("-") and not raw.startswith("---"):
-            if p.get("mode") == "removed" and old_line <= line < old_line + 1:
-                in_range = True
+            if p.get("mode") == "removed" and old_line == line:
+                found = True
             old_line += 1
         elif raw.startswith("+") and not raw.startswith("+++"):
-            if p.get("mode") != "removed" and new_line <= line < new_line + 1:
-                in_range = True
+            if p.get("mode") != "removed" and new_line == line:
+                found = True
             new_line += 1
         elif raw.startswith(" "):
             # Context lines advance BOTH sides. `--unified=0` emits none, but a caller who changes
@@ -519,7 +522,7 @@ def _run_diff(p: Dict[str, Any], ctx: Context) -> Tuple[Optional[bool], str, Dic
             old_line += 1
             new_line += 1
     verb = "removed by" if p.get("mode") == "removed" else "added in"
-    return in_range, f"{p['path']}:{line} is {'not ' if not in_range else ''}{verb} this change", {
+    return found, f"{p['path']}:{line} is {'not ' if not found else ''}{verb} this change", {
         "path": p["path"], "line": line, "mode": p.get("mode"), "base": base}
 
 
@@ -722,7 +725,8 @@ def self_test() -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
 
         def case(name: str, proof: Dict[str, Any], want: str) -> None:
             got = evaluate(proof, ctx)["status"]
-            cases.append({"case": name, "want": want, "got": got, "ok": got == want})
+            cases.append({"case": name, "kind": proof["kind"], "want": want, "got": got,
+                          "ok": got == want})
 
         case("absent finds the symbol", {"kind": "absent",
                                          "params": {"pattern": "unused_helper"}}, "refuted")
@@ -741,17 +745,36 @@ def self_test() -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
         case("command sees a failure", {"kind": "command",
                                         "params": {"argv": [py, "-c", "import sys; sys.exit(3)"],
                                                    "expect": {"exit": "nonzero"}}}, "supported")
+        # Both directions: a command that succeeded cannot support a claim that it failed.
+        case("command refutes a failure that did not happen", {"kind": "command",
+                                                              "params": {"argv": [py, "-c", "import sys; sys.exit(0)"],
+                                                                         "expect": {"exit": "nonzero"}}}, "refuted")
         case("json reads a pointer", {"kind": "json",
                                       "params": {"path": "data.json", "pointer": "/version",
                                                  "equals": 3}}, "supported")
         case("json catches a wrong value", {"kind": "json",
                                             "params": {"path": "data.json", "pointer": "/version",
                                                        "equals": 4}}, "refuted")
-        cases.append(_self_test_http(root, ctx))
-        cases.append(_self_test_dom(root, ctx))
+        cases.extend(_self_test_http(root, ctx))
+        cases.extend(_self_test_dom(root, ctx))
+        cases.extend(_self_test_diff(root))
 
+    # Green has to mean every kind was exercised in BOTH directions, not that the cases someone
+    # remembered to write passed. `diff` had no case at all while the summary still read
+    # "10/10 exercised and passed", which is how a hunk bug survived the suite.
+    cases.extend(_coverage_gaps(cases))
     failures = [c for c in cases if c.get("ok") is False]
     return cases, failures  # type: ignore[return-value]
+
+
+def _coverage_gaps(cases: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """One failing case per kind that is not exercised in both directions."""
+    covered: Dict[str, set] = {}
+    for entry in cases:
+        covered.setdefault(entry.get("kind", ""), set()).add(entry["want"])
+    return [{"case": f"coverage: {kind} is exercised both ways", "kind": kind,
+             "want": "both directions", "got": sorted(covered.get(kind, [])), "ok": False}
+            for kind in EXECUTORS if covered.get(kind) != {"supported", "refuted"}]
 
 
 def _self_test_http(root: Path, ctx: Context) -> Dict[str, Any]:
@@ -783,31 +806,87 @@ def _self_test_http(root: Path, ctx: Context) -> Dict[str, Any]:
     finally:
         server.shutdown()
         server.server_close()
-    ok = got == "supported" and returns == "refuted"
-    return {"case": "http sees a local server answer", "want": "supported", "got": got, "ok": ok}
+    return [
+        {"case": "http sees a local server answer", "kind": "http", "want": "supported",
+         "got": got, "ok": got == "supported"},
+        {"case": "http refuses a wrong status", "kind": "http", "want": "refuted",
+         "got": returns, "ok": returns == "refuted"},
+    ]
 
 
-def _self_test_dom(root: Path, ctx: Context) -> Dict[str, Any]:
+def _self_test_dom(root: Path, ctx: Context) -> List[Dict[str, Any]]:
     import probes
 
+    url = (root / "page.html").resolve().as_uri()
     driver = probes.browser_driver()
     if not driver:
         # NOT `ok: True`. A lane that was never exercised is not a lane that passed, and a summary
         # that says "10/10" for a run which skipped one is the same lie as a test that never ran.
-        return {"case": "dom reads a rendered page", "want": "supported", "got": "skipped",
-                "ok": None, "skipped": True,
-                "detail": "no headless browser on this host — the dom lane is not exercised here"}
-    got = evaluate({"kind": "dom", "params": {"selector": "#app", "expect": "present",
-                                              "url": (root / "page.html").resolve().as_uri()}},
-                   ctx)["status"]
+        return [
+            {"case": "dom finds a rendered element", "kind": "dom", "want": "supported",
+             "got": "skipped", "ok": None, "skipped": True,
+             "detail": "no headless browser on this host — the dom lane is not exercised here"},
+            {"case": "dom refuses a missing element", "kind": "dom", "want": "refuted",
+             "got": "skipped", "ok": None, "skipped": True,
+             "detail": "no headless browser on this host — the dom lane is not exercised here"},
+        ]
+    present = evaluate({"kind": "dom", "params": {"selector": "#app", "expect": "present",
+                                                 "url": url}}, ctx)["status"]
     # A browser that is PRESENT and cannot render is a broken lane, not a skipped one. This case
     # used to accept `unrunnable` and reported 10/10 inside an image whose chromium aborted on a
     # missing /dev/null — the exact failure a self-test exists to catch, waved through.
-    return {"case": "dom reads a rendered page", "want": "supported", "got": got,
-            "ok": got == "supported",
-            "detail": "" if got == "supported" else
-                      f"a driver was found at {driver!r} and the lane still failed: "
-                      f"{evaluate({'kind': 'dom', 'params': {'selector': '#app', 'expect': 'present'}}, ctx)['detail']}"}
+    absent = evaluate({"kind": "dom", "params": {"selector": "#missing", "expect": "present",
+                                                "url": url}}, ctx)["status"]
+    return [
+        {"case": "dom finds a rendered element", "kind": "dom", "want": "supported",
+         "got": present, "ok": present == "supported",
+         "detail": "" if present == "supported" else
+                   f"a driver was found at {driver!r} and the lane still failed"},
+        {"case": "dom refuses a missing element", "kind": "dom", "want": "refuted",
+         "got": absent, "ok": absent == "refuted",
+         "detail": "" if absent == "refuted" else
+                   f"a selector that is absent came back {absent!r} — the lane cannot refute"},
+    ]
+
+
+def _self_test_diff(root: Path) -> List[Dict[str, Any]]:
+    """Both directions, on a MULTI-HUNK change.
+
+    One hunk is the easy case and it hid the bug: the parser reset its answer at every hunk
+    header, so only the last region was ever matched, and every genuine change above it came
+    back "not added in this change". Two hunks, far apart, is the shape that catches it.
+    """
+    import subprocess as sp
+
+    repo = root / "diffrepo"
+    repo.mkdir()
+    if not (repo / ".git").exists():
+        sp.run(["git", "init", "-q"], cwd=repo, check=True)
+        sp.run(["git", "config", "user.email", "selftest@example.invalid"], cwd=repo, check=True)
+        sp.run(["git", "config", "user.name", "self test"], cwd=repo, check=True)
+        lines = [f"line{i} = 'original'" for i in range(1, 31)]
+        (repo / "a.py").write_text("\n".join(lines) + "\n", encoding="utf-8")
+        sp.run(["git", "add", "a.py"], cwd=repo, check=True)
+        sp.run(["git", "commit", "-qm", "base"], cwd=repo, check=True)
+        changed = list(lines)
+        changed[1] = "line2 = 'changed'"     # first hunk, line 2
+        changed[20] = "line21 = 'changed'"   # last hunk, line 21
+        (repo / "a.py").write_text("\n".join(changed) + "\n", encoding="utf-8")
+    diff_ctx = Context(root=repo, artefact_dir=root / ".artefacts", diff_base="HEAD")
+
+    def run(line: int, mode: str) -> str:
+        return evaluate({"kind": "diff", "params": {"path": "a.py", "line": line, "mode": mode}},
+                        diff_ctx)["status"]
+
+    checks = [
+        ("diff sees an addition in the FIRST hunk", run(2, "added"), "supported"),
+        ("diff sees an addition in the last hunk", run(21, "added"), "supported"),
+        ("diff refutes an unchanged line", run(5, "added"), "refuted"),
+        ("diff sees a removal in the first hunk", run(2, "removed"), "supported"),
+        ("diff refutes a removal that did not happen", run(5, "removed"), "refuted"),
+    ]
+    return [{"case": name, "kind": "diff", "want": want, "got": got, "ok": got == want}
+            for name, got, want in checks]
 
 
 # --- CLI ---------------------------------------------------------------------------

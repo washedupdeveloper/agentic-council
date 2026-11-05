@@ -70,7 +70,8 @@
   "min_per_class": 3,
   "provisional": false,
   "provenance": {
-    "corpus": "/tmp/clean-base",
+    "corpus": "a two-file clean base: a flake that evaluates, one NixOS module, one Python file",
+    "manifest": "tests/corpus/claims-2026-11-05.json",
     "seed": 20261006,
     "rungs": [
       0,

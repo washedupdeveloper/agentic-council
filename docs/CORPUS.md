@@ -139,23 +139,38 @@ tree — and their severities. The aggregate is therefore a measure of how much 
 like saying, and no cutoff inside a 10-point band survives another draw.
 
 The verdict does not depend on it. On the claims scale a run is `certified` when nothing of high or
-critical severity was confirmed and nothing blocking is unsettled — the blocking set, which did not
-vary. `council calibrate --verdicts corpus.json` scores that separation and exits non-zero when any
-rung disagrees with its label:
+critical severity was confirmed, nothing blocking is unsettled — and, since the shipped threshold,
+its aggregate clears the claims threshold. The blocking set is what did not vary; the aggregate is
+what the second corpus made fit to enforce:
 
 ```text
-  ok   level-0-run-1        good    84.20  certified
-  ok   level-1-run-2        bad     58.72  not certified
-  ...
+the shipped ladder   good 97.83 · 97.83 · 100.00   (spread 2.17)
+                     bad  73.46 · 76.83 · 73.46     (spread 3.37, detected 1/1 each)
+                     threshold 87.33   plateau 76.83–97.83
+```
+
+Every clean rung sits more than ten points above every defective one, and the threshold is the
+midpoint of the plateau rather than a point fitted to one draw. `tests/corpus/claims-2026-11-05.json`
+records the six rungs, so `council calibrate --from-runs` on it regenerates the number.
+
+```text
+  ok   level-0-run-1        good    97.83  certified
+  ok   level-0-run-2        good    97.83  certified
+  ok   level-0-run-3        good   100.00  certified
+  ok   level-1-run-1        bad     73.46  not certified
+  ok   level-1-run-2        bad     76.83  not certified
+  ok   level-1-run-3        bad     73.46  not certified
   verdicts separate every rung
 ```
 
-Twelve for twelve, and the check is not vacuous: relabelling a clean rung `bad` makes it exit 1 with
+Six for six, and the check is not vacuous: relabelling a clean rung `bad` makes it exit 1 with
 `verdicts WRONG for: level-0-run-1`, and dropping a rung's certification exits 1 with
 `rungs with no verdict`.
 
-The aggregate is still reported, and still useful as a trend. It is not the gate, and on the claims
-scale `certification_basis: "claims"` says so.
+The aggregate is reported and — once a claims calibration exists — enforced: clearing the blocking
+set with an aggregate under the threshold is `unsatisfied`, and the gate names the number it
+compared. Before this corpus the aggregate was reported and never compared, which is why the
+milestone called the threshold an open parameter.
 
 ## What this does not do
 

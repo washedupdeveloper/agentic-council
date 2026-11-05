@@ -234,6 +234,9 @@ let
       # The gate's data files: without them score_reviews falls back to the
       # uncalibrated count-based curve, so the deployment scores differently.
       cp ${../scripts}/calibration.json $out/scripts/calibration.json
+      # The claims scale's own threshold. Without it the gate reports `uncalibrated` for a
+      # claims-scored run and the deployment enforces a number from the other scale.
+      cp ${../scripts}/calibration.claims.json $out/scripts/calibration.claims.json
       cp ${../scripts}/eval-baseline.json $out/scripts/eval-baseline.json
       cp -r ${../protocol} $out/protocol
       cp ${../tests}/*.py $out/tests/

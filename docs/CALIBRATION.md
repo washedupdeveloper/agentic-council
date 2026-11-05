@@ -456,12 +456,11 @@ refused by name, as is a ladder handed to `--recalibrate`.
 
 ## The claims scale
 
-`scripts/calibration.json` is the deterministic threshold; a claims-scored run is compared against
-`scripts/calibration.claims.json`, which is derived from an adjudicated corpus rather than from probe
-densities (`council calibrate --from-runs corpus.json`). The shipped file comes from six runs — three
-clean rungs and three with a seeded credential — and gives `87.33` with a plateau of `76.83–97.83`
-and `provisional: false`; every defective rung was detected `1/1`, and the verdicts separate every
-rung.
+`scripts/calibration.claims.json` is the claims threshold, and the corpus that produced it is
+committed: `tests/corpus/claims-2026-11-05.json` records the six rungs, and
+`council calibrate --from-runs tests/corpus/claims-2026-11-05.json` regenerates `87.33` from them.
+The run directories themselves are LLM output, not source, so `--sample-corpus` is what reproduces
+them; the manifest is what makes the arithmetic checkable without paying for another ladder.
 
 Sample the corpus inside the toolchain. A proof that cannot run is not a defect the reviewer missed,
 but the claims scale reads it as one, and `collect` will tell you which of the two it was.

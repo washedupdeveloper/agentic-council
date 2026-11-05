@@ -2135,9 +2135,15 @@ def main(argv: Optional[List[str]] = None) -> int:
         args.mode, args.samples, args.max_rounds, args.threshold, cfg)
 
     # Still from the calibration manifest when neither the flag nor the config names one,
-    # so the loop and the calibration cannot drift (it was hardcoded in three places).
+    # so the loop and the calibration cannot drift (it was hardcoded in three places). A
+    # review run is claims-scored, so the claims threshold is the one that applies; the
+    # deterministic number is only the fallback when no corpus threshold exists.
     if args.threshold is None:
-        args.threshold = float(_gate_module().calibrated_threshold())
+        gate = _gate_module()
+        claims_payload = gate.load_scale_calibration("claims")
+        resolved = gate.threshold_from_scale(claims_payload)
+        args.threshold = float(resolved if resolved is not None
+                               else gate.calibrated_threshold())
 
     repo, code = resolve_target(args.repo)
     if repo is None:

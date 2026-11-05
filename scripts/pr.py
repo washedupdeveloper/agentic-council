@@ -113,7 +113,9 @@ def target_sha(run_dir: Path) -> Optional[str]:
 def verdict(run_dir: Path) -> Dict[str, Any]:
     """The gate's own result for this run. Not a re-derivation of it."""
     score = load("score_reviews", HERE / "score_reviews.py")
-    return score.evaluate(run_dir, score.calibrated_threshold())
+    # `None` lets `evaluate` resolve the threshold for the run's OWN scale. Passing the
+    # deterministic 80.0 here made a claims run publish a threshold the gate never used.
+    return score.evaluate(run_dir, None)
 
 
 def _location(finding: Dict[str, Any]) -> str:

@@ -997,14 +997,14 @@ def certification(satisfied: bool, blocking: List[Dict[str, Any]],
 def probe_defect_count(run_dir: Path) -> int:
     """How many defects the probes observed — the ones that could have blocked.
 
-    A finding counts when it is `high` or `critical`, or when it names no severity at
-    all: an unlabelled probe finding is not evidence that the reviewer was entitled to
-    ignore it, so it stays conservative. `low` and `medium` findings do not count,
-    because they cannot block on their own, and counting them made a clean tree
-    uncertifiable whenever the reviewer correctly stayed silent. Measured: three clean
-    rungs of one corpus, one silent reviewer, and `deadnix: unused lambda` plus "no
-    AGENTS.md" — both `low` — turned a correct run into `unprovable` and cost the corpus
-    a rung.
+    A finding counts when it is `medium`, `high` or `critical`, or when it names no severity at
+    all: an unlabelled probe finding is not evidence that the reviewer was entitled to ignore it,
+    so it stays conservative. `low` findings do not count, because they cannot block on their own,
+    and counting them made a clean tree uncertifiable whenever the reviewer correctly stayed
+    silent. Measured: three clean rungs of one corpus, one silent reviewer, and `deadnix: unused
+    lambda` plus "no AGENTS.md" — both `low` — turned a correct run into `unprovable` and cost the
+    corpus a rung. `medium` does count: a bandit medium or a complexity ratio ≥ 2 is a defect a
+    silent reviewer missed, and excluding it would reopen the hole this rule exists to close.
     """
     path = Path(run_dir) / "probes.json"
     if not path.exists():
@@ -1022,7 +1022,7 @@ def probe_defect_count(run_dir: Path) -> int:
         for finding in entry.get("findings") or []:
             severity = str((finding or {}).get("severity") or "").strip().lower() \
                 if isinstance(finding, dict) else ""
-            if severity in ("", "high", "critical"):
+            if severity in ("", "medium", "high", "critical"):
                 total += 1
     return total
 
@@ -1146,7 +1146,10 @@ def evaluate(run_dir: Path, threshold: Optional[float] = None,
     # number derived from densities: the file existed, was reported as calibrated, and
     # was never applied.
     if threshold is None:
-        threshold = threshold_from_scale(scale_payload) or calibrated_threshold()
+        resolved = threshold_from_scale(scale_payload)
+        # `or` would treat a legitimate 0.0 as absent and fall back to the deterministic 80.0 —
+        # the exact cross-scale leak this resolution exists to stop.
+        threshold = resolved if resolved is not None else calibrated_threshold()
 
     # Renormalize over the dimensions present, so a partial run is not diluted toward
     # zero by the absent ones.
@@ -1172,23 +1175,31 @@ def evaluate(run_dir: Path, threshold: Optional[float] = None,
         satisfied = False
         reason = gap if (not blocking and not unresolved) else f"{reason}; {gap}"
     if use_claims:
-        # On the claims scale the verdict is what the run PROVED, not where its aggregate landed.
-        # Measured: six passes over one identical tree scored 52.49–68.08, and three passes over a
-        # clean tree 78.37–88.81 — a 10-point spread against a 10-point margin. Any cutoff inside
-        # that band is a coin flip, so the aggregate is reported and the blocking set decides.
-        satisfied = not blocking and not unresolved and not gap
-        if satisfied:
+        # The claims verdict is the blocking set AND, when a claims calibration exists, the
+        # aggregate. The earlier version dropped the aggregate because the FIRST corpus did not
+        # separate (78.37–88.81 good against 52–68 bad, a 10-point band). The shipped corpus does:
+        # 97.83–100 good against 73.46–76.83 bad, plateau 76.83–97.83. So the number is
+        # enforceable — and printing `aggregate X >= Y` as the reason while never testing it was a
+        # false statement, true only because every run that reached it happened to clear the bar.
+        above = threshold is None or aggregate >= threshold
+        satisfied = not blocking and not unresolved and not gap and above
+        parts = []
+        if blocking:
+            parts.append(f"{len(blocking)} confirmed claim(s) of high or critical severity")
+        if unresolved:
+            parts.append(f"{len(unresolved)} blocking claim(s) could not be settled")
+        if gap:
+            parts.append("the probes saw a defect and nothing was settled")
+        if not above:
+            parts.append(f"aggregate {aggregate:.2f} is below the claims threshold {threshold:.2f}")
+        if parts:
+            reason = "; ".join(parts)
+        elif threshold is None:
             reason = ("no confirmed claim of high or critical severity, and nothing blocking is "
                       "unsettled")
         else:
-            parts = []
-            if blocking:
-                parts.append(f"{len(blocking)} confirmed claim(s) of high or critical severity")
-            if unresolved:
-                parts.append(f"{len(unresolved)} blocking claim(s) could not be settled")
-            if gap:
-                parts.append("the probes saw a defect and nothing was settled")
-            reason = "; ".join(parts) or reason
+            reason = (f"no confirmed claim of high or critical severity, nothing blocking is "
+                      f"unsettled, and aggregate {aggregate:.2f} >= {threshold:.2f}")
     elif not calibrated_for_scale and not blocking and not unresolved and not gap:
         # The number is real but it is not comparable: claims-scored runs are on a different scale
         # from the threshold this repository derived. Refusing to certify is the honest answer;
@@ -1443,8 +1454,9 @@ def main(argv: Optional[List[str]] = None) -> int:
                              "because it needs no run directory you would have to "
                              "know.")
     parser.add_argument("--threshold", type=float, default=None,
-                        help="Pass threshold (default: the calibrated value from "
-                             "scripts/calibration.json)")
+                        help="Pass threshold (default: the value calibrated for the run's own "
+                             "scale — scripts/calibration.claims.json for a claims-scored run, "
+                             "else scripts/calibration.json)")
     parser.add_argument("--json", action="store_true", help="Emit the full result as JSON on stdout")
     parser.add_argument("--tail-chars", type=int, default=3000,
                         help="Cap the continuation prompt (default 3000, matches goals.py)")
@@ -1513,7 +1525,12 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     if result["status"] == "satisfied":
         if not args.json and not args.quiet:
-            print(f"satisfied: aggregate {result['aggregate']} >= {result['threshold']:g}, no open high/critical")
+            if result.get("threshold") is None:
+                print("satisfied: no open high/critical and nothing blocking unsettled "
+                      "(no claims threshold is calibrated, so the number is not compared)")
+            else:
+                print(f"satisfied: aggregate {result['aggregate']} >= {result['threshold']:g}, "
+                      f"no open high/critical")
         return 0
     return 1
 

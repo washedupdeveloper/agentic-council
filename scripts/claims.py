@@ -513,7 +513,7 @@ def _gate(score_dir: Path, stacks: List[str]) -> Optional[Dict[str, Any]]:
             require_proof = bool(meta.get("require_proof"))
         except (OSError, json.JSONDecodeError):
             pass
-        return score.evaluate(score_dir, score.calibrated_threshold(), stacks=stacks or None,
+        return score.evaluate(score_dir, None, stacks=stacks or None,
                               require_proof=require_proof)
     except Exception as exc:  # noqa: BLE001 - a ladder must render even when the gate cannot
         return {"status": "error", "reason": f"the deterministic gate could not run: "

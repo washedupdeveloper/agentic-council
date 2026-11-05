@@ -133,7 +133,8 @@ cap applied. See `docs/ADJUDICATION.md`.
 the `scale` its threshold was derived on (`deterministic` — `calibrate.py` measures probe densities);
 `scripts/calibration.claims.json` holds the claims-scale threshold, derived from an adjudicated corpus
 (`87.33`, plateau `76.83–97.83`, three runs per class). A run is compared to the file for its own
-scale, and `uncalibrated` is reported only when that file is absent.
+scale; a scale with no calibration is compared to nothing, and a claims verdict still comes from what
+the run proved.
 
 **Normalization.** Findings density → Hill curve `100 / (1 + (x/K)^n)`. Bounded metrics → threshold curve. Within a category → weighted geometric mean, so one failing tool is not diluted by passing ones. Across languages → weighted by KLOC share.
 

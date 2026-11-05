@@ -326,7 +326,7 @@ in
                     done < dev-scripts.txt
 
                     # 2. the data files the modules resolve relative to themselves
-                    for f in calibration.json eval-baseline.json score_reviews.py probes.py toolchain.py hermes_home.py hermes.py; do
+                    for f in calibration.json calibration.claims.json eval-baseline.json score_reviews.py probes.py toolchain.py hermes_home.py hermes.py; do
                       test -f ${fw}/scripts/$f || { echo "shipped tree is missing scripts/$f" >&2; exit 1; }
                     done
 
