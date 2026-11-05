@@ -130,8 +130,10 @@ confirmed committed credential left `security` at `det` 71.75 under either scori
 cap applied. See `docs/ADJUDICATION.md`.
 
 **A score is only comparable to a threshold on its own scale.** `scripts/calibration.json` records
-the `scale` its threshold was derived on (`deterministic` — `calibrate.py` measures probe densities).
-A claims-scored run differs from that and is reported `uncalibrated` rather than compared.
+the `scale` its threshold was derived on (`deterministic` — `calibrate.py` measures probe densities);
+`scripts/calibration.claims.json` holds the claims-scale threshold, derived from an adjudicated corpus
+(`87.33`, plateau `76.83–97.83`, three runs per class). A run is compared to the file for its own
+scale, and `uncalibrated` is reported only when that file is absent.
 
 **Normalization.** Findings density → Hill curve `100 / (1 + (x/K)^n)`. Bounded metrics → threshold curve. Within a category → weighted geometric mean, so one failing tool is not diluted by passing ones. Across languages → weighted by KLOC share.
 

@@ -453,3 +453,15 @@ council calibrate --recalibrate calibration.json --k 1.4 --out retuned.json
 `--recalibrate` reads the `measured` points a calibration already recorded, so `k` and the selection
 rule can be re-tuned without paying for the toolchain sweep again. A manifest with no `ladder` key is
 refused by name, as is a ladder handed to `--recalibrate`.
+
+## The claims scale
+
+`scripts/calibration.json` is the deterministic threshold; a claims-scored run is compared against
+`scripts/calibration.claims.json`, which is derived from an adjudicated corpus rather than from probe
+densities (`council calibrate --from-runs corpus.json`). The shipped file comes from six runs — three
+clean rungs and three with a seeded credential — and gives `87.33` with a plateau of `76.83–97.83`
+and `provisional: false`; every defective rung was detected `1/1`, and the verdicts separate every
+rung.
+
+Sample the corpus inside the toolchain. A proof that cannot run is not a defect the reviewer missed,
+but the claims scale reads it as one, and `collect` will tell you which of the two it was.
