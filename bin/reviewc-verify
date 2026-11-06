@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# Run every claim in claims.toml. Exits 0 only if all of them hold.
+#
+# No installation and no machine paths: the root is resolved from this file's
+# own location, and `src` is put on the path for the duration of the command.
+set -euo pipefail
+
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+exec env PYTHONPATH="$root/src${PYTHONPATH:+:$PYTHONPATH}" \
+  "${PYTHON:-python3}" -m reviewc.claims --registry "$root/claims.toml" "$@"

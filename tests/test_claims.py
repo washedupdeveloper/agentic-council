@@ -1,0 +1,91 @@
+"""The registry itself is a claim: it must reject a claim it cannot check.
+
+A registry that silently accepts an entry with no `check` is the same failure it
+exists to prevent, one level up — so malformed registries are tested as
+carefully as failing checks.
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import pytest
+
+from reviewc.claims import Claim, RegistryError, load, run_all, run_one
+
+VALID = """
+[[claim]]
+id = "one"
+text = "The first claim holds."
+check = "true"
+
+[[claim]]
+id = "two"
+text = "The second claim holds."
+check = "true"
+"""
+
+
+def write(tmp_path: Path, body: str) -> Path:
+    path = tmp_path / "claims.toml"
+    path.write_text(body, encoding="utf-8")
+    return path
+
+
+def test_a_valid_registry_loads(tmp_path: Path) -> None:
+    claims = load(write(tmp_path, VALID))
+    assert [c.id for c in claims] == ["one", "two"]
+    assert claims[0].check == "true"
+
+
+def test_a_claim_without_a_check_is_rejected(tmp_path: Path) -> None:
+    body = '[[claim]]\nid = "x"\ntext = "No check."\n'
+    with pytest.raises(RegistryError, match="check"):
+        load(write(tmp_path, body))
+
+
+def test_a_duplicate_id_is_rejected(tmp_path: Path) -> None:
+    body = VALID + '\n[[claim]]\nid = "one"\ntext = "Again."\ncheck = "true"\n'
+    with pytest.raises(RegistryError, match="duplicate"):
+        load(write(tmp_path, body))
+
+
+def test_a_text_without_a_period_is_rejected(tmp_path: Path) -> None:
+    body = '[[claim]]\nid = "x"\ntext = "not a sentence"\ncheck = "true"\n'
+    with pytest.raises(RegistryError, match="period"):
+        load(write(tmp_path, body))
+
+
+def test_an_empty_registry_is_rejected(tmp_path: Path) -> None:
+    with pytest.raises(RegistryError, match="no \\[\\[claim\\]\\]"):
+        load(write(tmp_path, ""))
+
+
+def test_a_passing_check_reports_ok(tmp_path: Path) -> None:
+    result = run_one(Claim("x", "It holds.", "true"), tmp_path)
+    assert result.ok
+    assert result.detail == ""
+
+
+def test_a_failing_check_reports_the_exit_code(tmp_path: Path) -> None:
+    result = run_one(Claim("x", "It does not.", "false"), tmp_path)
+    assert not result.ok
+    assert "exit 1" in result.detail
+
+
+def test_a_missing_command_is_a_failure_not_a_crash(tmp_path: Path) -> None:
+    result = run_one(Claim("x", "It cannot run.", "definitely-not-a-command-xyz"), tmp_path)
+    assert not result.ok
+    assert "not found" in result.detail
+
+
+def test_a_timeout_is_a_failure(tmp_path: Path) -> None:
+    result = run_one(Claim("x", "It hangs.", "sleep 5"), tmp_path, timeout=1)
+    assert not result.ok
+    assert "timed out" in result.detail
+
+
+def test_run_all_keeps_going_after_a_failure(tmp_path: Path) -> None:
+    claims = [Claim("a", "Fails.", "false"), Claim("b", "Passes.", "true")]
+    results = run_all(claims, tmp_path)
+    assert [r.ok for r in results] == [False, True]

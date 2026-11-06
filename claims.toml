@@ -1,0 +1,25 @@
+# Every claim this project makes, and the command that would falsify it.
+#
+# `python3 -m reviewc.claims` runs them all and exits non-zero if any is false,
+# so the documentation and the tree cannot disagree for longer than one run.
+# A claim without a check is refused by the loader, not ignored.
+
+[[claim]]
+id = "verdict-fails-on-proven-blocking"
+text = "A proven high finding fails the run."
+check = "python3 -m pytest tests/test_verdict.py::test_a_proven_high_fails -q"
+
+[[claim]]
+id = "verdict-medium-does-not-block"
+text = "A proven medium finding does not fail the run."
+check = "python3 -m pytest tests/test_verdict.py::test_a_proven_medium_passes -q"
+
+[[claim]]
+id = "verdict-incomplete-is-not-fail"
+text = "An unsettled high finding makes the run incomplete, not failed."
+check = "python3 -m pytest tests/test_verdict.py::test_an_unsettled_high_is_incomplete -q"
+
+[[claim]]
+id = "registry-rejects-uncheckable"
+text = "The registry refuses a claim with no check."
+check = "python3 -m pytest tests/test_claims.py::test_a_claim_without_a_check_is_rejected -q"
