@@ -109,7 +109,7 @@ def run_all(claims: list[Claim], cwd: Path, timeout: int = DEFAULT_TIMEOUT) -> l
 
 
 def main(argv: list[str] | None = None) -> int:
-    """`python -m reviewc.claims [--registry PATH] [--list]`."""
+    """`python -m council.claims [--registry PATH] [--list]`."""
     args = list(sys.argv[1:] if argv is None else argv)
     registry = DEFAULT_REGISTRY
     if "--registry" in args:

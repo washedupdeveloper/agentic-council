@@ -1,7 +1,7 @@
 # Every claim this project makes, and the command that would falsify it.
 #
-# `python3 -m reviewc.claims` runs them all and exits non-zero if any is false,
-# so the documentation and the tree cannot disagree for longer than one run.
+# `./bin/council-verify` runs them all and exits non-zero if any is false, so
+# the documentation and the tree cannot disagree for longer than one run.
 # A claim without a check is refused by the loader, not ignored.
 
 [[claim]]
@@ -23,3 +23,23 @@ check = "python3 -m pytest tests/test_verdict.py::test_an_unsettled_high_is_inco
 id = "registry-rejects-uncheckable"
 text = "The registry refuses a claim with no check."
 check = "python3 -m pytest tests/test_claims.py::test_a_claim_without_a_check_is_rejected -q"
+
+[[claim]]
+id = "base-uses-the-merge-base"
+text = "With origin/HEAD, the base is the merge-base, not the tip."
+check = "python3 -m pytest tests/test_base.py::test_origin_head_wins_and_uses_the_merge_base -q"
+
+[[claim]]
+id = "base-falls-back-to-head-parent"
+text = "Without origin/HEAD, the base is HEAD~1."
+check = "python3 -m pytest tests/test_base.py::test_without_an_origin_it_falls_back_to_head_tilde_one -q"
+
+[[claim]]
+id = "base-refuses-when-there-is-none"
+text = "A one-commit repository with no origin refuses instead of guessing."
+check = "python3 -m pytest tests/test_base.py::test_one_commit_and_no_origin_refuses -q"
+
+[[claim]]
+id = "runs-stay-inside-the-repository"
+text = "Run artefacts live at .council/runs inside the checkout."
+check = "python3 -m pytest tests/test_paths.py::test_runs_are_inside_the_repository -q"

@@ -1,4 +1,4 @@
-# reviewc
+# council
 
 A review is a claim until a check settles it.
 
@@ -30,7 +30,7 @@ a trend; it cannot change it.
 
 ```sh
 python3 -m pytest            # the suite
-python3 -m reviewc.claims    # every claim this project makes, executed
+python3 -m council.claims    # every claim this project makes, executed
 ```
 
 `claims.toml` is the registry. Each entry is one sentence and the command that
@@ -40,9 +40,9 @@ non-zero if any claim is false.
 ## Layout
 
 ```
-src/reviewc/findings.py   Finding, State, Severity — the domain
-src/reviewc/verdict.py    judge() — the whole decision
-src/reviewc/claims.py     the claim registry and its runner
+src/council/findings.py   Finding, State, Severity — the domain
+src/council/verdict.py    judge() — the whole decision
+src/council/claims.py     the claim registry and its runner
 fixtures/corpus           the six-rung corpus (carried over from v1.9.0)
 fixtures/golden           the golden rounds and their pinned expectations
 ```

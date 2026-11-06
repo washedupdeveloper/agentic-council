@@ -7,4 +7,4 @@ set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 exec env PYTHONPATH="$root/src${PYTHONPATH:+:$PYTHONPATH}" \
-  "${PYTHON:-python3}" -m reviewc.claims --registry "$root/claims.toml" "$@"
+  "${PYTHON:-python3}" -m council.claims --registry "$root/claims.toml" "$@"

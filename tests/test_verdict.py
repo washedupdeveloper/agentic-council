@@ -10,8 +10,8 @@ from __future__ import annotations
 
 import pytest
 
-from reviewc.findings import SEVERITIES, Finding, State
-from reviewc.verdict import Result, Verdict, judge
+from council.findings import SEVERITIES, Finding, State
+from council.verdict import Result, Verdict, judge
 
 
 def finding(severity: str = "high", state: State = State.PROVEN, ident: str = "F-1") -> Finding:

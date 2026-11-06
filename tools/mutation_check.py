@@ -63,10 +63,10 @@ def run_suite(src: Path) -> int:
 def main() -> int:
     survivors: list[str] = []
     for mutation in MUTATIONS:
-        with tempfile.TemporaryDirectory(prefix="reviewc-mut-") as raw:
+        with tempfile.TemporaryDirectory(prefix="council-mut-") as raw:
             src = Path(raw) / "src"
             shutil.copytree(ROOT / "src", src)
-            target = src / "reviewc" / mutation.file
+            target = src / "council" / mutation.file
             text = target.read_text(encoding="utf-8")
             if mutation.old not in text:
                 print(f"  STALE  {mutation.name}: pattern not found in {mutation.file}")

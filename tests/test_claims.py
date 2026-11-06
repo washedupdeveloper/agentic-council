@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from reviewc.claims import Claim, RegistryError, load, run_all, run_one
+from council.claims import Claim, RegistryError, load, run_all, run_one
 
 VALID = """
 [[claim]]
