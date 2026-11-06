@@ -50,6 +50,7 @@ class Finding:
     state: State
     location: str = ""
     claim: str = ""
+    detail: str = ""
 
     @property
     def blocks(self) -> bool:

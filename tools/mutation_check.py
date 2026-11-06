@@ -64,6 +64,13 @@ MUTATIONS: tuple[Mutation, ...] = (
              'elif raw.startswith(" "):\n            pass'),
     Mutation("config-ignores-unknown-keys",
              "config.py", "if unknown:", "if False:"),
+    Mutation("merge-takes-the-lowest-severity",
+             "merge.py", "highest = max(entries, key=lambda entry: _RANK[entry[1].severity])",
+             "highest = min(entries, key=lambda entry: _RANK[entry[1].severity])"),
+    Mutation("a-missing-sample-can-still-pass",
+             "adjudicate.py",
+             "if adjudication.failed_samples and result.verdict is Verdict.PASS:",
+             "if False:"),
 )
 
 

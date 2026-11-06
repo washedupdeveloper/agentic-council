@@ -1,0 +1,62 @@
+"""Five samples, one finding set.
+
+Samples of the same model disagree about wording and sometimes about severity.
+They are merged by where the finding is — dimension, file, line — because that
+is the only part the samples cannot phrase differently. Severity is the highest
+any sample reported (the client's rule), and every sample's wording is kept, so
+the merge is auditable rather than an average nobody can inspect.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Any, Sequence
+
+from .findings import SEVERITIES
+from .sample import SampleResult
+from .schema import DIMENSIONS, RawFinding
+
+_RANK: dict[str, int] = {severity: index for index, severity in enumerate(SEVERITIES)}
+_ORDER: dict[str, int] = {dimension: index for index, dimension in enumerate(DIMENSIONS)}
+
+
+@dataclass(frozen=True, slots=True)
+class MergedFinding:
+    """One place in the change, as reported by one or more samples."""
+
+    dimension: str
+    file: str
+    line: int
+    severity: str
+    claims: tuple[str, ...]
+    samples: tuple[int, ...]
+    proof_kind: str
+    proof_params: dict[str, Any]
+
+
+def merge(results: Sequence[SampleResult]) -> tuple[MergedFinding, ...]:
+    """Merge parsed samples, deterministically. A failed sample contributes nothing."""
+    buckets: dict[tuple[str, str, int], list[tuple[int, RawFinding]]] = {}
+    for result in results:
+        if result.output is None:
+            continue
+        for finding in result.output.findings:
+            key = (finding.dimension, finding.file, finding.line)
+            buckets.setdefault(key, []).append((result.index, finding))
+
+    merged: list[MergedFinding] = []
+    for key in sorted(buckets, key=lambda k: (_ORDER[k[0]], k[1], k[2])):
+        entries = sorted(buckets[key], key=lambda entry: entry[0])
+        highest = max(entries, key=lambda entry: _RANK[entry[1].severity])
+        claims = tuple(dict.fromkeys(finding.claim for _, finding in entries))
+        merged.append(MergedFinding(
+            dimension=key[0],
+            file=key[1],
+            line=key[2],
+            severity=highest[1].severity,
+            claims=claims,
+            samples=tuple(sorted(index for index, _ in entries)),
+            proof_kind=highest[1].proof_kind,
+            proof_params=highest[1].proof_params,
+        ))
+    return tuple(merged)
