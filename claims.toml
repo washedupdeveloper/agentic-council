@@ -43,3 +43,18 @@ check = "python3 -m pytest tests/test_base.py::test_one_commit_and_no_origin_ref
 id = "runs-stay-inside-the-repository"
 text = "Run artefacts live at .council/runs inside the checkout."
 check = "python3 -m pytest tests/test_paths.py::test_runs_are_inside_the_repository -q"
+
+[[claim]]
+id = "a-finding-without-a-proof-is-refused"
+text = "The reviewer contract refuses a finding that carries no proof."
+check = "python3 -m pytest tests/test_schema.py::test_a_finding_without_a_proof_is_refused -q"
+
+[[claim]]
+id = "a-bad-sample-is-retried-once"
+text = "A sample that does not parse is retried once, then reported as a failure."
+check = "python3 -m pytest tests/test_sample.py::test_a_sample_that_never_parses_reports_why -q"
+
+[[claim]]
+id = "the-digest-identifies-the-instrument"
+text = "The run digest changes when the prompt or the profile changes."
+check = "python3 -m pytest tests/test_prompt.py::test_the_digest_changes_with_the_prompt tests/test_prompt.py::test_the_digest_changes_with_the_profile -q"
