@@ -58,3 +58,23 @@ check = "python3 -m pytest tests/test_sample.py::test_a_sample_that_never_parses
 id = "the-digest-identifies-the-instrument"
 text = "The run digest changes when the prompt or the profile changes."
 check = "python3 -m pytest tests/test_prompt.py::test_the_digest_changes_with_the_prompt tests/test_prompt.py::test_the_digest_changes_with_the_profile -q"
+
+[[claim]]
+id = "an-unlisted-command-cannot-run"
+text = "A command proof naming an executable that is not on the allowlist cannot run."
+check = "python3 -m pytest tests/test_proofs.py::test_an_unlisted_binary_cannot_run -q"
+
+[[claim]]
+id = "a-path-is-not-an-executable"
+text = "A command proof whose first element is a path cannot run."
+check = "python3 -m pytest tests/test_proofs.py::test_a_path_instead_of_a_name_cannot_run -q"
+
+[[claim]]
+id = "a-diff-proof-reads-every-hunk"
+text = "A diff proof finds an added line in the second hunk of a multi-hunk change."
+check = "python3 -m pytest tests/test_proofs.py::test_a_diff_proof_reads_a_line_in_the_second_hunk -q"
+
+[[claim]]
+id = "a-misspelt-config-key-is-refused"
+text = "A misspelt allowlist key is an error, not a silent fall back to the default."
+check = "python3 -m pytest tests/test_config.py::test_a_misspelt_allow_is_an_error_not_a_default -q"

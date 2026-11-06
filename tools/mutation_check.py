@@ -56,6 +56,14 @@ MUTATIONS: tuple[Mutation, ...] = (
     Mutation("sample-never-retries",
              "sample.py", "for attempt in range(1, attempts + 1):",
              "for attempt in range(1, 2):"),
+    Mutation("proof-allowlist-disabled",
+             "proofs.py", "if binary not in ctx.allow:", "if False:"),
+    Mutation("diff-context-not-counted",
+             "proofs.py",
+             'elif raw.startswith(" "):\n            old_line += 1\n            new_line += 1',
+             'elif raw.startswith(" "):\n            pass'),
+    Mutation("config-ignores-unknown-keys",
+             "config.py", "if unknown:", "if False:"),
 )
 
 
