@@ -9,9 +9,10 @@ from pathlib import Path
 
 CONFIG_NAME = "council.toml"
 
-#: Read-only inspection tools, plus the two that can evaluate the repository it
-#: is already reviewing. This is an allowlist against surprise, not a sandbox:
-#: `nix` can run anything the flake says, and the flake is the code under review.
+#: The tools this repository trusts a proof to run. Not a boundary: `nix` builds
+#: and `python3` executes, so anything here can run repository code with your
+#: rights. A real boundary is a sandbox; this is a list of known tools, and
+#: removing one interpreter closes a spelling, not the hole.
 DEFAULT_ALLOW: frozenset[str] = frozenset(
     {"rg", "grep", "git", "jq", "test", "stat", "python3", "nix"}
 )

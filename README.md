@@ -81,5 +81,7 @@ fixtures/                 the six-rung corpus and the golden rounds from v1.9.0
 
 - A browser. A DOM claim is a `command` proof: the repository runs its own
   browser test, and the tool only records whether it passed.
+- A sandbox. `command` proofs run with your user's rights; `[proofs].allow`
+  limits *which* tool runs, not what it does.
 - Calibration: there is no score, so there is nothing to calibrate.
 - A replacement for v1: 1.9.0 is untouched; this is a separate checkout.
