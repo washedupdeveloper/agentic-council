@@ -3,6 +3,7 @@ sentence, one command that would falsify it."""
 
 from __future__ import annotations
 
+import argparse
 import shlex
 import subprocess
 import sys
@@ -120,37 +121,44 @@ def run_all(claims: list[Claim], cwd: Path, timeout: int = DEFAULT_TIMEOUT) -> l
 
 
 def main(argv: list[str] | None = None) -> int:
-    """`python -m council.claims [--registry PATH] [--list]`."""
-    args = list(sys.argv[1:] if argv is None else argv)
-    registry = DEFAULT_REGISTRY
-    if "--registry" in args:
-        registry = Path(args[args.index("--registry") + 1])
+    """`council-verify [--registry PATH] [--list] [--write PATH] [--check PATH]`."""
+    parser = argparse.ArgumentParser(prog="council-verify",
+                                     description="Run every claim in the registry.")
+    parser.add_argument("--registry", type=Path, default=DEFAULT_REGISTRY)
+    parser.add_argument("--list", action="store_true", help="list the claims")
+    parser.add_argument("--write", type=Path, default=None, help="write the registry as markdown")
+    parser.add_argument("--check", type=Path, default=None,
+                        help="fail if the given markdown is not what the registry renders")
     try:
-        claims = load(registry)
+        args = parser.parse_args(sys.argv[1:] if argv is None else argv)
+    except SystemExit as exc:
+        # 2 is reserved for an incomplete review; a usage error is a start failure.
+        raise SystemExit(exc.code if exc.code == 0 else 3) from exc
+
+    try:
+        claims = load(args.registry)
     except RegistryError as exc:
         print(f"claims: {exc}", file=sys.stderr)
         return 3  # could not start; 2 is reserved for an incomplete review
 
-    if "--list" in args:
+    if args.list:
         for claim in claims:
             print(f"{claim.id}\t{claim.text}")
         return 0
 
-    if "--write" in args:
-        target = Path(args[args.index("--write") + 1])
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(render(claims), encoding="utf-8", newline="\n")
-        print(f"wrote {target} ({len(claims)} claims)")
+    if args.write is not None:
+        args.write.parent.mkdir(parents=True, exist_ok=True)
+        args.write.write_text(render(claims), encoding="utf-8", newline="\n")
+        print(f"wrote {args.write} ({len(claims)} claims)")
         return 0
 
-    if "--check" in args:
-        target = Path(args[args.index("--check") + 1])
-        current = target.read_text(encoding="utf-8") if target.exists() else ""
+    if args.check is not None:
+        current = args.check.read_text(encoding="utf-8") if args.check.exists() else ""
         if current != render(claims):
-            print(f"{target} does not match the registry: "
-                  f"run `council verify --write {target}`", file=sys.stderr)
+            print(f"{args.check} does not match the registry: "
+                  f"run `council verify --write {args.check}`", file=sys.stderr)
             return 1
-        print(f"{target} matches the registry ({len(claims)} claims)")
+        print(f"{args.check} matches the registry ({len(claims)} claims)")
         return 0
 
     results = run_all(claims, Path.cwd())

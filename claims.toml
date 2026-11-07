@@ -208,3 +208,23 @@ check = "python3 -m pytest tests/test_cli.py::test_verify_with_a_missing_registr
 id = "every-proof-kind-has-an-executor"
 text = "The contract and the executor table are the same set: no kind is offered that cannot run."
 check = "python3 -m pytest tests/test_proofs.py::test_every_declared_kind_has_an_executor -q"
+
+[[claim]]
+id = "a-new-file-is-part-of-the-change"
+text = "A secret in an untracked new file is reviewed and fails the run."
+check = "python3 -m pytest tests/test_run.py::test_a_new_file_is_part_of_the_change -q"
+
+[[claim]]
+id = "the-run-directory-is-not-the-change"
+text = "The tool's own untracked artefacts never enter the diff."
+check = "python3 -m pytest tests/test_run.py::test_the_run_directory_is_not_part_of_the_change -q"
+
+[[claim]]
+id = "a-bad-config-is-a-start-failure"
+text = "A council.toml the tool refuses exits 3 with a message, not a traceback."
+check = "python3 -m pytest tests/test_cli.py::test_a_bad_config_is_a_start_failure -q"
+
+[[claim]]
+id = "a-missing-flag-value-is-a-start-failure"
+text = "A flag with no value exits 3 from either entry point."
+check = "python3 -m pytest tests/test_claims.py::test_a_missing_flag_value_is_a_start_failure -q"

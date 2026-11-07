@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import NoReturn, Sequence
 
 from . import claims as claim_registry
+from .config import ConfigError
 from .run import (DEFAULT_PROFILE, DEFAULT_SAMPLES, Report, ReviewError, ReviewRequest,
                   init as init_repo, review)
 from .runner import hermes_runner
@@ -96,7 +97,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                           run_id=args.run_id),
             hermes_runner(args.profile, binary=args.reviewer),
         )
-    except ReviewError as exc:
+    except (ReviewError, ConfigError) as exc:
         print(f"council: {exc}", file=sys.stderr)
         return EXIT_ERROR
 

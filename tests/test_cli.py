@@ -148,6 +148,28 @@ def test_verify_writes_and_checks_the_page(tmp_path: Path) -> None:
     assert cli.main(["verify", "--registry", str(registry), "--check", str(page)]) == 0
 
 
+def test_a_bad_config_is_a_start_failure(tmp_path: Path,
+                                         monkeypatch: pytest.MonkeyPatch) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    for argv in (["init", "-q"], ["config", "user.email", "t@e.invalid"],
+                 ["config", "user.name", "t"]):
+        subprocess.run(["git", *argv], cwd=repo, check=True)
+    (repo / "a.py").write_text("x = 1\n", encoding="utf-8")
+    subprocess.run(["git", "add", "-A"], cwd=repo, check=True)
+    subprocess.run(["git", "commit", "-qm", "one"], cwd=repo, check=True)
+    (repo / "a.py").write_text("x = 1\ny = 2\n", encoding="utf-8")
+    subprocess.run(["git", "add", "-A"], cwd=repo, check=True)
+    subprocess.run(["git", "commit", "-qm", "two"], cwd=repo, check=True)
+    (repo / "council.toml").write_text('[proofs]\nallows = ["rg"]\n', encoding="utf-8")
+
+    empty = json.dumps({"sections": {name: [] for name in ("security", "correctness",
+                                                           "readability", "architecture",
+                                                           "performance")}})
+    monkeypatch.setattr(cli, "hermes_runner", lambda *a, **k: (lambda prompt: empty))
+    assert cli.main(["review", "-C", str(repo), "--run-id", "cfg", "--report"]) == 3
+
+
 def test_verify_with_a_missing_registry_is_not_incomplete(tmp_path: Path) -> None:
     """2 means a review is incomplete; a registry that cannot be read is 3."""
     assert cli.main(["verify", "--registry", str(tmp_path / "nope.toml")]) == 3

@@ -49,3 +49,7 @@ registry, so it cannot describe a claim that has no check.
 | `a-run-id-cannot-escape` | A run id containing a path separator is refused as a start failure, not a traceback. | `python3 -m pytest tests/test_run.py::test_a_run_id_with_a_separator_is_refused -q` |
 | `a-missing-registry-is-not-incomplete` | A registry that cannot be read exits 3; 2 stays reserved for an incomplete review. | `python3 -m pytest tests/test_cli.py::test_verify_with_a_missing_registry_is_not_incomplete -q` |
 | `every-proof-kind-has-an-executor` | The contract and the executor table are the same set: no kind is offered that cannot run. | `python3 -m pytest tests/test_proofs.py::test_every_declared_kind_has_an_executor -q` |
+| `a-new-file-is-part-of-the-change` | A secret in an untracked new file is reviewed and fails the run. | `python3 -m pytest tests/test_run.py::test_a_new_file_is_part_of_the_change -q` |
+| `the-run-directory-is-not-the-change` | The tool's own untracked artefacts never enter the diff. | `python3 -m pytest tests/test_run.py::test_the_run_directory_is_not_part_of_the_change -q` |
+| `a-bad-config-is-a-start-failure` | A council.toml the tool refuses exits 3 with a message, not a traceback. | `python3 -m pytest tests/test_cli.py::test_a_bad_config_is_a_start_failure -q` |
+| `a-missing-flag-value-is-a-start-failure` | A flag with no value exits 3 from either entry point. | `python3 -m pytest tests/test_claims.py::test_a_missing_flag_value_is_a_start_failure -q` |

@@ -160,6 +160,33 @@ def test_an_empty_run_id_is_refused(tmp_path: Path) -> None:
         review(ReviewRequest(repo=repo, run_id="   "), lambda _: body())
 
 
+def test_a_new_file_is_part_of_the_change(tmp_path: Path) -> None:
+    """`git diff` omits untracked files; a review that omits them passes a secret."""
+    repo, _ = make_repo(tmp_path)
+    (repo / "new.py").write_text('KEY = "AKIAIOSFODNN7EXAMPLE"\n', encoding="utf-8")
+    finding = {"severity": "critical", "file": "new.py", "line": 1,
+               "claim": "A key is added.", "proof": {"kind": "diff",
+               "params": {"path": "new.py", "line": 1, "mode": "added"}}}
+    report = review(ReviewRequest(repo=repo, run_id="r10"),
+                    lambda _: body({"security": [finding]}))
+    assert report.verdict is Verdict.FAIL
+
+
+def test_the_run_directory_is_not_part_of_the_change(tmp_path: Path) -> None:
+    """The tool's own artefacts are untracked too, and must never enter the diff."""
+    repo, _ = make_repo(tmp_path)
+    artifact = repo / ".council" / "runs" / "old" / "sample-1.json"
+    artifact.parent.mkdir(parents=True)
+    artifact.write_text("{}\n", encoding="utf-8")
+    finding = {"severity": "critical", "file": ".council/runs/old/sample-1.json", "line": 1,
+               "claim": "The run state is part of the change.",
+               "proof": {"kind": "diff", "params": {"path": ".council/runs/old/sample-1.json",
+                                                    "line": 1, "mode": "added"}}}
+    report = review(ReviewRequest(repo=repo, run_id="r11"),
+                    lambda _: body({"security": [finding]}))
+    assert report.verdict is Verdict.PASS
+
+
 def test_a_review_reports_whether_its_state_directory_is_ignored(tmp_path: Path) -> None:
     repo, _ = make_repo(tmp_path)
     first = review(ReviewRequest(repo=repo, run_id="r8"), lambda _: body())

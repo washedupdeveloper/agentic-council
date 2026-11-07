@@ -85,6 +85,12 @@ def test_a_timeout_is_a_failure(tmp_path: Path) -> None:
     assert "timed out" in result.detail
 
 
+def test_a_missing_flag_value_is_a_start_failure() -> None:
+    with pytest.raises(SystemExit) as raised:
+        main(["--registry"])
+    assert raised.value.code == 3
+
+
 def test_the_document_is_generated_from_the_registry(tmp_path: Path) -> None:
     """The page cannot list a claim the registry does not have, or miss one it does."""
     registry = write(tmp_path, VALID)
