@@ -1,4 +1,4 @@
-"""Seven proof kinds returning PROVEN, REFUTED, or UNRUNNABLE when the check
+"""Six proof kinds returning PROVEN, REFUTED, or UNRUNNABLE when the check
 cannot be made here. `command` is an argv list allowlisted by name: no shell."""
 
 from __future__ import annotations
@@ -212,11 +212,6 @@ def proof_http(params: Mapping[str, Any], ctx: ProofContext) -> ProofOutcome:
     return _failed(f"GET {url} returned {status}, not {expected}")
 
 
-def proof_dom(params: Mapping[str, Any], ctx: ProofContext) -> ProofOutcome:
-    _str_param(params, "selector")
-    return _cannot("no browser executor is built yet: the dom proof cannot be made on this host")
-
-
 def change_lines(diff: str) -> dict[str, tuple[set[int], set[int]]]:
     """path -> (line numbers added in the new file, line numbers removed from the old).
 
@@ -276,7 +271,6 @@ EXECUTORS: dict[str, Callable[[Mapping[str, Any], ProofContext], ProofOutcome]] 
     "command": proof_command,
     "json": proof_json,
     "http": proof_http,
-    "dom": proof_dom,
     "diff": proof_diff,
 }
 

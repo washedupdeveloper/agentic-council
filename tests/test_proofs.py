@@ -12,7 +12,8 @@ from pathlib import Path
 import pytest
 
 from council.findings import State
-from council.proofs import ProofContext, change_lines, run_proof
+from council.proofs import EXECUTORS, ProofContext, change_lines, run_proof
+from council.schema import PROOF_KINDS
 
 ALLOW = frozenset({"true", "false", "sh", "jq"})
 
@@ -154,10 +155,15 @@ def test_an_unreachable_url_cannot_run(tmp_path: Path) -> None:
     assert outcome.state is State.UNRUNNABLE
 
 
-def test_dom_is_unrunnable_in_this_build(tmp_path: Path) -> None:
+def test_dom_is_not_a_proof_kind(tmp_path: Path) -> None:
+    """A kind the tool cannot run is not offered: DOM claims cite a `command` proof."""
     outcome = run_proof("dom", {"selector": "#x"}, ctx(tmp_path))
     assert outcome.state is State.UNRUNNABLE
-    assert "browser" in outcome.detail
+    assert "not a proof kind" in outcome.detail
+
+
+def test_every_declared_kind_has_an_executor() -> None:
+    assert set(PROOF_KINDS) == set(EXECUTORS)
 
 
 # --- diff -------------------------------------------------------------------

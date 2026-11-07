@@ -47,7 +47,7 @@ cannot list a claim that has no check behind it.
 
 One call, five sections (`security`, `correctness`, `readability`,
 `architecture`, `performance`), one JSON object. A finding without a proof from
-the closed set (`absent`, `present`, `command`, `json`, `http`, `dom`, `diff`)
+the closed set (`absent`, `present`, `command`, `json`, `http`, `diff`)
 is refused by the parser, not by the prompt alone.
 
 The prompt ships with the tool at `src/council/prompts/reviewer.md`; `--prompt`
@@ -79,6 +79,7 @@ fixtures/                 the six-rung corpus and the golden rounds from v1.9.0
 
 ## What is not here
 
-- `dom` proofs: the executor returns `UNRUNNABLE`. A gap, not a pass.
+- A browser. A DOM claim is a `command` proof: the repository runs its own
+  browser test, and the tool only records whether it passed.
 - Calibration: there is no score, so there is nothing to calibrate.
 - A replacement for v1: 1.9.0 is untouched; this is a separate checkout.

@@ -48,3 +48,4 @@ registry, so it cannot describe a claim that has no check.
 | `the-skill-names-only-real-commands` | Every command in skills/council/SKILL.md exists in the CLI. | `python3 -m pytest tests/test_skill.py -q` |
 | `a-run-id-cannot-escape` | A run id containing a path separator is refused as a start failure, not a traceback. | `python3 -m pytest tests/test_run.py::test_a_run_id_with_a_separator_is_refused -q` |
 | `a-missing-registry-is-not-incomplete` | A registry that cannot be read exits 3; 2 stays reserved for an incomplete review. | `python3 -m pytest tests/test_cli.py::test_verify_with_a_missing_registry_is_not_incomplete -q` |
+| `every-proof-kind-has-an-executor` | The contract and the executor table are the same set: no kind is offered that cannot run. | `python3 -m pytest tests/test_proofs.py::test_every_declared_kind_has_an_executor -q` |

@@ -35,7 +35,6 @@ Each finding is:
 | `command` | `{"argv": ["tool", "arg"], "expect": {"exit": "zero"}}` |
 | `json` | `{"path": "data.json", "pointer": "/a/b", "equals": 3}` |
 | `http` | `{"url": "http://127.0.0.1:8000/", "expect_status": 200}` |
-| `dom` | `{"selector": "#id", "expect": "present"}` |
 | `diff` | `{"path": "a.py", "line": 12, "mode": "added"}` |
 
 ## Rules
@@ -45,6 +44,7 @@ Each finding is:
 - If you cannot name a proof for a finding, do not report the finding.
 - Report only what this change introduces or fails to fix.
 - Keep each `claim` under 160 characters: a long answer is a truncated answer.
+- For a rendered page, cite a `command` proof that runs the project's own browser test.
 - Every section is present, even when empty.
 - `file` is a path from the repository root, without a leading `./`.
 - `line` is 1-based and inside the file.
