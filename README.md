@@ -45,9 +45,11 @@ One call, five sections (`security`, `correctness`, `readability`,
 the closed set (`absent`, `present`, `command`, `json`, `http`, `dom`, `diff`)
 is refused by the parser, not by the prompt alone.
 
-The prompt is `prompts/reviewer.md` — edit it without touching code. Every run
-records a digest over the template, the profile and the dimensions; two runs are
-comparable only when the digest matches.
+The prompt ships with the tool at `src/council/prompts/reviewer.md`; `--prompt`
+names a different one. It is deliberately **not** read from the repository under
+review — otherwise the code being judged could supply a prompt that reports
+nothing. Every run records a digest over the template, the profile and the
+dimensions; two runs are comparable only when the digest matches.
 
 ## Layout
 
@@ -60,7 +62,7 @@ src/council/schema.py     the reviewer's output contract
 src/council/prompt.py     render the template, digest the instrument
 src/council/sample.py     one sample: run, retry once, record
 src/council/claims.py     the claim registry and its runner
-prompts/reviewer.md       the prompt you can edit
+src/council/prompts/      the reviewer prompt, shipped with the tool
 fixtures/                 the six-rung corpus and the golden rounds from v1.9.0
 ```
 

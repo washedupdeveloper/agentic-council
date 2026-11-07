@@ -108,3 +108,48 @@ check = "python3 -m pytest tests/test_pipeline.py::test_a_committed_secret_the_d
 id = "evidence-that-cannot-run-is-incomplete"
 text = "A blocking finding whose proof cannot run produces INCOMPLETE and exit 2."
 check = "python3 -m pytest tests/test_pipeline.py::test_a_claim_whose_proof_cannot_run_is_incomplete -q"
+
+[[claim]]
+id = "review-exits-1-on-a-proven-finding"
+text = "A review with a proven blocking finding exits 1."
+check = "python3 -m pytest tests/test_cli.py::test_fail_exits_one -q"
+
+[[claim]]
+id = "review-exits-2-when-evidence-is-missing"
+text = "A review whose evidence is missing exits 2, not 1 and not 0."
+check = "python3 -m pytest tests/test_cli.py::test_incomplete_exits_two -q"
+
+[[claim]]
+id = "report-mode-always-exits-zero"
+text = "With --report the verdict is advice, so the exit code is 0."
+check = "python3 -m pytest tests/test_cli.py::test_report_mode_exits_zero_even_on_failure -q"
+
+[[claim]]
+id = "a-usage-error-is-not-incomplete"
+text = "A command-line misuse exits 3, leaving 2 to mean incomplete."
+check = "python3 -m pytest tests/test_cli.py::test_a_usage_error_exits_three -q"
+
+[[claim]]
+id = "a-run-never-overwrites-a-run-id"
+text = "A run whose directory already exists is refused."
+check = "python3 -m pytest tests/test_run.py::test_a_run_id_is_never_overwritten -q"
+
+[[claim]]
+id = "a-run-writes-its-samples-and-verdict"
+text = "A review writes one sample file per sample and a verdict.json beside them."
+check = "python3 -m pytest tests/test_run.py::test_a_proven_finding_is_written_and_fails -q"
+
+[[claim]]
+id = "the-runner-passes-the-prompt-as-a-file"
+text = "The Hermes runner sends the prompt with --query-file, so no text is shell-interpreted."
+check = "python3 -m pytest tests/test_runner.py::test_the_prompt_is_written_verbatim -q"
+
+[[claim]]
+id = "the-reviewed-repository-cannot-supply-the-instrument"
+text = "A prompt committed to the repository under review is ignored."
+check = "python3 -m pytest tests/test_run.py::test_the_reviewed_repository_cannot_supply_the_instrument -q"
+
+[[claim]]
+id = "an-explicit-prompt-is-recorded-by-digest"
+text = "Choosing a prompt with --prompt changes the recorded instrument digest."
+check = "python3 -m pytest tests/test_run.py::test_an_explicit_prompt_is_used_and_its_digest_recorded -q"

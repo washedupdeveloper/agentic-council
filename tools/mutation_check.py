@@ -71,6 +71,18 @@ MUTATIONS: tuple[Mutation, ...] = (
              "adjudicate.py",
              "if adjudication.failed_samples and result.verdict is Verdict.PASS:",
              "if False:"),
+    Mutation("report-mode-is-ignored",
+             "cli.py", "return 0 if args.report else report.exit_code",
+             "return report.exit_code"),
+    Mutation("a-usage-error-reuses-the-incomplete-code",
+             "cli.py", "EXIT_ERROR = 3", "EXIT_ERROR = 2"),
+    Mutation("a-run-may-overwrite-an-old-one",
+             "run.py", "if directory.exists():", "if False:"),
+    Mutation("failed-samples-are-forgotten",
+             "run.py", "failed_samples=[sample.index for sample in samples if not sample.ok],",
+             "failed_samples=[],"),
+    Mutation("a-missing-prompt-is-not-refused",
+             "run.py", "if not prompt_file.exists():", "if False:"),
 )
 
 

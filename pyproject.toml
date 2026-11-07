@@ -10,10 +10,14 @@ requires-python = ">=3.11"
 dependencies = []
 
 [project.scripts]
+council = "council.cli:main"
 council-verify = "council.claims:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+council = ["prompts/*.md"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
