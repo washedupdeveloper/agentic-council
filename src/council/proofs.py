@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any, Callable, Mapping
 
 from .findings import State
+from .sandbox import argv as sandbox_argv
 
 SKIP_DIRS = frozenset({".git", ".council", ".venv", "__pycache__", "node_modules", ".mypy_cache"})
 
@@ -24,6 +25,7 @@ class ProofContext:
     allow: frozenset[str]
     diff: str | None = None
     timeout: int = 120
+    sandbox: bool = True
 
 
 @dataclass(frozen=True, slots=True)
@@ -139,9 +141,17 @@ def proof_command(params: Mapping[str, Any], ctx: ProofContext) -> ProofOutcome:
     if mode not in ("zero", "nonzero"):
         raise _BadParams("params.expect.exit: expected 'zero' or 'nonzero'")
 
+    command = argv
+    if ctx.sandbox:
+        wrapped = sandbox_argv(argv, ctx.repo)
+        if wrapped is None:
+            return _cannot("bwrap is not installed: command proofs run in a sandbox "
+                           "(install bubblewrap, or set [proofs] sandbox = false)")
+        command = wrapped
+
     try:
         proc = subprocess.run(
-            argv, cwd=ctx.repo, capture_output=True, text=True, timeout=ctx.timeout, check=False
+            command, cwd=ctx.repo, capture_output=True, text=True, timeout=ctx.timeout, check=False
         )
     except FileNotFoundError:
         return _cannot(f"{binary!r} is not installed on this host")
@@ -149,6 +159,15 @@ def proof_command(params: Mapping[str, Any], ctx: ProofContext) -> ProofOutcome:
         return _cannot(f"{' '.join(argv)} did not finish within {ctx.timeout}s")
     except OSError as exc:
         return _cannot(f"{binary!r} could not be started: {exc}")
+
+    if proc.returncode != 0 and (proc.stderr or "").startswith("bwrap:"):
+        first = (proc.stderr or "").strip().splitlines()[0]
+        return _cannot(f"the sandbox could not start: {first}")
+
+    if proc.returncode != 0 and "read-only file system" in (proc.stderr or "").lower():
+        tail = (proc.stderr or "").strip().splitlines()
+        return _cannot("the command needed to write inside the repository, which the "
+                       f"sandbox mounts read-only: {tail[-1] if tail else 'EROFS'}")
 
     passed = proc.returncode == 0 if mode == "zero" else proc.returncode != 0
     if passed:

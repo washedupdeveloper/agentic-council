@@ -7,6 +7,8 @@ where the claim holds and once where it does not.
 from __future__ import annotations
 
 import json
+import shutil
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -15,11 +17,23 @@ from council.findings import State
 from council.proofs import EXECUTORS, ProofContext, change_lines, run_proof
 from council.schema import PROOF_KINDS
 
-ALLOW = frozenset({"true", "false", "sh", "jq"})
+ALLOW = frozenset({"true", "false", "sh", "jq", "python3"})
 
 
 def ctx(repo: Path, *, diff: str | None = None) -> ProofContext:
-    return ProofContext(repo=repo, allow=ALLOW, diff=diff, timeout=10)
+    return ProofContext(repo=repo, allow=ALLOW, diff=diff, timeout=10, sandbox=False)
+
+
+def sandbox_ctx(repo: Path) -> ProofContext:
+    return ProofContext(repo=repo, allow=ALLOW, timeout=20, sandbox=True)
+
+
+def _userns_ok() -> bool:
+    bwrap = shutil.which("bwrap")
+    if bwrap is None:
+        return False
+    return subprocess.run([bwrap, "--unshare-all", "--ro-bind", "/", "/", "/bin/true"],
+                          capture_output=True).returncode == 0
 
 
 def write(repo: Path, name: str, text: str) -> Path:
@@ -120,6 +134,36 @@ def test_a_path_instead_of_a_name_cannot_run(tmp_path: Path) -> None:
 
 def test_a_shell_command_runs_only_when_the_shell_is_allowed(tmp_path: Path) -> None:
     assert run_proof("command", {"argv": ["sh", "-c", "exit 0"]}, ctx(tmp_path)).state is State.PROVEN
+
+
+NETWORK_PROBE = "import socket; socket.create_connection(('1.1.1.1', 80), 2)"
+
+
+def test_without_bwrap_a_command_proof_does_not_run(tmp_path: Path,
+                                                    monkeypatch: pytest.MonkeyPatch) -> None:
+    """No sandbox is not a reason to run unsandboxed: it is a reason to say so."""
+    monkeypatch.setattr("council.sandbox.shutil.which", lambda _: None)
+    outcome = run_proof("command", {"argv": ["true"]}, sandbox_ctx(tmp_path))
+    assert outcome.state is State.UNRUNNABLE
+    assert "bwrap" in outcome.detail
+
+
+@pytest.mark.skipif(not _userns_ok(), reason="user namespaces are unavailable here")
+def test_the_sandbox_blocks_the_network(tmp_path: Path) -> None:
+    outcome = run_proof("command",
+                        {"argv": ["python3", "-c", NETWORK_PROBE],
+                         "expect": {"exit": "nonzero"}},
+                        sandbox_ctx(tmp_path))
+    assert outcome.state is State.PROVEN, outcome.detail
+
+
+@pytest.mark.skipif(not _userns_ok(), reason="user namespaces are unavailable here")
+def test_the_sandbox_makes_the_repository_read_only(tmp_path: Path) -> None:
+    (tmp_path / "a.txt").write_text("x\n", encoding="utf-8")
+    outcome = run_proof("command", {"argv": ["sh", "-c", "echo y > a.txt"]},
+                        sandbox_ctx(tmp_path))
+    assert outcome.state is State.UNRUNNABLE
+    assert "read-only" in outcome.detail
 
 
 # --- json -------------------------------------------------------------------

@@ -60,6 +60,8 @@ dimensions; two runs are comparable only when the digest matches.
 
 `nix build .#image` → an OCI tarball with `council`, `git` and `bash`. It carries
 the tool, not the reviewer: mount one at `/bin/hermes` or pass `--reviewer`.
+Command proofs need user namespaces; a runtime that blocks them makes those
+proofs `UNRUNNABLE`, never unsandboxed.
 
 ## Layout
 
@@ -71,17 +73,25 @@ src/council/paths.py      where a run's artefacts live
 src/council/schema.py     the reviewer's output contract
 src/council/prompt.py     render the template, digest the instrument
 src/council/sample.py     one sample: run, retry once, record
+src/council/proofs.py     the six proof kinds
+src/council/sandbox.py    bubblewrap: no network, read-only tree
 src/council/claims.py     the claim registry and its runner
 src/council/prompts/      the reviewer prompt, shipped with the tool
 skills/council/           the agent-facing skill
 fixtures/                 the six-rung corpus and the golden rounds from v1.9.0
 ```
 
+## The sandbox
+
+A `command` proof runs under `bubblewrap`: no network, the whole filesystem
+read-only (the repository included), a private `/tmp` and `$HOME`, and a cleared
+environment. A proof that needs to write into the tree is `UNRUNNABLE`, not
+refuted. `[proofs] sandbox = false` opts out; without `bwrap` on `PATH` the same
+proofs are `UNRUNNABLE` and never fall back to running unsandboxed.
+
 ## What is not here
 
 - A browser. A DOM claim is a `command` proof: the repository runs its own
   browser test, and the tool only records whether it passed.
-- A sandbox. `command` proofs run with your user's rights; `[proofs].allow`
-  limits *which* tool runs, not what it does.
 - Calibration: there is no score, so there is nothing to calibrate.
 - A replacement for v1: 1.9.0 is untouched; this is a separate checkout.

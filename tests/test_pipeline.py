@@ -36,7 +36,7 @@ def sample_body(findings: dict[str, list[dict[str, object]]]) -> str:
 
 def pipeline(tmp_path: Path, body: str) -> tuple[Verdict, int]:
     result = run_sample("prompt", lambda _: body)
-    context = ProofContext(repo=tmp_path, allow=ALLOW, diff=DIFF, timeout=10)
+    context = ProofContext(repo=tmp_path, allow=ALLOW, diff=DIFF, timeout=10, sandbox=False)
     outcome = verdict(adjudicate(merge([result]), context))
     return outcome.verdict, outcome.exit_code
 
@@ -95,5 +95,6 @@ def test_a_finding_in_a_second_hunk_is_settled(tmp_path: Path) -> None:
     }]})
     result = run_sample("prompt", lambda _: body)
     outcome = verdict(adjudicate(merge([result]),
-                                 ProofContext(repo=tmp_path, allow=ALLOW, diff=diff, timeout=10)))
+                                 ProofContext(repo=tmp_path, allow=ALLOW, diff=diff, timeout=10,
+                                              sandbox=False)))
     assert outcome.verdict is Verdict.FAIL

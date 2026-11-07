@@ -9,7 +9,7 @@
       each = f: nixpkgs.lib.genAttrs systems (system: f nixpkgs.legacyPackages.${system});
 
       # Defined once: the package and the image ship the same application.
-      app = pkgs: pkgs.python3Packages.buildPythonApplication {
+      base = pkgs: pkgs.python3Packages.buildPythonApplication {
         pname = "council";
         version = "0.1.0";
         format = "pyproject";
@@ -21,6 +21,15 @@
           mainProgram = "council";
         };
       };
+
+      # bwrap is on the binary's own PATH: a sandboxed proof must not depend on
+      # whatever the caller's environment happens to contain.
+      app = pkgs: pkgs.runCommand "council-0.1.0" { nativeBuildInputs = [ pkgs.makeWrapper ]; } ''
+        mkdir -p $out/bin
+        makeWrapper ${base pkgs}/bin/council $out/bin/council \
+          --prefix PATH : ${pkgs.bubblewrap}/bin
+        ln -s ${base pkgs}/bin/council-verify $out/bin/council-verify
+      '';
 
       # One interpreter with the two tools the checks need, so `nix develop`,
       # `nix build` and `nix flake check` agree on the versions.
@@ -41,7 +50,7 @@
         image = pkgs.dockerTools.buildLayeredImage {
           name = "council";
           tag = "0.1.0";
-          contents = [ pkgs.bash pkgs.coreutils pkgs.git pkgs.cacert (app pkgs) ];
+          contents = [ pkgs.bash pkgs.coreutils pkgs.git pkgs.cacert pkgs.bubblewrap (app pkgs) ];
           config = {
             Entrypoint = [ "/bin/council" ];
             Env = [ "PATH=/bin" "HOME=/tmp" "GIT_SSL_CAINFO=/etc/ssl/certs/ca-bundle.crt" ];
@@ -58,7 +67,7 @@
           # Each check runs in a writable copy: the flake source in the store is
           # read-only, and pytest, mypy and the mutation check all write.
           mkCheck = name: command: pkgs.runCommand name {
-            nativeBuildInputs = [ py pkgs.git ];
+            nativeBuildInputs = [ py pkgs.git pkgs.bubblewrap ];
           } ''
             cp -r ${src} work
             chmod -R u+w work
@@ -88,7 +97,7 @@
 
       devShells = each (pkgs: {
         default = pkgs.mkShell {
-          packages = [ (pythonEnv pkgs) pkgs.git pkgs.ruff pkgs.jq ];
+          packages = [ (pythonEnv pkgs) pkgs.git pkgs.ruff pkgs.jq pkgs.bubblewrap ];
           shellHook = ''
             echo "council devshell — $(python --version 2>&1)"
             echo "  python -m pytest     the suite"

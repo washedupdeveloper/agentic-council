@@ -48,6 +48,19 @@ def test_a_non_list_allow_is_refused(tmp_path: Path) -> None:
         load(write(tmp_path, '[proofs]\nallow = "rg"\n'))
 
 
+def test_the_sandbox_is_on_by_default(tmp_path: Path) -> None:
+    assert load(tmp_path / "council.toml").sandbox is True
+
+
+def test_the_sandbox_can_be_turned_off_explicitly(tmp_path: Path) -> None:
+    assert load(write(tmp_path, "[proofs]\nsandbox = false\n")).sandbox is False
+
+
+def test_a_non_boolean_sandbox_is_refused(tmp_path: Path) -> None:
+    with pytest.raises(ConfigError, match="sandbox"):
+        load(write(tmp_path, '[proofs]\nsandbox = "no"\n'))
+
+
 def test_a_non_positive_timeout_is_refused(tmp_path: Path) -> None:
     with pytest.raises(ConfigError, match="positive"):
         load(write(tmp_path, "[proofs]\ntimeout = 0\n"))

@@ -15,7 +15,7 @@ ALLOW = frozenset({"true"})
 
 
 def ctx(repo: Path) -> ProofContext:
-    return ProofContext(repo=repo, allow=ALLOW, diff=None, timeout=5)
+    return ProofContext(repo=repo, allow=ALLOW, diff=None, timeout=5, sandbox=False)
 
 
 def merged(severity: str = "high", kind: str = "present",

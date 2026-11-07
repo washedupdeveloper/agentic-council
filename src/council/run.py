@@ -219,7 +219,8 @@ def review(request: ReviewRequest, runner: Runner) -> Report:
     merged = merge(samples)
     adjudication = adjudicate(
         merged,
-        ProofContext(repo=root, allow=config.allow, diff=diff, timeout=config.timeout),
+        ProofContext(repo=root, allow=config.allow, diff=diff, timeout=config.timeout,
+                     sandbox=config.sandbox),
         failed_samples=[sample.index for sample in samples if not sample.ok],
     )
     result = verdict(adjudication)

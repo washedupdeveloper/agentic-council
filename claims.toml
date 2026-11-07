@@ -248,3 +248,8 @@ check = "python3 -m pytest tests/test_adjudicate.py::test_any_proof_that_holds_s
 id = "the-digest-covers-the-contract"
 text = "The instrument digest changes when the proof contract changes, not only the prompt."
 check = "python3 -m pytest tests/test_prompt.py::test_the_digest_changes_with_the_contract -q"
+
+[[claim]]
+id = "a-command-proof-is-never-unsandboxed"
+text = "Without bubblewrap a command proof is UNRUNNABLE; it never falls back to running unsandboxed."
+check = "python3 -m pytest tests/test_proofs.py::test_without_bwrap_a_command_proof_does_not_run -q"

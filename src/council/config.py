@@ -9,10 +9,9 @@ from pathlib import Path
 
 CONFIG_NAME = "council.toml"
 
-#: The tools this repository trusts a proof to run. Not a boundary: `nix` builds
-#: and `python3` executes, so anything here can run repository code with your
-#: rights. A real boundary is a sandbox; this is a list of known tools, and
-#: removing one interpreter closes a spelling, not the hole.
+#: The tools this repository trusts a proof to name. `command` proofs are
+#: sandboxed (see `sandbox.py`); this list decides which tools may be named at
+#: all, and is a convenience filter rather than a boundary.
 DEFAULT_ALLOW: frozenset[str] = frozenset(
     {"rg", "grep", "git", "jq", "test", "stat", "python3", "nix"}
 )
@@ -26,6 +25,7 @@ class ConfigError(ValueError):
 class Config:
     allow: frozenset[str] = DEFAULT_ALLOW
     timeout: int = 120
+    sandbox: bool = True
 
 
 def load(path: Path) -> Config:
@@ -41,7 +41,7 @@ def load(path: Path) -> Config:
     proofs = raw.get("proofs", {})
     if not isinstance(proofs, dict):
         raise ConfigError("[proofs] must be a table")
-    unknown = set(proofs) - {"allow", "timeout"}
+    unknown = set(proofs) - {"allow", "timeout", "sandbox"}
     if unknown:
         raise ConfigError(f"unknown key(s) in [proofs]: {', '.join(sorted(unknown))}")
 
@@ -57,4 +57,8 @@ def load(path: Path) -> Config:
     if not isinstance(timeout, int) or timeout < 1:
         raise ConfigError("[proofs].timeout must be a positive integer")
 
-    return Config(allow=allow, timeout=timeout)
+    sandbox = proofs.get("sandbox", True)
+    if not isinstance(sandbox, bool):
+        raise ConfigError("[proofs].sandbox must be true or false")
+
+    return Config(allow=allow, timeout=timeout, sandbox=sandbox)
