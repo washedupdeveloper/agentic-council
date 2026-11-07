@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -116,6 +117,21 @@ def test_verify_runs_the_registry_and_passes(tmp_path: Path) -> None:
     registry.write_text('[[claim]]\nid = "x"\ntext = "It holds."\ncheck = "true"\n',
                         encoding="utf-8")
     assert cli.main(["verify", "--registry", str(registry)]) == 0
+
+
+def test_init_adds_the_state_directory(tmp_path: Path) -> None:
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    assert cli.main(["init", "-C", str(tmp_path)]) == 0
+    assert ".council/" in (tmp_path / ".gitignore").read_text(encoding="utf-8")
+
+
+def test_verify_writes_and_checks_the_page(tmp_path: Path) -> None:
+    registry = tmp_path / "claims.toml"
+    registry.write_text('[[claim]]\nid = "x"\ntext = "It holds."\ncheck = "true"\n',
+                        encoding="utf-8")
+    page = tmp_path / "CLAIMS.md"
+    assert cli.main(["verify", "--registry", str(registry), "--write", str(page)]) == 0
+    assert cli.main(["verify", "--registry", str(registry), "--check", str(page)]) == 0
 
 
 def test_verify_fails_when_a_claim_is_false(tmp_path: Path) -> None:

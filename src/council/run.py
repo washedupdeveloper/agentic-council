@@ -67,6 +67,7 @@ class Report:
     result: Result
     samples: tuple[SampleResult, ...]
     prompt: Path | None = None
+    ignored: bool = True
 
     @property
     def verdict(self) -> Verdict:
@@ -96,15 +97,39 @@ def repo_root(path: Path) -> Path:
         raise ReviewError(f"{path} is not inside a git repository: {exc}") from exc
 
 
+def state_dir_ignored(root: Path) -> bool:
+    """Whether `.council/` is ignored here, so a review does not dirty `git status`."""
+    proc = subprocess.run(["git", "check-ignore", "-q", ".council"], cwd=root,
+                          capture_output=True, text=True, timeout=30)
+    return proc.returncode == 0
+
+
+IGNORE_LINE = ".council/"
+
+
+def init(repo: Path) -> bool:
+    """Add `.council/` to the repository's `.gitignore`. True if it was added."""
+    root = repo_root(repo)
+    path = root / ".gitignore"
+    existing = path.read_text(encoding="utf-8") if path.exists() else ""
+    if any(line.strip().rstrip("/") == ".council" for line in existing.splitlines()):
+        return False
+    prefix = "" if not existing or existing.endswith("\n") else "\n"
+    with path.open("a", encoding="utf-8", newline="\n") as handle:
+        handle.write(f"{prefix}{IGNORE_LINE}\n")
+    return True
+
+
 def _write_verdict(run_dir: Path, request: ReviewRequest, base: str, head: str,
-                   digest: str, prompt: Path, samples: tuple[SampleResult, ...],
-                   result: Result) -> None:
+                   digest: str, prompt: Path, ignored: bool,
+                   samples: tuple[SampleResult, ...], result: Result) -> None:
     payload = {
         "run": run_dir.name,
         "base": base,
         "head": head,
         "digest": digest,
         "prompt": str(prompt),
+        "state_dir_ignored": ignored,
         "profile": request.profile,
         "samples_requested": request.samples,
         "samples": [
@@ -164,5 +189,7 @@ def review(request: ReviewRequest, runner: Runner) -> Report:
         failed_samples=[sample.index for sample in samples if not sample.ok],
     )
     result = verdict(adjudication)
-    _write_verdict(directory, request, base, head, digest, prompt_file, samples, result)
-    return Report(directory, base, head, digest, result, samples, prompt_file)
+    ignored = state_dir_ignored(root)
+    _write_verdict(directory, request, base, head, digest, prompt_file, ignored,
+                   samples, result)
+    return Report(directory, base, head, digest, result, samples, prompt_file, ignored)

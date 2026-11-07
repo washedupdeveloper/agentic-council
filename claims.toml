@@ -163,3 +163,13 @@ check = "python3 -m pytest tests/test_cli.py::test_the_run_id_is_passed_through 
 id = "the-claims-document-matches-the-registry"
 text = "docs/CLAIMS.md is generated from claims.toml, so it cannot list a claim that has no check."
 check = "python3 -m pytest tests/test_claims.py::test_the_document_is_generated_from_the_registry -q"
+
+[[claim]]
+id = "a-review-says-when-its-state-directory-is-ignored"
+text = "A run records whether .council/ is ignored, so a review does not quietly dirty git status."
+check = "python3 -m pytest tests/test_run.py::test_a_review_reports_whether_its_state_directory_is_ignored -q"
+
+[[claim]]
+id = "init-adds-the-state-directory-once"
+text = "council init adds .council/ to .gitignore exactly once and keeps the existing file."
+check = "python3 -m pytest tests/test_run.py::test_init_adds_the_line_once tests/test_run.py::test_init_keeps_an_existing_file_intact -q"

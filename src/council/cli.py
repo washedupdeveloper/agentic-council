@@ -13,7 +13,8 @@ from pathlib import Path
 from typing import NoReturn, Sequence
 
 from . import claims as claim_registry
-from .run import DEFAULT_PROFILE, DEFAULT_SAMPLES, Report, ReviewError, ReviewRequest, review
+from .run import (DEFAULT_PROFILE, DEFAULT_SAMPLES, Report, ReviewError, ReviewRequest,
+                  init as init_repo, review)
 from .runner import hermes_runner
 
 EXIT_ERROR = 3
@@ -49,6 +50,13 @@ def build_parser() -> argparse.ArgumentParser:
     verify = sub.add_parser("verify", help="run every claim in the registry")
     verify.add_argument("--registry", type=Path, default=Path("claims.toml"))
     verify.add_argument("--list", action="store_true", help="list the claims without running them")
+    verify.add_argument("--write", type=Path, default=None,
+                        help="write the registry as markdown")
+    verify.add_argument("--check", type=Path, default=None,
+                        help="fail if the given markdown is not what the registry renders")
+
+    init = sub.add_parser("init", help="add .council/ to the repository's .gitignore")
+    init.add_argument("-C", "--repo", type=Path, default=Path("."))
     return parser
 
 
@@ -69,7 +77,20 @@ def main(argv: Sequence[str] | None = None) -> int:
         verify_argv = ["--registry", str(args.registry)]
         if args.list:
             verify_argv.append("--list")
+        if args.write is not None:
+            verify_argv += ["--write", str(args.write)]
+        if args.check is not None:
+            verify_argv += ["--check", str(args.check)]
         return claim_registry.main(verify_argv)
+
+    if args.command == "init":
+        try:
+            added = init_repo(args.repo)
+        except ReviewError as exc:
+            print(f"council: {exc}", file=sys.stderr)
+            return EXIT_ERROR
+        print("added .council/ to .gitignore" if added else ".council/ is already ignored")
+        return 0
 
     try:
         report = review(
@@ -86,6 +107,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         print((report.run_dir / "verdict.json").read_text(encoding="utf-8"), end="")
     else:
         _print_report(report)
+
+    if not report.ignored:
+        print("note: .council/ is not ignored here; run `council init` to keep git clean",
+              file=sys.stderr)
 
     return 0 if args.report else report.exit_code
 

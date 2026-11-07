@@ -9,6 +9,7 @@ from typing import Any
 
 import pytest
 
+from council import run
 from council.prompt import instrument_digest
 from council.run import (DEFAULT_PROFILE, ReviewError, ReviewRequest, default_prompt,
                          review)
@@ -145,3 +146,28 @@ def test_a_run_id_is_never_overwritten(tmp_path: Path) -> None:
 def test_a_directory_outside_a_repository_is_refused(tmp_path: Path) -> None:
     with pytest.raises(ReviewError, match="not inside a git repository"):
         review(ReviewRequest(repo=tmp_path, run_id="r7"), lambda _: body())
+
+
+def test_a_review_reports_whether_its_state_directory_is_ignored(tmp_path: Path) -> None:
+    repo, _ = make_repo(tmp_path)
+    first = review(ReviewRequest(repo=repo, run_id="r8"), lambda _: body())
+    assert first.ignored is False
+
+    assert run.init(repo) is True
+    second = review(ReviewRequest(repo=repo, run_id="r9"), lambda _: body())
+    assert second.ignored is True
+
+
+def test_init_adds_the_line_once(tmp_path: Path) -> None:
+    repo, _ = make_repo(tmp_path)
+    assert run.init(repo) is True
+    assert run.init(repo) is False
+    text = (repo / ".gitignore").read_text(encoding="utf-8")
+    assert text.count(".council/") == 1
+
+
+def test_init_keeps_an_existing_file_intact(tmp_path: Path) -> None:
+    repo, _ = make_repo(tmp_path)
+    (repo / ".gitignore").write_text("*.log", encoding="utf-8")
+    assert run.init(repo) is True
+    assert (repo / ".gitignore").read_text(encoding="utf-8") == "*.log\n.council/\n"
