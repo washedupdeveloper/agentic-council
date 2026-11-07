@@ -10,11 +10,24 @@ from typing import NoReturn, Sequence
 from . import claims as claim_registry
 from .config import ConfigError
 from .repo import ReviewError, init as init_repo
-from .run import DEFAULT_PROFILE, DEFAULT_SAMPLES, Report, ReviewRequest, review
+from .run import DEFAULT_PROFILE, Report, ReviewRequest, review
 from .runner import hermes_runner
 from .verdict import Verdict
 
 EXIT_ERROR = 3
+
+
+def _samples(value: str) -> int | None:
+    """`--samples auto` or a positive count."""
+    if value == "auto":
+        return None
+    try:
+        number = int(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("expected a number or 'auto'") from exc
+    if number < 1:
+        raise argparse.ArgumentTypeError("expected at least 1")
+    return number
 
 
 class _Parser(argparse.ArgumentParser):
@@ -33,8 +46,8 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("-C", "--repo", type=Path, default=Path("."),
                      help="repository to review (default: the current directory)")
     run.add_argument("--base", help="revision to diff against (default: origin/HEAD, then HEAD~1)")
-    run.add_argument("--samples", type=int, default=DEFAULT_SAMPLES,
-                     help=f"reviewer samples to run (default: {DEFAULT_SAMPLES})")
+    run.add_argument("--samples", type=_samples, default=None,
+                     help="samples: N, or auto (default: 1 clean, 2 to confirm, 3 to break a tie)")
     run.add_argument("--profile", default=DEFAULT_PROFILE, help="Hermes profile to ask")
     run.add_argument("--reviewer", default="hermes",
                      help="binary that answers a sample (default: hermes)")

@@ -57,7 +57,7 @@ Every flag the tool accepts, what it changes, and why it exists. `council <comma
 |---|---|---|---|
 | `-C, --repo PATH` | `.` | the checkout to review | a review is about a repository, not a shell's idea of a directory |
 | `--base REV` | `origin/HEAD`, else `HEAD~1` | where the diff starts | a wrong base still produces a confident verdict, so the default is a chain and each step is checked |
-| `--samples N` | 1 | reviewer samples to ask, merged by place | one sample is cheap; more samples survive a model's bad day |
+| `--samples N` | auto | samples to ask: N, or auto — 1 clean, 2 to confirm a finding, 3 to break a tie | one sample is cheap; a second confirms a finding; a third only when the model disagrees with itself |
 | `--profile NAME` | `council-generalist` | the Hermes profile asked | the instrument is a profile, not a string in the prompt |
 | `--reviewer BIN` | `hermes` | the binary that answers a sample | the corpus harness needs a stub, and another host may need another binary |
 | `--prompt PATH` | the shipped prompt | a different instrument | experiments must not edit the prompt the gate uses |

@@ -74,3 +74,6 @@ registry, so it cannot describe a claim that has no check.
 | `http-is-not-a-proof-kind` | Retrieval is context, not evidence: `http` is not a proof kind. | `python3 -m pytest tests/test_proofs.py::test_http_is_not_a_proof_kind -q` |
 | `a-caller-supplied-reference-reaches-the-prompt` | A URL the caller names is fetched and recorded, and its text reaches the prompt. | `python3 -m pytest tests/test_run.py::test_a_caller_supplied_reference_reaches_the_prompt_and_the_verdict -q` |
 | `a-reference-is-bounded` | A reference larger than the limit is refused, not silently truncated. | `python3 -m pytest tests/test_reference.py::test_a_reference_over_the_limit_is_refused -q` |
+| `auto-sampling-stops-when-clean` | A clean first sample is the only sample. | `python3 -m pytest tests/test_run.py::test_auto_sampling_stops_after_one_clean_sample -q` |
+| `auto-sampling-confirms-a-finding` | A sample that reports a blocking finding is asked for a second opinion. | `python3 -m pytest tests/test_run.py::test_auto_sampling_confirms_a_finding_with_a_second_sample -q` |
+| `auto-sampling-breaks-a-tie` | Samples that disagree are asked a third time, and the disagreement is recorded. | `python3 -m pytest tests/test_run.py::test_auto_sampling_asks_a_third_when_the_samples_disagree -q` |

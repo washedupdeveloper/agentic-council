@@ -13,7 +13,7 @@ from .adjudicate import adjudicate, verdict
 from .base import resolve_base
 from .config import CONFIG_NAME, load as load_config
 from .context import Context, build as build_context
-from .findings import Finding
+from .findings import Finding, blocks
 from .merge import merge
 from .paths import run_dir as run_path
 from .prompt import instrument_digest, render
@@ -24,8 +24,8 @@ from .repo import (ReviewError, Skipped, diff, output, python_files,
 from .sample import Runner, SampleResult, run_sample, write_sample
 from .verdict import Result, Verdict
 
-DEFAULT_SAMPLES = 1
 DEFAULT_PROFILE = "council-generalist"
+AUTO_MAX = 3
 
 
 def default_prompt() -> Path:
@@ -42,7 +42,7 @@ def default_prompt() -> Path:
 class ReviewRequest:
     repo: Path
     base: str | None = None
-    samples: int = DEFAULT_SAMPLES
+    samples: int | None = None
     profile: str = DEFAULT_PROFILE
     run_id: str | None = None
     prompt: Path | None = None
@@ -78,6 +78,41 @@ class Report:
         return self.result.exit_code
 
 
+def _blocking_key(sample: SampleResult) -> frozenset[tuple[str, str, int, str]] | None:
+    """What a sample says would block, independent of wording or proof order."""
+    if sample.output is None:
+        return None
+    return frozenset((item.dimension, item.file, item.line, item.severity)
+                     for item in sample.output.findings
+                     if blocks(item.dimension, item.severity))
+
+
+def _samples(prompt: str, runner: Runner,
+             requested: int | None) -> tuple[tuple[SampleResult, ...], int, bool | None]:
+    """Fixed N, or auto: one clean sample, two to confirm a finding, three to break a tie."""
+    if requested is not None:
+        fixed = tuple(run_sample(prompt, runner, index=index)
+                      for index in range(1, requested + 1))
+        return fixed, requested, None
+
+    first = run_sample(prompt, runner, index=1)
+    if first.output is None:
+        # The retry inside `run_sample` already covered a flaky reviewer; asking
+        # a missing binary two more times only multiplies the same error.
+        return (first,), 1, None
+    if not first.output.findings:
+        return (first,), 1, True
+
+    results = [first, run_sample(prompt, runner, index=2)]
+    agreed: bool | None = (results[1].output is not None
+                           and _blocking_key(first) == _blocking_key(results[1]))
+    if not agreed and len(results) < AUTO_MAX:
+        results.append(run_sample(prompt, runner, index=3))
+        keys = [key for key in (_blocking_key(sample) for sample in results) if key is not None]
+        agreed = len(set(keys)) == 1 if keys else None
+    return tuple(results), len(results), agreed
+
+
 def _reader(root: Path) -> Callable[[str], str | None]:
     """Read a repository-relative file, refusing anything that resolves outside it."""
     base = root.resolve()
@@ -107,7 +142,8 @@ def _write_verdict(run_dir: Path, request: ReviewRequest, base: str, head: str,
                    samples: tuple[SampleResult, ...], result: Result, *,
                    worktree: bool, diff_sha256: str,
                    skipped: tuple[Skipped, ...], context: Context,
-                   references: tuple[Reference, ...]) -> None:
+                   references: tuple[Reference, ...],
+                   samples_run: int, agreement: bool | None) -> None:
     payload = {
         "run": run_dir.name,
         "base": base,
@@ -118,7 +154,9 @@ def _write_verdict(run_dir: Path, request: ReviewRequest, base: str, head: str,
         "prompt": str(prompt),
         "state_dir_ignored": ignored,
         "profile": request.profile,
-        "samples_requested": request.samples,
+        "samples_requested": request.samples if request.samples is not None else "auto",
+        "samples_run": samples_run,
+        "agreement": agreement,
         "samples": [
             {"index": sample.index, "ok": sample.ok, "attempts": sample.attempts,
              "error": sample.error, "findings": len(sample.output.findings)
@@ -150,7 +188,7 @@ def _write_verdict(run_dir: Path, request: ReviewRequest, base: str, head: str,
 
 def review(request: ReviewRequest, runner: Runner) -> Report:
     """Run one review and write every artefact under `.council/runs/<id>/`."""
-    if request.samples < 1:
+    if request.samples is not None and request.samples < 1:
         raise ReviewError("samples must be at least 1")
 
     root = repo_root(request.repo)
@@ -186,8 +224,7 @@ def review(request: ReviewRequest, runner: Runner) -> Report:
         raise ReviewError(f"run {run_id!r} already exists at {directory}")
 
     prompt = render(template, base=base, diff=patch, context=prompt_context)
-    samples = tuple(run_sample(prompt, runner, index=index)
-                    for index in range(1, request.samples + 1))
+    samples, samples_run, agreement = _samples(prompt, runner, request.samples)
     for sample in samples:
         write_sample(directory, sample)
 
@@ -204,6 +241,7 @@ def review(request: ReviewRequest, runner: Runner) -> Report:
     ignored = state_dir_ignored(root)
     _write_verdict(directory, request, base, head, digest, prompt_file, ignored,
                    samples, result, worktree=True, diff_sha256=diff_sha256,
-                   skipped=change.skipped, context=context, references=references)
+                   skipped=change.skipped, context=context, references=references,
+                   samples_run=samples_run, agreement=agreement)
     return Report(directory, base, head, digest, result, samples, prompt_file, ignored,
                   change.skipped, diff_sha256, context.digest)

@@ -123,6 +123,52 @@ def test_a_caller_supplied_reference_reaches_the_prompt_and_the_verdict(tmp_path
     assert "REFERENCE TEXT" in seen[0]
 
 
+def test_auto_sampling_stops_after_one_clean_sample(tmp_path: Path) -> None:
+    repo, _ = make_repo(tmp_path)
+    calls: list[str] = []
+
+    def runner(prompt: str) -> str:
+        calls.append(prompt)
+        return body()
+
+    report = review(ReviewRequest(repo=repo, run_id="r-auto1"), runner)
+    payload = json.loads((report.run_dir / "verdict.json").read_text(encoding="utf-8"))
+    assert len(calls) == 1
+    assert payload["samples_requested"] == "auto"
+    assert payload["samples_run"] == 1
+    assert payload["agreement"] is True
+
+
+def test_auto_sampling_confirms_a_finding_with_a_second_sample(tmp_path: Path) -> None:
+    repo, _ = make_repo(tmp_path)
+    calls: list[str] = []
+
+    def runner(prompt: str) -> str:
+        calls.append(prompt)
+        return body({"security": [secret()]})
+
+    review(ReviewRequest(repo=repo, run_id="r-auto2"), runner)
+    assert len(calls) == 2
+
+
+def test_auto_sampling_asks_a_third_when_the_samples_disagree(tmp_path: Path) -> None:
+    repo, _ = make_repo(tmp_path)
+    answers = [body({"security": [secret()]}),
+               body({"security": [secret(line=1, claim="A different place.")]}),
+               body({"security": [secret()]})]
+    calls: list[str] = []
+
+    def runner(prompt: str) -> str:
+        calls.append(prompt)
+        return answers[len(calls) - 1]
+
+    report = review(ReviewRequest(repo=repo, run_id="r-auto3"), runner)
+    payload = json.loads((report.run_dir / "verdict.json").read_text(encoding="utf-8"))
+    assert len(calls) == 3
+    assert payload["samples_run"] == 3
+    assert payload["agreement"] is False
+
+
 def test_every_sample_is_written_even_when_one_fails(tmp_path: Path) -> None:
     repo, _ = make_repo(tmp_path)
     calls: list[int] = []

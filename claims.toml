@@ -333,3 +333,18 @@ check = "python3 -m pytest tests/test_run.py::test_a_caller_supplied_reference_r
 id = "a-reference-is-bounded"
 text = "A reference larger than the limit is refused, not silently truncated."
 check = "python3 -m pytest tests/test_reference.py::test_a_reference_over_the_limit_is_refused -q"
+
+[[claim]]
+id = "auto-sampling-stops-when-clean"
+text = "A clean first sample is the only sample."
+check = "python3 -m pytest tests/test_run.py::test_auto_sampling_stops_after_one_clean_sample -q"
+
+[[claim]]
+id = "auto-sampling-confirms-a-finding"
+text = "A sample that reports a blocking finding is asked for a second opinion."
+check = "python3 -m pytest tests/test_run.py::test_auto_sampling_confirms_a_finding_with_a_second_sample -q"
+
+[[claim]]
+id = "auto-sampling-breaks-a-tie"
+text = "Samples that disagree are asked a third time, and the disagreement is recorded."
+check = "python3 -m pytest tests/test_run.py::test_auto_sampling_asks_a_third_when_the_samples_disagree -q"
