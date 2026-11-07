@@ -187,6 +187,29 @@ def test_the_run_directory_is_not_part_of_the_change(tmp_path: Path) -> None:
     assert report.verdict is Verdict.PASS
 
 
+def test_a_user_diff_prefix_cannot_hide_a_change(tmp_path: Path) -> None:
+    """`diff.dstPrefix` would rename every path in the patch; the parser pins a/ and b/."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    for argv in (["init", "-q"], ["config", "user.email", "t@e.invalid"],
+                 ["config", "user.name", "t"]):
+        subprocess.run(["git", *argv], cwd=repo, check=True)
+    (repo / "app.py").write_text("x = 1\n", encoding="utf-8")
+    subprocess.run(["git", "add", "-A"], cwd=repo, check=True)
+    subprocess.run(["git", "commit", "-qm", "one"], cwd=repo, check=True)
+    (repo / "app.py").write_text("x = 1\ny = 2\n", encoding="utf-8")
+    subprocess.run(["git", "add", "-A"], cwd=repo, check=True)
+    subprocess.run(["git", "commit", "-qm", "two"], cwd=repo, check=True)
+    subprocess.run(["git", "config", "diff.dstPrefix", "new/"], cwd=repo, check=True)
+
+    finding = {"severity": "critical", "file": "app.py", "line": 2,
+               "claim": "A line is added.", "proof": {"kind": "diff",
+               "params": {"path": "app.py", "line": 2, "mode": "added"}}}
+    report = review(ReviewRequest(repo=repo, run_id="r12"),
+                    lambda _: body({"security": [finding]}))
+    assert report.verdict is Verdict.FAIL
+
+
 def test_a_review_reports_whether_its_state_directory_is_ignored(tmp_path: Path) -> None:
     repo, _ = make_repo(tmp_path)
     first = review(ReviewRequest(repo=repo, run_id="r8"), lambda _: body())

@@ -53,3 +53,4 @@ registry, so it cannot describe a claim that has no check.
 | `the-run-directory-is-not-the-change` | The tool's own untracked artefacts never enter the diff. | `python3 -m pytest tests/test_run.py::test_the_run_directory_is_not_part_of_the_change -q` |
 | `a-bad-config-is-a-start-failure` | A council.toml the tool refuses exits 3 with a message, not a traceback. | `python3 -m pytest tests/test_cli.py::test_a_bad_config_is_a_start_failure -q` |
 | `a-missing-flag-value-is-a-start-failure` | A flag with no value exits 3 from either entry point. | `python3 -m pytest tests/test_claims.py::test_a_missing_flag_value_is_a_start_failure -q` |
+| `a-user-diff-prefix-cannot-hide-a-change` | A user's diff.dstPrefix setting cannot rename the paths a proof cites. | `python3 -m pytest tests/test_run.py::test_a_user_diff_prefix_cannot_hide_a_change -q` |

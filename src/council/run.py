@@ -112,7 +112,8 @@ def _untracked_diff(root: Path) -> str:
 
 def _diff(root: Path, base: str) -> str:
     """The change as a patch: tracked edits, plus new files git leaves out."""
-    tracked = _git(root, "-c", "color.ui=false", "diff", "--no-color", "--no-ext-diff", base)
+    tracked = _git(root, "-c", "color.ui=false", "-c", "diff.srcPrefix=a/",
+                   "-c", "diff.dstPrefix=b/", "diff", "--no-color", "--no-ext-diff", base)
     return tracked + _untracked_diff(root)
 
 

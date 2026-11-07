@@ -228,3 +228,8 @@ check = "python3 -m pytest tests/test_cli.py::test_a_bad_config_is_a_start_failu
 id = "a-missing-flag-value-is-a-start-failure"
 text = "A flag with no value exits 3 from either entry point."
 check = "python3 -m pytest tests/test_claims.py::test_a_missing_flag_value_is_a_start_failure -q"
+
+[[claim]]
+id = "a-user-diff-prefix-cannot-hide-a-change"
+text = "A user's diff.dstPrefix setting cannot rename the paths a proof cites."
+check = "python3 -m pytest tests/test_run.py::test_a_user_diff_prefix_cannot_hide_a_change -q"
