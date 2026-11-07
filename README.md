@@ -46,6 +46,57 @@ non-zero if any claim is false. `docs/CLAIMS.md` is generated from it
 (`council verify --write docs/CLAIMS.md`) and checked in the flake, so the page
 cannot list a claim that has no check behind it.
 
+## Flags
+
+Every flag the tool accepts, what it changes, and why it exists. `council <command>
+--help` prints the same set from the parser; a test keeps this table and the parser in step.
+
+### `council review`
+
+| flag | default | what it does | why |
+|---|---|---|---|
+| `-C, --repo PATH` | `.` | the checkout to review | a review is about a repository, not a shell's idea of a directory |
+| `--base REV` | `origin/HEAD`, else `HEAD~1` | where the diff starts | a wrong base still produces a confident verdict, so the default is a chain and each step is checked |
+| `--samples N` | 1 | reviewer samples to ask, merged by place | one sample is cheap; more samples survive a model's bad day |
+| `--profile NAME` | `council-generalist` | the Hermes profile asked | the instrument is a profile, not a string in the prompt |
+| `--reviewer BIN` | `hermes` | the binary that answers a sample | the corpus harness needs a stub, and another host may need another binary |
+| `--prompt PATH` | the shipped prompt | a different instrument | experiments must not edit the prompt the gate uses |
+| `--report` | off | exit 0 whatever the verdict | advice in a hook that must not block |
+| `--json` | off | print `verdict.json` | the machine-readable form, byte-identical to the artefact |
+| `--run-id ID` | timestamp | name the run; refused if it exists | two runs are comparable only when they can be named |
+| `-h, --help` | — | usage | — |
+
+### `council verify`
+
+| flag | default | what it does | why |
+|---|---|---|---|
+| `--registry PATH` | `claims.toml` | the claims to run | the registry is the project's own contract, and a fork may carry another |
+| `--list` | off | print the claims without running them | reading the contract must not execute it |
+| `--write PATH` | — | render the registry as markdown | the documentation is generated, never hand-edited |
+| `--check PATH` | — | fail if the file differs from the registry | a stale page is a failing check, not a review note |
+| `-h, --help` | — | usage | — |
+
+### `council init`
+
+| flag | default | what it does | why |
+|---|---|---|---|
+| `-C, --repo PATH` | `.` | the checkout to add `.council/` to | the state directory is per repository |
+| `-h, --help` | — | usage | — |
+
+## Architecture
+
+A pure core and an enumerated effect shell. `findings`, `verdict`, `merge`, `schema`,
+`prompt` and `paths` may not import `subprocess`, `urllib`, `os`, `time`, `random`,
+`shutil`, `tempfile` or `sys`, and may not call `open`, `write_text`, `write_bytes`,
+`mkdir`, `unlink`, `rename`, `run`, `Popen`, `system` or `urlopen`. A test enforces it
+(`tests/test_architecture.py`), because "the verdict is a pure function" is a claim about
+the whole path from parsed sample to `Result`, not about one function.
+
+Everything that acts is in a module a reader can name: `repo` (git), `proofs` and
+`sandbox` (commands), `sample` and `runner` (the model), `config` (the repository's
+file), `run` (writes the run), `cli` (stdout), `claims` (runs the registry). That is the
+whole of the side effects.
+
 ## The reviewer contract
 
 One call, five sections (`security`, `correctness`, `readability`,

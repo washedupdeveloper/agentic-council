@@ -63,3 +63,5 @@ registry, so it cannot describe a claim that has no check.
 | `a-proven-security-finding-blocks` | A proven security finding fails the run at any severity. | `python3 -m pytest tests/test_verdict.py::test_a_proven_low_security_finding_blocks -q` |
 | `a-symlinked-state-directory-is-refused` | A `.council` symlink cannot move a run's writes outside the checkout. | `python3 -m pytest tests/test_paths.py::test_a_symlinked_state_directory_is_refused -q` |
 | `an-incomplete-review-is-announced` | An INCOMPLETE verdict says on stderr that a merge is blocked. | `python3 -m pytest tests/test_cli.py::test_incomplete_is_announced_explicitly -q` |
+| `the-decision-path-is-pure` | The modules from parsed sample to verdict import and call nothing that acts. | `python3 -m pytest tests/test_architecture.py -q` |
+| `every-flag-is-documented` | Every flag the CLI accepts appears in the README. | `python3 -m pytest tests/test_docs.py::test_every_flag_is_documented -q` |

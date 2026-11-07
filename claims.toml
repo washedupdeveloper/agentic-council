@@ -278,3 +278,13 @@ check = "python3 -m pytest tests/test_paths.py::test_a_symlinked_state_directory
 id = "an-incomplete-review-is-announced"
 text = "An INCOMPLETE verdict says on stderr that a merge is blocked."
 check = "python3 -m pytest tests/test_cli.py::test_incomplete_is_announced_explicitly -q"
+
+[[claim]]
+id = "the-decision-path-is-pure"
+text = "The modules from parsed sample to verdict import and call nothing that acts."
+check = "python3 -m pytest tests/test_architecture.py -q"
+
+[[claim]]
+id = "every-flag-is-documented"
+text = "Every flag the CLI accepts appears in the README."
+check = "python3 -m pytest tests/test_docs.py::test_every_flag_is_documented -q"
