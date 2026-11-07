@@ -45,3 +45,4 @@ registry, so it cannot describe a claim that has no check.
 | `the-differential-explains-its-differences` | Against v1.9.0's fixtures: clean is PASS, defects is INCOMPLETE, and the difference is named. | `python3 -m pytest tests/test_differential.py -q` |
 | `a-sample-inside-a-tool-transcript-is-read` | A reviewer answer that arrives inside a tool transcript is parsed, not discarded. | `python3 -m pytest tests/test_schema.py::test_json_inside_a_tool_transcript_is_read -q` |
 | `a-failed-sample-keeps-what-it-said` | A sample that does not parse keeps the raw answer, so the failure can be read. | `python3 -m pytest tests/test_sample.py::test_a_failed_sample_keeps_the_raw_answer -q` |
+| `the-skill-names-only-real-commands` | Every command in skills/council/SKILL.md exists in the CLI. | `python3 -m pytest tests/test_skill.py -q` |

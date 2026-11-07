@@ -188,3 +188,8 @@ check = "python3 -m pytest tests/test_schema.py::test_json_inside_a_tool_transcr
 id = "a-failed-sample-keeps-what-it-said"
 text = "A sample that does not parse keeps the raw answer, so the failure can be read."
 check = "python3 -m pytest tests/test_sample.py::test_a_failed_sample_keeps_the_raw_answer -q"
+
+[[claim]]
+id = "the-skill-names-only-real-commands"
+text = "Every command in skills/council/SKILL.md exists in the CLI."
+check = "python3 -m pytest tests/test_skill.py -q"

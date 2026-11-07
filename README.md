@@ -73,6 +73,7 @@ src/council/prompt.py     render the template, digest the instrument
 src/council/sample.py     one sample: run, retry once, record
 src/council/claims.py     the claim registry and its runner
 src/council/prompts/      the reviewer prompt, shipped with the tool
+skills/council/           the agent-facing skill
 fixtures/                 the six-rung corpus and the golden rounds from v1.9.0
 ```
 
