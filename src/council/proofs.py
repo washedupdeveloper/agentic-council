@@ -1,15 +1,5 @@
-"""Seven ways to settle a claim.
-
-Each executor returns one of two outcomes: the claim held, or it did not. The
-states that are not outcomes — `UNSETTLED`, `UNRUNNABLE` — are returned when the
-check could not be made, and they are distinct on purpose: one means nobody
-tried, the other means it was tried and this host could not do it.
-
-Nothing here runs a shell. A `command` proof is an argv list whose first element
-must be a bare name on `[proofs].allow`; a path, a shell metacharacter or an
-unlisted binary is `UNRUNNABLE`, which is visible in the verdict rather than
-silently executed or silently ignored.
-"""
+"""Seven proof kinds returning PROVEN, REFUTED, or UNRUNNABLE when the check
+cannot be made here. `command` is an argv list allowlisted by name: no shell."""
 
 from __future__ import annotations
 

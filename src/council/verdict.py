@@ -1,9 +1,5 @@
-"""The verdict: one function, one type, three outcomes.
-
-`judge(findings)` is the whole decision. It is a pure function over the states
-the evidence reached — no threshold, no score, no calibration, no clock. A
-number may be reported beside a verdict as a trend; it can never change it.
-"""
+"""`judge(findings)` is the whole decision: no threshold, no score, no clock.
+A number may sit beside a verdict as a trend; it cannot change it."""
 
 from __future__ import annotations
 

@@ -1,9 +1,7 @@
 """A finding is a claim; its state says what the evidence settled.
 
-The vocabulary is closed on purpose: four states, four severities, and one
-predicate (`blocks`) that decides whether the state matters to the verdict.
-There is no `confirmed`, no `certified`, no `admission` — a reader who has seen
-`State` knows everything the verdict can depend on.
+Four states, four severities, one `blocks` predicate. No `confirmed`,
+`certified` or `admission`: a reader who knows `State` knows the verdict.
 """
 
 from __future__ import annotations

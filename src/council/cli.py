@@ -1,9 +1,4 @@
-"""The command line: parse, call the deep module, print, exit.
-
-Exit codes are the contract: 0 pass, 1 fail, 2 incomplete, 3 the review could
-not be attempted. `--report` turns any non-passing verdict into 0, which is the
-advice mode a person wants when they are not gating a merge.
-"""
+"""CLI: 0 pass, 1 fail, 2 incomplete, 3 could not start. `--report` exits 0."""
 
 from __future__ import annotations
 

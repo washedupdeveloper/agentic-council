@@ -1,13 +1,5 @@
-"""The claim registry: every claim this project makes is a command that fails.
-
-A claim that lives only in prose is a claim nobody checks. Each entry in
-`claims.toml` names one sentence and the command that would falsify it; `verify`
-runs them all and exits non-zero if any is false, so the documentation and the
-tree cannot disagree for longer than one run.
-
-The registry is also the source for the generated table in `docs/CLAIMS.md`, so
-a new claim cannot be added to the docs without a check to back it.
-"""
+"""`claims.toml` is the source of both `verify` and `docs/CLAIMS.md`: one
+sentence, one command that would falsify it."""
 
 from __future__ import annotations
 

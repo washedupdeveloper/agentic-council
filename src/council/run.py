@@ -1,13 +1,4 @@
-"""One review, from a request to a written run.
-
-This is the deep module: the caller says what to review, and gets a `Report` with
-a verdict, the findings that produced it, and the directory holding every
-artefact. Base resolution, the diff, the prompt, the samples, the merge, the
-proofs, the verdict and the files on disk are all behind that one call.
-
-The runner is a parameter, not a global: tests pass a stub, the CLI passes
-`hermes_runner`, and neither knows how the other works.
-"""
+"""One review: request in, written run out. The runner is a parameter."""
 
 from __future__ import annotations
 

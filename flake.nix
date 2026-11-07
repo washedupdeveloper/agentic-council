@@ -66,6 +66,9 @@
 
           # The suite, broken on purpose eighteen ways. It must notice each one.
           mutations = mkCheck "council-mutations" "python tools/mutation_check.py";
+
+          # v1.9.0's pinned verdicts beside this rule, on the same fixtures.
+          differential = mkCheck "council-differential" "python tools/differential.py";
         });
 
       devShells = each (pkgs: {

@@ -1,9 +1,5 @@
-"""Every merged finding is put to its proof, and the answer becomes its state.
-
-This is the only place a finding acquires a state, and the only place a proof is
-run. A failed sample is carried alongside rather than dropped: a run missing a
-sample knows less than one that has all of them, and says so.
-"""
+"""Proofs become states. A missing sample makes a run INCOMPLETE unless the
+evidence already fails it."""
 
 from __future__ import annotations
 

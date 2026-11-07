@@ -1,15 +1,5 @@
-"""The revision a review is taken against.
-
-A diff needs a left-hand side, and guessing one silently is how a review of the
-wrong change looks exactly like a review of the right one. The order is fixed
-and each step is checked against the repository:
-
-1. `--base <rev>`, if given — and a ref that does not resolve is an error, not
-   a fallback, because the caller asked for something specific;
-2. the merge-base with `origin/HEAD`, which is what a pull request means;
-3. `HEAD~1`;
-4. otherwise refuse, naming all three.
-"""
+"""The base: `--base`, else merge-base with `origin/HEAD`, else `HEAD~1`, else
+refuse. A wrong base looks like a healthy review, so each step is checked."""
 
 from __future__ import annotations
 

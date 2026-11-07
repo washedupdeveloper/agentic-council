@@ -1,9 +1,5 @@
-"""One sample: run it, parse it, retry once, record what happened.
-
-The retry policy is the client's: a failed sample is retried once and then
-reported as a failure, never silently dropped. The caller turns a failure into
-`INCOMPLETE`, because evidence that did not arrive is not evidence of absence.
-"""
+"""One sample: run, parse, retry once, record. A failure is recorded, not
+dropped."""
 
 from __future__ import annotations
 

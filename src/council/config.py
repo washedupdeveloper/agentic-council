@@ -1,9 +1,5 @@
-"""`council.toml`: the few things a repository is allowed to decide.
-
-A key that does nothing is a lie, so unknown keys are refused rather than
-ignored — a misspelt `allow` that silently falls back to the default would look
-exactly like a working allowlist.
-"""
+"""`council.toml`: `[proofs].allow` and `timeout`. Unknown keys are refused, so
+a typo cannot silently restore the default allowlist."""
 
 from __future__ import annotations
 

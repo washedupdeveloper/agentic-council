@@ -1,11 +1,5 @@
-"""Where a run's artefacts live.
-
-Inside the repository, in a gitignored directory, so a run is inspectable beside
-the code it is about — `.council/runs/<id>/`. The shape is the one a cache would
-have (`runs/<id>`), but the location is local: a review is evidence about this
-checkout, and moving it to a global cache separates it from the thing it
-describes.
-"""
+"""Artefacts live at `<repo>/.council/runs/<id>/`: inside the checkout,
+gitignored, one path segment per id."""
 
 from __future__ import annotations
 

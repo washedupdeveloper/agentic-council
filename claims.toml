@@ -173,3 +173,8 @@ check = "python3 -m pytest tests/test_run.py::test_a_review_reports_whether_its_
 id = "init-adds-the-state-directory-once"
 text = "council init adds .council/ to .gitignore exactly once and keeps the existing file."
 check = "python3 -m pytest tests/test_run.py::test_init_adds_the_line_once tests/test_run.py::test_init_keeps_an_existing_file_intact -q"
+
+[[claim]]
+id = "the-differential-explains-its-differences"
+text = "Against v1.9.0's fixtures: clean is PASS, defects is INCOMPLETE, and the difference is named."
+check = "python3 -m pytest tests/test_differential.py -q"

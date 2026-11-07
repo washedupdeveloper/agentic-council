@@ -1,11 +1,4 @@
-"""Five samples, one finding set.
-
-Samples of the same model disagree about wording and sometimes about severity.
-They are merged by where the finding is — dimension, file, line — because that
-is the only part the samples cannot phrase differently. Severity is the highest
-any sample reported (the client's rule), and every sample's wording is kept, so
-the merge is auditable rather than an average nobody can inspect.
-"""
+"""Merge by (dimension, file, line); highest severity wins; order fixed."""
 
 from __future__ import annotations
 

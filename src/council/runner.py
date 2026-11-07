@@ -1,10 +1,5 @@
-"""The real reviewer: one Hermes process per sample.
-
-`--query-file` is used rather than `-q` because the prompt contains arbitrary
-diff text: nothing in it is shell-interpreted. The process is asked to answer and
-exit (`--oneshot -Q`), and a non-zero exit is an `OSError` so the sample's retry
-policy sees it as "the reviewer could not run", not as an empty review.
-"""
+"""One Hermes process per sample, via `--query-file`: no diff text is
+shell-interpreted. A non-zero exit is OSError, so the sample retries."""
 
 from __future__ import annotations
 

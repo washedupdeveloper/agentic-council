@@ -1,11 +1,5 @@
-"""The reviewer prompt: a file you can edit, and a digest that records it.
-
-The template lives in `prompts/reviewer.md` so the customer can tune the
-instrument without touching code. Every run records the digest of the template,
-the profile and the dimensions it used — two runs are only comparable when that
-digest matches, and a prompt edit invalidates the old points visibly instead of
-averaging answers to two different questions.
-"""
+"""The prompt ships in the package; the digest covers template, profile and
+dimensions, so runs of different instruments are never averaged."""
 
 from __future__ import annotations
 

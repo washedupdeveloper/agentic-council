@@ -1,10 +1,5 @@
-"""The reviewer's output contract, enforced before anything is believed.
-
-The model returns one JSON object with five sections. This module turns that
-text into typed findings or refuses it with a path to the exact field that is
-wrong — a sample that cannot be parsed is evidence that did not arrive, not a
-sample with no findings.
-"""
+"""The reviewer's output contract. A refusal names the exact field; an
+unparsable sample is evidence that did not arrive, not "no findings"."""
 
 from __future__ import annotations
 

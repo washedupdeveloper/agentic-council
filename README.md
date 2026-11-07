@@ -34,6 +34,7 @@ council review --report       # advice only: always exits 0
 python3 -m pytest             # the suite
 ./bin/council-verify          # every claim this project makes, executed
 python3 tools/mutation_check.py   # prove the suite can fail
+python3 tools/differential.py     # v1.9.0's verdicts beside this rule
 ```
 
 `claims.toml` is the registry. Each entry is one sentence and the command that
