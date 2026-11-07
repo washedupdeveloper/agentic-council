@@ -83,11 +83,12 @@ fixtures/                 the six-rung corpus and the golden rounds from v1.9.0
 
 ## The sandbox
 
-A `command` proof runs under `bubblewrap`: no network, the whole filesystem
-read-only (the repository included), a private `/tmp` and `$HOME`, and a cleared
-environment. A proof that needs to write into the tree is `UNRUNNABLE`, not
-refuted. `[proofs] sandbox = false` opts out; without `bwrap` on `PATH` the same
-proofs are `UNRUNNABLE` and never fall back to running unsandboxed.
+A `command` proof runs under `bubblewrap`: no network, a read-only root, a
+private `/tmp` and `$HOME`, and a cleared environment. The repository is an
+overlay — a proof may write, and the writes vanish with it. A write anywhere
+else is `UNRUNNABLE`, not refuted. `[proofs] sandbox = false` opts out; without
+`bwrap` on `PATH` the same proofs are `UNRUNNABLE` and never fall back to
+running unsandboxed.
 
 ## What is not here
 

@@ -158,12 +158,22 @@ def test_the_sandbox_blocks_the_network(tmp_path: Path) -> None:
 
 
 @pytest.mark.skipif(not _userns_ok(), reason="user namespaces are unavailable here")
-def test_the_sandbox_makes_the_repository_read_only(tmp_path: Path) -> None:
+def test_the_sandbox_discards_writes_to_the_repository(tmp_path: Path) -> None:
+    """A tool may write; the tree it judges is unchanged when the proof exits."""
     (tmp_path / "a.txt").write_text("x\n", encoding="utf-8")
     outcome = run_proof("command", {"argv": ["sh", "-c", "echo y > a.txt"]},
                         sandbox_ctx(tmp_path))
+    assert outcome.state is State.PROVEN, outcome.detail
+    assert (tmp_path / "a.txt").read_text(encoding="utf-8") == "x\n"
+
+
+@pytest.mark.skipif(not _userns_ok(), reason="user namespaces are unavailable here")
+def test_a_write_outside_the_repository_is_unrunnable(tmp_path: Path) -> None:
+    outcome = run_proof("command", {"argv": ["sh", "-c", "echo y > /etc/zz-sandbox"]},
+                        sandbox_ctx(tmp_path))
     assert outcome.state is State.UNRUNNABLE
     assert "read-only" in outcome.detail
+    assert not Path("/etc/zz-sandbox").exists()
 
 
 # --- json -------------------------------------------------------------------

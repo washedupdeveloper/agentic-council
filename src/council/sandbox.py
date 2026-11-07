@@ -1,12 +1,11 @@
 """The boundary a `command` proof runs in.
 
-bubblewrap, one process: no network, every mount read-only, a private `/tmp` and
-`$HOME`, and a cleared environment. The repository the proof judges is therefore
-read-only too — a proof cannot edit the thing it is evidence about.
+bubblewrap, one process: no network, a read-only root, a private `/tmp` and
+`$HOME`, and a cleared environment. The repository is an overlay with a tmpfs
+upper — a proof may write, and the writes vanish when it exits.
 
-Read-only is not free: a tool that wants to write into the tree fails with
-`EROFS`. That is reported as `UNRUNNABLE` (the check could not be made), never
-as a refutation.
+A write outside the repository (and outside `/tmp`) is EROFS, reported as
+`UNRUNNABLE` (the check could not be made), never as a refutation.
 """
 
 from __future__ import annotations
@@ -41,7 +40,7 @@ def argv(argv: Sequence[str], repo: Path) -> list[str] | None:
         "--proc", "/proc",
         "--tmpfs", "/tmp",
         *mountpoint,
-        "--ro-bind", str(target), str(target),
+        "--overlay-src", str(target), "--tmp-overlay", str(target),
         "--chdir", str(target),
         "--setenv", "PATH", os.environ.get("PATH", "/usr/bin:/bin"),
         "--setenv", "HOME", "/tmp",
