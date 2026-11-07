@@ -17,11 +17,16 @@ DEFAULT_TIMEOUT = 900
 
 @dataclass(frozen=True, slots=True)
 class Claim:
-    """One sentence this project asserts, and the command that proves it."""
+    """One sentence this project asserts, and the command that proves it.
+
+    `falsifier` names the mutation that must break this claim; the mutation run
+    checks both directions, so a check that cannot fail is visible.
+    """
 
     id: str
     text: str
     check: str
+    falsifier: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -58,10 +63,14 @@ def load(path: Path) -> list[Claim]:
         ident = entry.get("id")
         text = entry.get("text")
         check = entry.get("check")
+        falsifier = entry.get("falsifier")
         missing = [k for k, v in (("id", ident), ("text", text), ("check", check))
                    if not isinstance(v, str) or not v.strip()]
         if missing:
             problems.append(f"claim #{index} is missing {', '.join(missing)}")
+            continue
+        if falsifier is not None and (not isinstance(falsifier, str) or not falsifier.strip()):
+            problems.append(f"claim #{index}: falsifier must be a non-empty string")
             continue
         assert isinstance(ident, str) and isinstance(text, str) and isinstance(check, str)
         if ident in seen:
@@ -70,7 +79,7 @@ def load(path: Path) -> list[Claim]:
         seen.add(ident)
         if not text.rstrip().endswith("."):
             problems.append(f"{ident}: the text is a sentence, end it with a period")
-        claims.append(Claim(ident, text, check))
+        claims.append(Claim(ident, text, check, falsifier))
 
     if problems:
         raise RegistryError(f"{path}:\n  - " + "\n  - ".join(problems))

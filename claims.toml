@@ -8,16 +8,19 @@
 id = "verdict-fails-on-proven-blocking"
 text = "A proven high finding fails the run."
 check = "python3 -m pytest tests/test_verdict.py::test_a_proven_high_fails -q"
+falsifier = "fail-branch-reads-refuted"
 
 [[claim]]
 id = "verdict-medium-does-not-block"
 text = "A proven medium finding does not fail the run."
 check = "python3 -m pytest tests/test_verdict.py::test_a_proven_medium_passes -q"
+falsifier = "medium-becomes-blocking"
 
 [[claim]]
 id = "verdict-incomplete-is-not-fail"
 text = "An unsettled high finding makes the run incomplete, not failed."
 check = "python3 -m pytest tests/test_verdict.py::test_an_unsettled_high_is_incomplete -q"
+falsifier = "incomplete-branch-removed"
 
 [[claim]]
 id = "registry-rejects-uncheckable"
@@ -48,6 +51,7 @@ check = "python3 -m pytest tests/test_paths.py::test_runs_are_inside_the_reposit
 id = "a-finding-without-a-proof-is-refused"
 text = "The reviewer contract refuses a finding that carries no proof."
 check = "python3 -m pytest tests/test_schema.py::test_a_finding_without_a_proof_is_refused -q"
+falsifier = "schema-accepts-a-missing-proof"
 
 [[claim]]
 id = "a-bad-sample-is-retried-once"
@@ -63,6 +67,7 @@ check = "python3 -m pytest tests/test_prompt.py::test_the_digest_changes_with_th
 id = "an-unlisted-command-cannot-run"
 text = "A command proof naming an executable that is not on the allowlist cannot run."
 check = "python3 -m pytest tests/test_proofs.py::test_an_unlisted_binary_cannot_run -q"
+falsifier = "proof-allowlist-disabled"
 
 [[claim]]
 id = "a-path-is-not-an-executable"
@@ -73,6 +78,7 @@ check = "python3 -m pytest tests/test_proofs.py::test_a_path_instead_of_a_name_c
 id = "a-diff-proof-reads-every-hunk"
 text = "A diff proof finds an added line in the second hunk of a multi-hunk change."
 check = "python3 -m pytest tests/test_proofs.py::test_a_diff_proof_reads_a_line_in_the_second_hunk -q"
+falsifier = "diff-context-not-counted"
 
 [[claim]]
 id = "a-misspelt-config-key-is-refused"
@@ -83,6 +89,7 @@ check = "python3 -m pytest tests/test_config.py::test_a_misspelt_allow_is_an_err
 id = "the-highest-severity-wins"
 text = "When samples disagree on severity, the highest one is kept."
 check = "python3 -m pytest tests/test_merge.py::test_the_highest_severity_wins -q"
+falsifier = "merge-takes-the-lowest-severity"
 
 [[claim]]
 id = "the-merge-is-order-independent"
@@ -93,6 +100,7 @@ check = "python3 -m pytest tests/test_merge.py::test_the_highest_severity_wins_w
 id = "a-missing-sample-cannot-pass"
 text = "A run missing a sample is incomplete, never a pass."
 check = "python3 -m pytest tests/test_adjudicate.py::test_a_missing_sample_makes_an_otherwise_clean_run_incomplete -q"
+falsifier = "a-missing-sample-can-still-pass"
 
 [[claim]]
 id = "a-missing-sample-cannot-soften-a-failure"
@@ -108,31 +116,37 @@ check = "python3 -m pytest tests/test_pipeline.py::test_a_committed_secret_the_d
 id = "evidence-that-cannot-run-is-incomplete"
 text = "A blocking finding whose proof cannot run produces INCOMPLETE and exit 2."
 check = "python3 -m pytest tests/test_pipeline.py::test_a_claim_whose_proof_cannot_run_is_incomplete -q"
+falsifier = "open-states-narrowed"
 
 [[claim]]
 id = "review-exits-1-on-a-proven-finding"
 text = "A review with a proven blocking finding exits 1."
 check = "python3 -m pytest tests/test_cli.py::test_fail_exits_one -q"
+falsifier = "exit-code-swapped"
 
 [[claim]]
 id = "review-exits-2-when-evidence-is-missing"
 text = "A review whose evidence is missing exits 2, not 1 and not 0."
 check = "python3 -m pytest tests/test_cli.py::test_incomplete_exits_two -q"
+falsifier = "exit-code-swapped"
 
 [[claim]]
 id = "report-mode-always-exits-zero"
 text = "With --report the verdict is advice, so the exit code is 0."
 check = "python3 -m pytest tests/test_cli.py::test_report_mode_exits_zero_even_on_failure -q"
+falsifier = "report-mode-is-ignored"
 
 [[claim]]
 id = "a-usage-error-is-not-incomplete"
 text = "A command-line misuse exits 3, leaving 2 to mean incomplete."
 check = "python3 -m pytest tests/test_cli.py::test_a_usage_error_exits_three -q"
+falsifier = "a-usage-error-reuses-the-incomplete-code"
 
 [[claim]]
 id = "a-run-never-overwrites-a-run-id"
 text = "A run whose directory already exists is refused."
 check = "python3 -m pytest tests/test_run.py::test_a_run_id_is_never_overwritten -q"
+falsifier = "a-run-may-overwrite-an-old-one"
 
 [[claim]]
 id = "a-run-writes-its-samples-and-verdict"
@@ -348,3 +362,33 @@ check = "python3 -m pytest tests/test_run.py::test_auto_sampling_confirms_a_find
 id = "auto-sampling-breaks-a-tie"
 text = "Samples that disagree are asked a third time, and the disagreement is recorded."
 check = "python3 -m pytest tests/test_run.py::test_auto_sampling_asks_a_third_when_the_samples_disagree -q"
+
+[[claim]]
+id = "a-zero-line-is-refused"
+text = "A finding cannot cite line zero."
+check = "python3 -m pytest tests/test_schema.py::test_a_zero_line_is_refused -q"
+falsifier = "schema-accepts-a-zero-line"
+
+[[claim]]
+id = "a-failed-sample-is-retried-once"
+text = "A sample that does not parse is asked once more."
+check = "python3 -m pytest tests/test_sample.py::test_a_bad_sample_is_retried_once -q"
+falsifier = "sample-never-retries"
+
+[[claim]]
+id = "an-unknown-top-level-key-is-refused"
+text = "An unknown top-level key in council.toml is an error."
+check = "python3 -m pytest tests/test_config.py::test_an_unknown_top_level_key_is_refused -q"
+falsifier = "config-ignores-unknown-keys"
+
+[[claim]]
+id = "a-failed-sample-makes-the-run-incomplete"
+text = "A run whose reviewer never answered is incomplete, and its samples are still written."
+check = "python3 -m pytest tests/test_run.py::test_every_sample_is_written_even_when_one_fails -q"
+falsifier = "failed-samples-are-forgotten"
+
+[[claim]]
+id = "a-missing-prompt-is-refused"
+text = "A prompt path that does not exist stops the run before the reviewer is asked."
+check = "python3 -m pytest tests/test_run.py::test_an_explicit_prompt_that_does_not_exist_is_refused -q"
+falsifier = "a-missing-prompt-is-not-refused"

@@ -1,27 +1,38 @@
 """Prove the suite can fail: mutate the rule, expect the tests to catch it.
 
 A test that survives a mutation is decorative — it asserts something the code
-does anyway. This runs a small set of deliberate breakages against a scratch
-copy of `src/`, and fails if any of them passes the suite.
+does anyway. This runs a set of deliberate breakages against a scratch copy of
+`src/`, and fails if any of them passes the suite.
+
+It also ties each mutation to the claims it breaks: a claim may name its
+`falsifier`, and every mutation must falsify at least one claim. Both directions
+are checked, so a check that cannot fail and a mutation nobody notices are both
+visible.
 
 Usage:
     python3 tools/mutation_check.py
 
-Exit 0 when every mutation is caught. This is the check that would have caught
-the two defects the v1 suite missed: a parser that only honoured the last hunk,
-and a threshold that was printed but never compared.
+Exit 0 when every mutation is caught, every declared falsifier breaks its claim,
+and every mutation falsifies at least one claim.
 """
 
 from __future__ import annotations
 
+import re
 import shutil
 import subprocess
 import sys
 import tempfile
+import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT / "src"))
+
+from council.claims import load as load_claims  # noqa: E402
+
+NODE = re.compile(r"(tests/[\w./-]+\.py::[\w\[\]-]+)")
 
 
 @dataclass(frozen=True, slots=True)
@@ -86,17 +97,42 @@ MUTATIONS: tuple[Mutation, ...] = (
 )
 
 
-def run_suite(src: Path) -> int:
-    """Run the suite against a mutated source tree; return pytest's exit code."""
-    return subprocess.run(
-        [sys.executable, "-m", "pytest", "-o", f"pythonpath={src}", "-q", "--no-header",
-         "-p", "no:cacheprovider"],
-        cwd=ROOT, capture_output=True, text=True,
-    ).returncode
+def claim_node(check: str) -> str | None:
+    """The pytest node a claim cites, if it cites one."""
+    match = NODE.search(check)
+    return match.group(1) if match else None
+
+
+def failing_tests(report: Path) -> set[str]:
+    broken: set[str] = set()
+    for case in ET.parse(report).iter("testcase"):
+        if case.find("failure") is None and case.find("error") is None:
+            continue
+        module = case.get("classname", "").replace(".", "/")
+        if module and not module.endswith(".py"):
+            module = f"{module}.py"
+        broken.add(f"{module}::{case.get('name', '')}")
+    return broken
+
+
+def run_suite(src: Path) -> tuple[int, set[str]]:
+    """Run the suite against a mutated tree; return the exit code and failing node ids."""
+    with tempfile.TemporaryDirectory() as raw:
+        report = Path(raw) / "junit.xml"
+        code = subprocess.run(
+            [sys.executable, "-m", "pytest", "-o", f"pythonpath={src}", "-q", "--no-header",
+             "-p", "no:cacheprovider", f"--junitxml={report}"],
+            cwd=ROOT, capture_output=True, text=True,
+        ).returncode
+        return code, failing_tests(report) if report.exists() else set()
 
 
 def main() -> int:
+    claims = load_claims(ROOT / "claims.toml")
+    by_node = {claim_node(claim.check): claim for claim in claims if claim_node(claim.check)}
+
     survivors: list[str] = []
+    falsified: dict[str, set[str]] = {}
     for mutation in MUTATIONS:
         with tempfile.TemporaryDirectory(prefix="council-mut-") as raw:
             src = Path(raw) / "src"
@@ -110,17 +146,38 @@ def main() -> int:
             if mutation.old not in text:
                 print(f"  STALE  {mutation.name}: pattern not found in {mutation.file}")
                 survivors.append(mutation.name)
+                falsified[mutation.name] = set()
                 continue
             target.write_text(text.replace(mutation.old, mutation.new, 1), encoding="utf-8")
-            code = run_suite(src)
+            code, broken = run_suite(src)
             caught = code != 0
             print(f"  {'caught' if caught else 'SURVIVED'}  {mutation.name}")
             if not caught:
                 survivors.append(mutation.name)
+            hit = {by_node[node].id for node in broken if node in by_node}
+            falsified[mutation.name] = hit
+            if hit:
+                print(f"            falsifies {', '.join(sorted(hit))}")
+
+    problems: list[str] = []
+    for claim in claims:
+        if claim.falsifier is None:
+            continue
+        if claim.falsifier not in falsified:
+            problems.append(f"{claim.id}: falsifier {claim.falsifier!r} is not a mutation")
+        elif claim.id not in falsified[claim.falsifier]:
+            problems.append(f"{claim.id}: falsifier {claim.falsifier!r} did not break it")
+    for mutation in MUTATIONS:
+        if not falsified[mutation.name]:
+            problems.append(f"mutation {mutation.name!r} falsifies no claim")
 
     total = len(MUTATIONS)
-    print(f"\n{total - len(survivors)}/{total} mutations caught")
-    return 0 if not survivors else 1
+    declared = sum(1 for claim in claims if claim.falsifier is not None)
+    print(f"\n{total - len(survivors)}/{total} mutations caught; "
+          f"{declared} claim(s) declare a falsifier")
+    for problem in problems:
+        print(f"  PROBLEM {problem}")
+    return 0 if not survivors and not problems else 1
 
 
 if __name__ == "__main__":
