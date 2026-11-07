@@ -71,3 +71,6 @@ registry, so it cannot describe a claim that has no check.
 | `the-context-follows-the-call-chain` | The context follows calls within the repository two deep, then stops. | `python3 -m pytest tests/test_context.py::test_the_call_chain_is_followed_two_deep_and_then_stops -q` |
 | `a-call-the-context-cannot-resolve-is-named` | A call the context cannot resolve is listed, not silently omitted. | `python3 -m pytest tests/test_context.py::test_an_unresolved_call_is_named_not_hidden -q` |
 | `a-run-records-and-sends-the-context` | verdict.json records the context, and the prompt the model receives contains it. | `python3 -m pytest tests/test_run.py::test_the_context_of_a_changed_function_is_recorded_and_sent -q` |
+| `http-is-not-a-proof-kind` | Retrieval is context, not evidence: `http` is not a proof kind. | `python3 -m pytest tests/test_proofs.py::test_http_is_not_a_proof_kind -q` |
+| `a-caller-supplied-reference-reaches-the-prompt` | A URL the caller names is fetched and recorded, and its text reaches the prompt. | `python3 -m pytest tests/test_run.py::test_a_caller_supplied_reference_reaches_the_prompt_and_the_verdict -q` |
+| `a-reference-is-bounded` | A reference larger than the limit is refused, not silently truncated. | `python3 -m pytest tests/test_reference.py::test_a_reference_over_the_limit_is_refused -q` |

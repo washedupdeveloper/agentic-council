@@ -7,8 +7,6 @@ import fnmatch
 import json as jsonlib
 import re
 import subprocess
-import urllib.error
-import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Mapping
@@ -216,20 +214,7 @@ def proof_json(params: Mapping[str, Any], ctx: ProofContext) -> ProofOutcome:
     return _failed(f"{path.name}{pointer} is {value!r}, not {params['equals']!r}")
 
 
-def proof_http(params: Mapping[str, Any], ctx: ProofContext) -> ProofOutcome:
-    url = _str_param(params, "url")
-    expected = _int_param(params, "expect_status")
-    request = urllib.request.Request(url, method="GET")
-    try:
-        with urllib.request.urlopen(request, timeout=min(ctx.timeout, 30)) as response:
-            status = response.status
-    except urllib.error.HTTPError as exc:
-        status = exc.code
-    except (urllib.error.URLError, OSError) as exc:
-        return _cannot(f"{url} could not be reached: {exc}")
-    if status == expected:
-        return _held(f"GET {url} returned {status}")
-    return _failed(f"GET {url} returned {status}, not {expected}")
+
 
 
 def proof_diff(params: Mapping[str, Any], ctx: ProofContext) -> ProofOutcome:
@@ -255,7 +240,6 @@ EXECUTORS: dict[str, Callable[[Mapping[str, Any], ProofContext], ProofOutcome]] 
     "present": proof_present,
     "command": proof_command,
     "json": proof_json,
-    "http": proof_http,
     "diff": proof_diff,
 }
 

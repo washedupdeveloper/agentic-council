@@ -86,6 +86,19 @@ def test_a_usage_error_exits_three() -> None:
     assert raised.value.code == 3
 
 
+def test_the_context_urls_are_passed_through(monkeypatch: pytest.MonkeyPatch) -> None:
+    seen: dict[str, tuple[str, ...]] = {}
+
+    def capture(request: Any, runner: Any) -> Report:
+        seen["urls"] = request.context_urls
+        return report(Verdict.PASS)
+
+    monkeypatch.setattr(cli, "review", capture)
+    assert cli.main(["review", "--context-url", "https://example.invalid/a",
+                     "--context-url", "https://example.invalid/b"]) == 0
+    assert seen["urls"] == ("https://example.invalid/a", "https://example.invalid/b")
+
+
 def test_the_defaults_are_passed_through(monkeypatch: pytest.MonkeyPatch) -> None:
     seen: dict[str, Any] = {}
 

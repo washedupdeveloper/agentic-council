@@ -34,7 +34,6 @@ Each finding is:
 | `present` | `{"path": "a.py", "line": 3, "text": "exact line"}` — that line says this |
 | `command` | `{"argv": ["tool", "arg"], "expect": {"exit": "zero"}}` |
 | `json` | `{"path": "data.json", "pointer": "/a/b", "equals": 3}` |
-| `http` | `{"url": "http://127.0.0.1:8000/", "expect_status": 200}` |
 | `diff` | `{"path": "a.py", "line": 12, "mode": "added"}` |
 
 ## Rules

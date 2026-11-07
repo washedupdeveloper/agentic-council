@@ -204,9 +204,11 @@ def test_json_cannot_resolve_a_missing_pointer(tmp_path: Path) -> None:
 
 # --- http / dom -------------------------------------------------------------
 
-def test_an_unreachable_url_cannot_run(tmp_path: Path) -> None:
+def test_http_is_not_a_proof_kind(tmp_path: Path) -> None:
+    """Retrieval is context, not evidence: the caller fetches, the model does not."""
     outcome = run_proof("http", {"url": "http://127.0.0.1:1/", "expect_status": 200}, ctx(tmp_path))
     assert outcome.state is State.UNRUNNABLE
+    assert "not a proof kind" in outcome.detail
 
 
 def test_dom_is_not_a_proof_kind(tmp_path: Path) -> None:

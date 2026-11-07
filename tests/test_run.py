@@ -102,6 +102,27 @@ def test_the_context_of_a_changed_function_is_recorded_and_sent(tmp_path: Path) 
     assert "## Context" in seen[0]
 
 
+def test_a_caller_supplied_reference_reaches_the_prompt_and_the_verdict(tmp_path: Path) -> None:
+    import tempfile
+
+    repo, _ = make_repo(tmp_path)
+    with tempfile.TemporaryDirectory() as outside:
+        doc = Path(outside) / "doc.txt"
+        doc.write_text("REFERENCE TEXT", encoding="utf-8")
+        seen: list[str] = []
+
+        def runner(prompt: str) -> str:
+            seen.append(prompt)
+            return body()
+
+        report = review(ReviewRequest(repo=repo, run_id="r-ref",
+                                      context_urls=(doc.as_uri(),)), runner)
+
+    payload = json.loads((report.run_dir / "verdict.json").read_text(encoding="utf-8"))
+    assert payload["references"][0]["url"] == doc.as_uri()
+    assert "REFERENCE TEXT" in seen[0]
+
+
 def test_every_sample_is_written_even_when_one_fails(tmp_path: Path) -> None:
     repo, _ = make_repo(tmp_path)
     calls: list[int] = []

@@ -318,3 +318,18 @@ check = "python3 -m pytest tests/test_context.py::test_an_unresolved_call_is_nam
 id = "a-run-records-and-sends-the-context"
 text = "verdict.json records the context, and the prompt the model receives contains it."
 check = "python3 -m pytest tests/test_run.py::test_the_context_of_a_changed_function_is_recorded_and_sent -q"
+
+[[claim]]
+id = "http-is-not-a-proof-kind"
+text = "Retrieval is context, not evidence: `http` is not a proof kind."
+check = "python3 -m pytest tests/test_proofs.py::test_http_is_not_a_proof_kind -q"
+
+[[claim]]
+id = "a-caller-supplied-reference-reaches-the-prompt"
+text = "A URL the caller names is fetched and recorded, and its text reaches the prompt."
+check = "python3 -m pytest tests/test_run.py::test_a_caller_supplied_reference_reaches_the_prompt_and_the_verdict -q"
+
+[[claim]]
+id = "a-reference-is-bounded"
+text = "A reference larger than the limit is refused, not silently truncated."
+check = "python3 -m pytest tests/test_reference.py::test_a_reference_over_the_limit_is_refused -q"

@@ -64,6 +64,7 @@ Every flag the tool accepts, what it changes, and why it exists. `council <comma
 | `--report` | off | exit 0 whatever the verdict | advice in a hook that must not block |
 | `--json` | off | print `verdict.json` | the machine-readable form, byte-identical to the artefact |
 | `--run-id ID` | timestamp | name the run; refused if it exists | two runs are comparable only when they can be named |
+| `--context-url URL` | none | fetch a URL as reference context (repeatable) | retrieval is context, not evidence; the caller names it, never the model |
 | `-h, --help` | — | usage | — |
 
 ### `council verify`
@@ -102,15 +103,15 @@ whole of the side effects.
 `verdict.json` records `base`, `head`, `worktree` (whether local edits were
 included), `diff_sha256`, and `skipped` — every file in the change the diff could
 not carry, with the reason (`too large`, `binary`, `not utf-8`, `unreadable`).
-It also records `context_digest`, the spans the model was shown, and
-`unresolved` — calls the context could not follow. A run states what it did not
-look at.
+It also records `context_digest`, the spans the model was shown,
+`unresolved` — calls the context could not follow — and `references`, the URLs
+the caller asked for, with a digest each. A run states what it did not look at.
 
 ## The reviewer contract
 
 One call, five sections (`security`, `correctness`, `readability`,
 `architecture`, `performance`), one JSON object. A finding without a proof from
-the closed set (`absent`, `present`, `command`, `json`, `http`, `diff`)
+the closed set (`absent`, `present`, `command`, `json`, `diff`)
 is refused by the parser, not by the prompt alone.
 
 The prompt ships with the tool at `src/council/prompts/reviewer.md`; `--prompt`
@@ -141,7 +142,7 @@ src/council/prompt.py     render the template, digest the instrument
 src/council/changes.py    the diff parser, shared by the diff proof and context
 src/council/context.py    the functions around the change, and their calls
 src/council/sample.py     one sample: run, retry once, record
-src/council/proofs.py     the six proof kinds
+src/council/proofs.py     the five proof kinds
 src/council/sandbox.py    bubblewrap: no network, overlay tree
 src/council/claims.py     the claim registry and its runner
 src/council/prompts/      the reviewer prompt, shipped with the tool

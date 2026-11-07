@@ -15,7 +15,7 @@ DIMENSIONS: tuple[str, ...] = (
     "performance",
 )
 SEVERITIES: tuple[str, ...] = ("low", "medium", "high", "critical")
-PROOF_KINDS: tuple[str, ...] = ("absent", "present", "command", "json", "http", "diff")
+PROOF_KINDS: tuple[str, ...] = ("absent", "present", "command", "json", "diff")
 
 
 class SchemaError(ValueError):
