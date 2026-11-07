@@ -148,6 +148,18 @@ def test_a_directory_outside_a_repository_is_refused(tmp_path: Path) -> None:
         review(ReviewRequest(repo=tmp_path, run_id="r7"), lambda _: body())
 
 
+def test_a_run_id_with_a_separator_is_refused(tmp_path: Path) -> None:
+    repo, _ = make_repo(tmp_path)
+    with pytest.raises(ReviewError, match="run id"):
+        review(ReviewRequest(repo=repo, run_id="../escape"), lambda _: body())
+
+
+def test_an_empty_run_id_is_refused(tmp_path: Path) -> None:
+    repo, _ = make_repo(tmp_path)
+    with pytest.raises(ReviewError, match="empty"):
+        review(ReviewRequest(repo=repo, run_id="   "), lambda _: body())
+
+
 def test_a_review_reports_whether_its_state_directory_is_ignored(tmp_path: Path) -> None:
     repo, _ = make_repo(tmp_path)
     first = review(ReviewRequest(repo=repo, run_id="r8"), lambda _: body())

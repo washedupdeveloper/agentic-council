@@ -148,6 +148,11 @@ def test_verify_writes_and_checks_the_page(tmp_path: Path) -> None:
     assert cli.main(["verify", "--registry", str(registry), "--check", str(page)]) == 0
 
 
+def test_verify_with_a_missing_registry_is_not_incomplete(tmp_path: Path) -> None:
+    """2 means a review is incomplete; a registry that cannot be read is 3."""
+    assert cli.main(["verify", "--registry", str(tmp_path / "nope.toml")]) == 3
+
+
 def test_verify_fails_when_a_claim_is_false(tmp_path: Path) -> None:
     registry = tmp_path / "claims.toml"
     registry.write_text('[[claim]]\nid = "x"\ntext = "It does not."\ncheck = "false"\n',

@@ -77,8 +77,8 @@ skills/council/           the agent-facing skill
 fixtures/                 the six-rung corpus and the golden rounds from v1.9.0
 ```
 
-## What is deliberately absent
+## What is not here
 
-No CLI wiring, no proof execution, no merge of samples, no calibration, no
-packaging. Those arrive in later milestones, and each one has to satisfy this
-rule and add its claims to the registry before it exists.
+- `dom` proofs: the executor returns `UNRUNNABLE`. A gap, not a pass.
+- Calibration: there is no score, so there is nothing to calibrate.
+- A replacement for v1: 1.9.0 is untouched; this is a separate checkout.

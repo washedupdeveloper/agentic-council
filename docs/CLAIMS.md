@@ -46,3 +46,5 @@ registry, so it cannot describe a claim that has no check.
 | `a-sample-inside-a-tool-transcript-is-read` | A reviewer answer that arrives inside a tool transcript is parsed, not discarded. | `python3 -m pytest tests/test_schema.py::test_json_inside_a_tool_transcript_is_read -q` |
 | `a-failed-sample-keeps-what-it-said` | A sample that does not parse keeps the raw answer, so the failure can be read. | `python3 -m pytest tests/test_sample.py::test_a_failed_sample_keeps_the_raw_answer -q` |
 | `the-skill-names-only-real-commands` | Every command in skills/council/SKILL.md exists in the CLI. | `python3 -m pytest tests/test_skill.py -q` |
+| `a-run-id-cannot-escape` | A run id containing a path separator is refused as a start failure, not a traceback. | `python3 -m pytest tests/test_run.py::test_a_run_id_with_a_separator_is_refused -q` |
+| `a-missing-registry-is-not-incomplete` | A registry that cannot be read exits 3; 2 stays reserved for an incomplete review. | `python3 -m pytest tests/test_cli.py::test_verify_with_a_missing_registry_is_not_incomplete -q` |

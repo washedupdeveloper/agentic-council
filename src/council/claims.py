@@ -129,7 +129,7 @@ def main(argv: list[str] | None = None) -> int:
         claims = load(registry)
     except RegistryError as exc:
         print(f"claims: {exc}", file=sys.stderr)
-        return 2
+        return 3  # could not start; 2 is reserved for an incomplete review
 
     if "--list" in args:
         for claim in claims:

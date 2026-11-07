@@ -193,3 +193,13 @@ check = "python3 -m pytest tests/test_sample.py::test_a_failed_sample_keeps_the_
 id = "the-skill-names-only-real-commands"
 text = "Every command in skills/council/SKILL.md exists in the CLI."
 check = "python3 -m pytest tests/test_skill.py -q"
+
+[[claim]]
+id = "a-run-id-cannot-escape"
+text = "A run id containing a path separator is refused as a start failure, not a traceback."
+check = "python3 -m pytest tests/test_run.py::test_a_run_id_with_a_separator_is_refused -q"
+
+[[claim]]
+id = "a-missing-registry-is-not-incomplete"
+text = "A registry that cannot be read exits 3; 2 stays reserved for an incomplete review."
+check = "python3 -m pytest tests/test_cli.py::test_verify_with_a_missing_registry_is_not_incomplete -q"

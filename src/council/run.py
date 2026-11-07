@@ -161,8 +161,14 @@ def review(request: ReviewRequest, runner: Runner) -> Report:
     template = prompt_file.read_text(encoding="utf-8")
     digest = instrument_digest(template, profile=request.profile)
 
-    run_id = request.run_id or datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
-    directory = run_path(root, run_id)
+    run_id = (request.run_id if request.run_id is not None
+              else datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S"))
+    if not run_id.strip():
+        raise ReviewError("--run-id must not be empty")
+    try:
+        directory = run_path(root, run_id)
+    except ValueError as exc:
+        raise ReviewError(str(exc)) from exc
     if directory.exists():
         raise ReviewError(f"run {run_id!r} already exists at {directory}")
 
