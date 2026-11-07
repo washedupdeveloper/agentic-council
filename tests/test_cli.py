@@ -119,6 +119,20 @@ def test_verify_runs_the_registry_and_passes(tmp_path: Path) -> None:
     assert cli.main(["verify", "--registry", str(registry)]) == 0
 
 
+def test_the_reviewer_binary_is_passed_through(monkeypatch: pytest.MonkeyPatch) -> None:
+    seen: dict[str, Any] = {}
+
+    def fake_runner(profile: str, **kwargs: Any) -> Any:
+        seen["profile"] = profile
+        seen.update(kwargs)
+        return lambda prompt: "{}"
+
+    monkeypatch.setattr(cli, "hermes_runner", fake_runner)
+    stub(monkeypatch, report(Verdict.PASS))
+    assert cli.main(["review", "--reviewer", "/bin/other"]) == 0
+    assert seen["binary"] == "/bin/other"
+
+
 def test_init_adds_the_state_directory(tmp_path: Path) -> None:
     subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
     assert cli.main(["init", "-C", str(tmp_path)]) == 0

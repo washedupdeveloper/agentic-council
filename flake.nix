@@ -8,6 +8,20 @@
       systems = [ "x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin" ];
       each = f: nixpkgs.lib.genAttrs systems (system: f nixpkgs.legacyPackages.${system});
 
+      # Defined once: the package and the image ship the same application.
+      app = pkgs: pkgs.python3Packages.buildPythonApplication {
+        pname = "council";
+        version = "0.1.0";
+        format = "pyproject";
+        src = self;
+        nativeBuildInputs = [ pkgs.python3Packages.setuptools ];
+        doCheck = false;
+        meta = {
+          description = "A review is a claim until a check settles it.";
+          mainProgram = "council";
+        };
+      };
+
       # One interpreter with the two tools the checks need, so `nix develop`,
       # `nix build` and `nix flake check` agree on the versions.
       pythonEnv = pkgs: pkgs.python3.withPackages (ps: [ ps.pytest ps.mypy ps.setuptools ]);
@@ -21,16 +35,17 @@
     in
     {
       packages = each (pkgs: {
-        default = pkgs.python3Packages.buildPythonApplication {
-          pname = "council";
-          version = "0.1.0";
-          format = "pyproject";
-          src = self;
-          nativeBuildInputs = [ pkgs.python3Packages.setuptools ];
-          doCheck = false;
-          meta = {
-            description = "A review is a claim until a check settles it.";
-            mainProgram = "council";
+        default = app pkgs;
+
+        # The tool, not the reviewer: mount a hermes binary and a repository.
+        image = pkgs.dockerTools.buildLayeredImage {
+          name = "council";
+          tag = "0.1.0";
+          contents = [ pkgs.bash pkgs.coreutils pkgs.git pkgs.cacert (app pkgs) ];
+          config = {
+            Entrypoint = [ "/bin/council" ];
+            Env = [ "PATH=/bin" "HOME=/tmp" "GIT_SSL_CAINFO=/etc/ssl/certs/ca-bundle.crt" ];
+            WorkingDir = "/repo";
           };
         };
       });

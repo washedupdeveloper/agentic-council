@@ -34,6 +34,8 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--samples", type=int, default=DEFAULT_SAMPLES,
                      help=f"reviewer samples to run (default: {DEFAULT_SAMPLES})")
     run.add_argument("--profile", default=DEFAULT_PROFILE, help="Hermes profile to ask")
+    run.add_argument("--reviewer", default="hermes",
+                     help="binary that answers a sample (default: hermes)")
     run.add_argument("--prompt", type=Path, default=None,
                      help="reviewer prompt to use instead of the one shipped with council")
     run.add_argument("--report", action="store_true",
@@ -92,7 +94,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             ReviewRequest(repo=args.repo, base=args.base, samples=args.samples,
                           profile=args.profile, prompt=args.prompt,
                           run_id=args.run_id),
-            hermes_runner(args.profile),
+            hermes_runner(args.profile, binary=args.reviewer),
         )
     except ReviewError as exc:
         print(f"council: {exc}", file=sys.stderr)
