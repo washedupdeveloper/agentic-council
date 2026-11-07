@@ -23,8 +23,7 @@ class MergedFinding:
     severity: str
     claims: tuple[str, ...]
     samples: tuple[int, ...]
-    proof_kind: str
-    proof_params: dict[str, Any]
+    proofs: tuple[tuple[str, dict[str, Any]], ...]
 
 
 def merge(results: Sequence[SampleResult]) -> tuple[MergedFinding, ...]:
@@ -42,6 +41,11 @@ def merge(results: Sequence[SampleResult]) -> tuple[MergedFinding, ...]:
         entries = sorted(buckets[key], key=lambda entry: entry[0])
         highest = max(entries, key=lambda entry: _RANK[entry[1].severity])
         claims = tuple(dict.fromkeys(finding.claim for _, finding in entries))
+        proofs: list[tuple[str, dict[str, Any]]] = []
+        for _, finding in entries:
+            proof = (finding.proof_kind, finding.proof_params)
+            if proof not in proofs:
+                proofs.append(proof)
         merged.append(MergedFinding(
             dimension=key[0],
             file=key[1],
@@ -49,7 +53,6 @@ def merge(results: Sequence[SampleResult]) -> tuple[MergedFinding, ...]:
             severity=highest[1].severity,
             claims=claims,
             samples=tuple(sorted(index for index, _ in entries)),
-            proof_kind=highest[1].proof_kind,
-            proof_params=highest[1].proof_params,
+            proofs=tuple(proofs),
         ))
     return tuple(merged)

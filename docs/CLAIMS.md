@@ -54,3 +54,6 @@ registry, so it cannot describe a claim that has no check.
 | `a-bad-config-is-a-start-failure` | A council.toml the tool refuses exits 3 with a message, not a traceback. | `python3 -m pytest tests/test_cli.py::test_a_bad_config_is_a_start_failure -q` |
 | `a-missing-flag-value-is-a-start-failure` | A flag with no value exits 3 from either entry point. | `python3 -m pytest tests/test_claims.py::test_a_missing_flag_value_is_a_start_failure -q` |
 | `a-user-diff-prefix-cannot-hide-a-change` | A user's diff.dstPrefix setting cannot rename the paths a proof cites. | `python3 -m pytest tests/test_run.py::test_a_user_diff_prefix_cannot_hide_a_change -q` |
+| `a-finding-keeps-every-proof` | When samples report one place with different proofs, every proof is kept and run. | `python3 -m pytest tests/test_merge.py::test_every_samples_proof_is_kept -q` |
+| `any-proof-that-holds-settles-the-finding` | A finding is proven when any of its proofs holds, even if another is refuted. | `python3 -m pytest tests/test_adjudicate.py::test_any_proof_that_holds_settles_the_finding -q` |
+| `the-digest-covers-the-contract` | The instrument digest changes when the proof contract changes, not only the prompt. | `python3 -m pytest tests/test_prompt.py::test_the_digest_changes_with_the_contract -q` |

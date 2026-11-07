@@ -233,3 +233,18 @@ check = "python3 -m pytest tests/test_claims.py::test_a_missing_flag_value_is_a_
 id = "a-user-diff-prefix-cannot-hide-a-change"
 text = "A user's diff.dstPrefix setting cannot rename the paths a proof cites."
 check = "python3 -m pytest tests/test_run.py::test_a_user_diff_prefix_cannot_hide_a_change -q"
+
+[[claim]]
+id = "a-finding-keeps-every-proof"
+text = "When samples report one place with different proofs, every proof is kept and run."
+check = "python3 -m pytest tests/test_merge.py::test_every_samples_proof_is_kept -q"
+
+[[claim]]
+id = "any-proof-that-holds-settles-the-finding"
+text = "A finding is proven when any of its proofs holds, even if another is refuted."
+check = "python3 -m pytest tests/test_adjudicate.py::test_any_proof_that_holds_settles_the_finding -q"
+
+[[claim]]
+id = "the-digest-covers-the-contract"
+text = "The instrument digest changes when the proof contract changes, not only the prompt."
+check = "python3 -m pytest tests/test_prompt.py::test_the_digest_changes_with_the_contract -q"

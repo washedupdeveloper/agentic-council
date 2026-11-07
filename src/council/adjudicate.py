@@ -6,7 +6,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Sequence, cast
 
-from .findings import Finding, Severity
+from .findings import Finding, Severity, State
 from .merge import MergedFinding
 from .proofs import ProofContext, run_proof
 from .verdict import Result, Verdict, judge
@@ -23,15 +23,23 @@ def adjudicate(merged: Sequence[MergedFinding], ctx: ProofContext, *,
     """Run each finding's proof and record what it settled."""
     findings: list[Finding] = []
     for number, item in enumerate(merged, start=1):
-        outcome = run_proof(item.proof_kind, item.proof_params, ctx)
+        outcomes = [run_proof(kind, params, ctx) for kind, params in item.proofs]
+        proven = [o for o in outcomes if o.state is State.PROVEN]
+        unrunnable = [o for o in outcomes if o.state is State.UNRUNNABLE]
+        if proven:
+            state, detail = State.PROVEN, proven[0].detail
+        elif unrunnable:
+            state, detail = State.UNRUNNABLE, unrunnable[0].detail
+        else:
+            state, detail = State.REFUTED, (outcomes[0].detail if outcomes else "no proof")
         findings.append(Finding(
             id=f"F-{number:02d}",
             dimension=item.dimension,
             severity=cast(Severity, item.severity),
-            state=outcome.state,
+            state=state,
             location=f"{item.file}:{item.line}",
             claim=item.claims[0] if item.claims else "",
-            detail=outcome.detail,
+            detail=detail,
         ))
     return Adjudication(tuple(findings), tuple(sorted(failed_samples)))
 

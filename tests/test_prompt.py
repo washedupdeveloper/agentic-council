@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from council.prompt import PromptError, instrument_digest, render
+from council.prompt import CONTRACT, PromptError, instrument_digest, render
+from council.schema import PROOF_KINDS, SEVERITIES
 
 TEMPLATE = "Base {{base}}\n\n{{diff}}"
 
@@ -34,6 +35,16 @@ def test_the_digest_changes_with_the_prompt() -> None:
 
 def test_the_digest_changes_with_the_profile() -> None:
     assert instrument_digest(TEMPLATE, profile="a") != instrument_digest(TEMPLATE, profile="b")
+
+
+def test_the_digest_changes_with_the_contract() -> None:
+    assert instrument_digest(TEMPLATE, profile="p", contract="a") != \
+        instrument_digest(TEMPLATE, profile="p", contract="b")
+
+
+def test_the_contract_names_every_kind_and_severity() -> None:
+    assert all(kind in CONTRACT for kind in PROOF_KINDS)
+    assert all(severity in CONTRACT for severity in SEVERITIES)
 
 
 def test_the_digest_changes_with_the_dimensions() -> None:

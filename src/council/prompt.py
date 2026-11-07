@@ -6,7 +6,11 @@ from __future__ import annotations
 import hashlib
 from typing import Sequence
 
-from .schema import DIMENSIONS
+from .schema import DIMENSIONS, PROOF_KINDS, SEVERITIES
+
+#: The rule a sample was asked under. A prompt change and a contract change are
+#: both instrument changes, so both break the digest.
+CONTRACT = "|".join((*SEVERITIES, *PROOF_KINDS))
 
 BASE = "{{base}}"
 DIFF = "{{diff}}"
@@ -25,7 +29,8 @@ def render(template: str, *, base: str, diff: str) -> str:
 
 
 def instrument_digest(template: str, *, profile: str,
-                      dimensions: Sequence[str] = DIMENSIONS) -> str:
+                      dimensions: Sequence[str] = DIMENSIONS,
+                      contract: str = CONTRACT) -> str:
     """A short hash of everything that decides what a sample means.
 
     Deliberately excludes the diff: the digest identifies the instrument, so two
@@ -33,7 +38,7 @@ def instrument_digest(template: str, *, profile: str,
     it.
     """
     digest = hashlib.sha256()
-    for part in ("reviewc-prompt-v1", template, profile, *dimensions):
+    for part in ("council-prompt-v2", contract, template, profile, *dimensions):
         digest.update(part.encode("utf-8"))
         digest.update(b"\x00")
     return digest.hexdigest()[:16]

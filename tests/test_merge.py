@@ -65,10 +65,11 @@ def test_the_output_order_is_fixed() -> None:
     assert [item.line for item in merged] == [3, 9]
 
 
-def test_the_proof_comes_from_the_highest_severity_report() -> None:
+def test_every_samples_proof_is_kept() -> None:
     low = raw("low", kind="absent")
     high = raw("high", kind="command")
-    assert merge([sample(1, low, ), sample(2, high)])[0].proof_kind == "command"
+    merged = merge([sample(1, low), sample(2, high)])
+    assert [kind for kind, _ in merged[0].proofs] == ["absent", "command"]
 
 
 def test_no_samples_merge_to_nothing() -> None:

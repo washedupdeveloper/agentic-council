@@ -23,7 +23,7 @@ def merged(severity: str = "high", kind: str = "present",
     return MergedFinding(
         dimension="correctness", file="a.py", line=2, severity=severity,
         claims=("It is wrong.",), samples=(1,),
-        proof_kind=kind, proof_params=params or {"path": "a.py", "line": 2, "text": "two"},
+        proofs=((kind, params or {"path": "a.py", "line": 2, "text": "two"}),),
     )
 
 
@@ -51,6 +51,18 @@ def test_a_proof_that_cannot_run_is_unrunnable(tmp_path: Path) -> None:
     adj = adjudicate([merged(kind="command", params={"argv": ["curl", "http://example.invalid"]})],
                      ctx(repo_with(tmp_path)))
     assert adj.findings[0].state is State.UNRUNNABLE
+
+
+def test_any_proof_that_holds_settles_the_finding(tmp_path: Path) -> None:
+    """Two samples, two proofs: one refuted and one proven is still a proven finding."""
+    item = MergedFinding(
+        dimension="correctness", file="a.py", line=2, severity="high",
+        claims=("It is wrong.",), samples=(1, 2),
+        proofs=(("present", {"path": "a.py", "line": 2, "text": "three"}),
+                ("present", {"path": "a.py", "line": 1, "text": "one"})),
+    )
+    adj = adjudicate([item], ctx(repo_with(tmp_path)))
+    assert adj.findings[0].state is State.PROVEN
 
 
 def test_ids_are_sequential_and_zero_padded(tmp_path: Path) -> None:
