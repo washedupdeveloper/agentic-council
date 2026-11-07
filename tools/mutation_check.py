@@ -77,7 +77,7 @@ MUTATIONS: tuple[Mutation, ...] = (
     Mutation("a-usage-error-reuses-the-incomplete-code",
              "cli.py", "EXIT_ERROR = 3", "EXIT_ERROR = 2"),
     Mutation("a-run-may-overwrite-an-old-one",
-             "run.py", "if directory.exists():", "if False:"),
+             "run.py", "if directory.is_symlink() or directory.exists():", "if False:"),
     Mutation("failed-samples-are-forgotten",
              "run.py", "failed_samples=[sample.index for sample in samples if not sample.ok],",
              "failed_samples=[],"),

@@ -59,3 +59,7 @@ registry, so it cannot describe a claim that has no check.
 | `the-digest-covers-the-contract` | The instrument digest changes when the proof contract changes, not only the prompt. | `python3 -m pytest tests/test_prompt.py::test_the_digest_changes_with_the_contract -q` |
 | `a-command-proof-is-never-unsandboxed` | Without bubblewrap a command proof is UNRUNNABLE; it never falls back to running unsandboxed. | `python3 -m pytest tests/test_proofs.py::test_without_bwrap_a_command_proof_does_not_run -q` |
 | `git-is-read-in-one-place` | Every git call goes through one helper, so a fix is made once. | `python3 -m pytest tests/test_repo.py::test_git_is_called_in_one_module -q` |
+| `a-repository-cannot-widen-its-own-policy` | A repository cannot turn the sandbox off when the runner requires it. | `python3 -m pytest tests/test_config.py::test_a_repository_cannot_turn_the_sandbox_off -q` |
+| `a-proven-security-finding-blocks` | A proven security finding fails the run at any severity. | `python3 -m pytest tests/test_verdict.py::test_a_proven_low_security_finding_blocks -q` |
+| `a-symlinked-state-directory-is-refused` | A `.council` symlink cannot move a run's writes outside the checkout. | `python3 -m pytest tests/test_paths.py::test_a_symlinked_state_directory_is_refused -q` |
+| `an-incomplete-review-is-announced` | An INCOMPLETE verdict says on stderr that a merge is blocked. | `python3 -m pytest tests/test_cli.py::test_incomplete_is_announced_explicitly -q` |

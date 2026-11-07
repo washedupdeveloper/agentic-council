@@ -21,3 +21,23 @@ def test_a_run_id_is_one_segment(tmp_path: Path) -> None:
 def test_a_run_id_cannot_escape(tmp_path: Path, run_id: str) -> None:
     with pytest.raises(ValueError, match="run id"):
         run_dir(tmp_path, run_id)
+
+
+def test_a_symlinked_state_directory_is_refused(tmp_path: Path) -> None:
+    """A pre-existing `.council -> elsewhere` must not move the writes out."""
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    (tmp_path / "repo").mkdir()
+    (tmp_path / "repo" / ".council").symlink_to(elsewhere)
+    with pytest.raises(ValueError, match="symlink"):
+        run_dir(tmp_path / "repo", "r1")
+
+
+def test_a_symlinked_runs_directory_is_refused(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    (repo / ".council").mkdir(parents=True)
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    (repo / ".council" / "runs").symlink_to(elsewhere)
+    with pytest.raises(ValueError, match="symlink"):
+        run_dir(repo, "r1")

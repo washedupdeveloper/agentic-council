@@ -17,6 +17,16 @@ Severity = Literal["low", "medium", "high", "critical"]
 SEVERITIES: tuple[Severity, ...] = ("low", "medium", "high", "critical")
 BLOCKING: frozenset[Severity] = frozenset({"high", "critical"})
 
+#: Dimensions whose proven finding blocks at any severity. The model may rank a
+#: defect; it may not decide that a proven security or correctness defect is
+#: mergeable. This is the tool's rule, not the model's.
+ALWAYS_BLOCKING: frozenset[str] = frozenset({"security", "correctness"})
+
+
+def blocks(dimension: str, severity: str) -> bool:
+    """Whether a proven finding of this dimension and severity fails a run."""
+    return severity in BLOCKING or dimension in ALWAYS_BLOCKING
+
 
 class State(Enum):
     """What the run's own check settled about a finding's claim.
@@ -52,8 +62,8 @@ class Finding:
 
     @property
     def blocks(self) -> bool:
-        """Whether this finding's severity can fail a run at all."""
-        return self.severity in BLOCKING
+        """Whether this finding's dimension and severity can fail a run at all."""
+        return blocks(self.dimension, self.severity)
 
     def __post_init__(self) -> None:
         if not self.id:

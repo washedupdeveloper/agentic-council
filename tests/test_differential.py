@@ -21,9 +21,9 @@ def test_it_accepts_the_fixtures_and_explains_the_difference() -> None:
     assert "never checked" in result.stdout
 
 
-def test_the_defects_round_has_three_blocking_claims_and_no_check() -> None:
+def test_the_defects_round_has_four_blocking_claims_and_no_check() -> None:
     line = next(line for line in run().stdout.splitlines() if line.startswith("defects"))
     fields = line.split()
     assert fields[2] == "INCOMPLETE"
-    assert fields[4] == "3"      # blocking
+    assert fields[4] == "4"      # blocking: severity high+, or security/correctness at any severity
     assert fields[5] == "0"      # with a check

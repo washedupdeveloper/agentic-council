@@ -16,6 +16,20 @@ def runs_root(repo: Path) -> Path:
     return repo / STATE_DIR / RUNS
 
 
+def state_root(repo: Path) -> Path:
+    """The runs directory, refusing a symlinked path out of the checkout.
+
+    `run_id` is checked for separators, but a pre-existing `.council` symlink
+    would still move every write elsewhere; `is_symlink()` is an lstat, so a
+    link is seen even when its target is missing.
+    """
+    base = repo / STATE_DIR
+    for part in (base, base / RUNS):
+        if part.is_symlink():
+            raise ValueError(f"{part} is a symlink: a run must not write outside the checkout")
+    return base / RUNS
+
+
 def run_dir(repo: Path, run_id: str) -> Path:
     """The directory for one run.
 
@@ -24,4 +38,4 @@ def run_dir(repo: Path, run_id: str) -> Path:
     """
     if not run_id or run_id in {".", ".."} or "/" in run_id or "\\" in run_id:
         raise ValueError(f"invalid run id {run_id!r}: expected one path segment")
-    return runs_root(repo) / run_id
+    return state_root(repo) / run_id

@@ -166,8 +166,8 @@ def proof_command(params: Mapping[str, Any], ctx: ProofContext) -> ProofOutcome:
 
     if proc.returncode != 0 and "read-only file system" in (proc.stderr or "").lower():
         tail = (proc.stderr or "").strip().splitlines()
-        return _cannot("the command needed to write inside the repository, which the "
-                       f"sandbox mounts read-only: {tail[-1] if tail else 'EROFS'}")
+        return _cannot("the command needed to write outside the repository and /tmp, "
+                       f"which the sandbox keeps read-only: {tail[-1] if tail else 'EROFS'}")
 
     passed = proc.returncode == 0 if mode == "zero" else proc.returncode != 0
     if passed:

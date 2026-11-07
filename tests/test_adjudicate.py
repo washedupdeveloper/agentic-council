@@ -19,9 +19,10 @@ def ctx(repo: Path) -> ProofContext:
 
 
 def merged(severity: str = "high", kind: str = "present",
-           params: dict[str, Any] | None = None) -> MergedFinding:
+           params: dict[str, Any] | None = None,
+           dimension: str = "correctness") -> MergedFinding:
     return MergedFinding(
-        dimension="correctness", file="a.py", line=2, severity=severity,
+        dimension=dimension, file="a.py", line=2, severity=severity,
         claims=("It is wrong.",), samples=(1,),
         proofs=((kind, params or {"path": "a.py", "line": 2, "text": "two"}),),
     )
@@ -79,7 +80,9 @@ def test_a_proven_blocking_finding_fails_the_run(tmp_path: Path) -> None:
 
 
 def test_a_proven_low_finding_passes_the_run(tmp_path: Path) -> None:
-    result = verdict(adjudicate([merged(severity="low")], ctx(repo_with(tmp_path))))
+    """Severity still matters outside security and correctness."""
+    result = verdict(adjudicate([merged(severity="low", dimension="readability")],
+                                ctx(repo_with(tmp_path))))
     assert result.verdict is Verdict.PASS
 
 

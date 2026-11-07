@@ -46,6 +46,15 @@ def test_incomplete_exits_two(monkeypatch: pytest.MonkeyPatch) -> None:
     assert cli.main(["review"]) == 2
 
 
+def test_incomplete_is_announced_explicitly(monkeypatch: pytest.MonkeyPatch,
+                                            capsys: pytest.CaptureFixture[str]) -> None:
+    stub(monkeypatch, report(Verdict.INCOMPLETE))
+    cli.main(["review"])
+    err = capsys.readouterr().err
+    assert "INCOMPLETE" in err
+    assert "blocked" in err
+
+
 def test_report_mode_exits_zero_even_on_failure(monkeypatch: pytest.MonkeyPatch) -> None:
     stub(monkeypatch, report(Verdict.FAIL))
     assert cli.main(["review", "--report"]) == 0

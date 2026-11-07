@@ -12,6 +12,7 @@ from .config import ConfigError
 from .repo import ReviewError, init as init_repo
 from .run import DEFAULT_PROFILE, DEFAULT_SAMPLES, Report, ReviewRequest, review
 from .runner import hermes_runner
+from .verdict import Verdict
 
 EXIT_ERROR = 3
 
@@ -105,6 +106,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         print((report.run_dir / "verdict.json").read_text(encoding="utf-8"), end="")
     else:
         _print_report(report)
+
+    if report.verdict is Verdict.INCOMPLETE:
+        stance = "advice only (--report): not blocking here" if args.report \
+            else "a merge is blocked until the missing evidence is obtained"
+        print(f"council: INCOMPLETE — {stance}", file=sys.stderr)
 
     if not report.ignored:
         print("note: .council/ is not ignored here; run `council init` to keep git clean",

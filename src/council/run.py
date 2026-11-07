@@ -127,7 +127,7 @@ def review(request: ReviewRequest, runner: Runner) -> Report:
         directory = run_path(root, run_id)
     except ValueError as exc:
         raise ReviewError(str(exc)) from exc
-    if directory.exists():
+    if directory.is_symlink() or directory.exists():
         raise ReviewError(f"run {run_id!r} already exists at {directory}")
 
     prompt = render(template, base=base, diff=patch)

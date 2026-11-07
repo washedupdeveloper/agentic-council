@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from council.config import DEFAULT_ALLOW, ConfigError, load
+from council.config import DEFAULT_ALLOW, ConfigError, Policy, load
 
 
 def write(tmp_path: Path, body: str) -> Path:
@@ -52,8 +52,32 @@ def test_the_sandbox_is_on_by_default(tmp_path: Path) -> None:
     assert load(tmp_path / "council.toml").sandbox is True
 
 
-def test_the_sandbox_can_be_turned_off_explicitly(tmp_path: Path) -> None:
-    assert load(write(tmp_path, "[proofs]\nsandbox = false\n")).sandbox is False
+def test_the_sandbox_can_be_turned_off_when_the_caller_allows_it(tmp_path: Path) -> None:
+    assert load(write(tmp_path, "[proofs]\nsandbox = false\n"),
+                Policy(sandbox=False)).sandbox is False
+
+
+def test_a_repository_cannot_turn_the_sandbox_off(tmp_path: Path) -> None:
+    """The repository is untrusted: the boundary is the caller's, not its own."""
+    with pytest.raises(ConfigError, match="requires the sandbox"):
+        load(write(tmp_path, "[proofs]\nsandbox = false\n"))
+
+
+def test_a_repository_cannot_add_a_tool(tmp_path: Path) -> None:
+    with pytest.raises(ConfigError, match="does not permit"):
+        load(write(tmp_path, '[proofs]\nallow = ["rg", "cargo"]\n'))
+
+
+def test_a_repository_can_narrow_the_allowlist(tmp_path: Path) -> None:
+    assert load(write(tmp_path, '[proofs]\nallow = ["rg"]\n')).allow == frozenset({"rg"})
+
+
+def test_a_repository_cannot_raise_the_timeout(tmp_path: Path) -> None:
+    assert load(write(tmp_path, "[proofs]\ntimeout = 900\n")).timeout == 120
+
+
+def test_a_repository_can_lower_the_timeout(tmp_path: Path) -> None:
+    assert load(write(tmp_path, "[proofs]\ntimeout = 30\n")).timeout == 30
 
 
 def test_a_non_boolean_sandbox_is_refused(tmp_path: Path) -> None:

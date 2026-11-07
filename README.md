@@ -20,8 +20,11 @@ else any blocking finding open     -> INCOMPLETE  exit 2
 else                               -> PASS        exit 0
 ```
 
-`blocking` means severity `high` or `critical`. The boundary is tested in both
-directions: a proven `medium` passes, a proven `high` fails.
+`blocking` means severity `high` or `critical` — **or any severity in `security`
+or `correctness`**. The model may rank a defect; it may not decide that a proven
+security or correctness defect is mergeable. The boundary is tested in both
+directions: a proven `low` security finding fails, a proven `low` readability
+finding passes.
 
 There is no score in this decision. A number may be reported beside a verdict as
 a trend; it cannot change it.
@@ -74,7 +77,7 @@ src/council/schema.py     the reviewer's output contract
 src/council/prompt.py     render the template, digest the instrument
 src/council/sample.py     one sample: run, retry once, record
 src/council/proofs.py     the six proof kinds
-src/council/sandbox.py    bubblewrap: no network, read-only tree
+src/council/sandbox.py    bubblewrap: no network, overlay tree
 src/council/claims.py     the claim registry and its runner
 src/council/prompts/      the reviewer prompt, shipped with the tool
 skills/council/           the agent-facing skill

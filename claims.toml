@@ -258,3 +258,23 @@ check = "python3 -m pytest tests/test_proofs.py::test_without_bwrap_a_command_pr
 id = "git-is-read-in-one-place"
 text = "Every git call goes through one helper, so a fix is made once."
 check = "python3 -m pytest tests/test_repo.py::test_git_is_called_in_one_module -q"
+
+[[claim]]
+id = "a-repository-cannot-widen-its-own-policy"
+text = "A repository cannot turn the sandbox off when the runner requires it."
+check = "python3 -m pytest tests/test_config.py::test_a_repository_cannot_turn_the_sandbox_off -q"
+
+[[claim]]
+id = "a-proven-security-finding-blocks"
+text = "A proven security finding fails the run at any severity."
+check = "python3 -m pytest tests/test_verdict.py::test_a_proven_low_security_finding_blocks -q"
+
+[[claim]]
+id = "a-symlinked-state-directory-is-refused"
+text = "A `.council` symlink cannot move a run's writes outside the checkout."
+check = "python3 -m pytest tests/test_paths.py::test_a_symlinked_state_directory_is_refused -q"
+
+[[claim]]
+id = "an-incomplete-review-is-announced"
+text = "An INCOMPLETE verdict says on stderr that a merge is blocked."
+check = "python3 -m pytest tests/test_cli.py::test_incomplete_is_announced_explicitly -q"
