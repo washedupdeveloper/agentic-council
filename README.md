@@ -56,6 +56,11 @@ review — otherwise the code being judged could supply a prompt that reports
 nothing. Every run records a digest over the template, the profile and the
 dimensions; two runs are comparable only when the digest matches.
 
+## Container
+
+`nix build .#image` → an OCI tarball with `council`, `git` and `bash`. It carries
+the tool, not the reviewer: mount one at `/bin/hermes` or pass `--reviewer`.
+
 ## Layout
 
 ```
