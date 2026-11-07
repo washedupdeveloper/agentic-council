@@ -33,7 +33,9 @@
 
       # One interpreter with the two tools the checks need, so `nix develop`,
       # `nix build` and `nix flake check` agree on the versions.
-      pythonEnv = pkgs: pkgs.python3.withPackages (ps: [ ps.pytest ps.mypy ps.setuptools ]);
+      pythonEnv = pkgs: pkgs.python3.withPackages (ps: [
+        ps.pytest ps.mypy ps.setuptools ps.pip ps.wheel
+      ]);
 
       # A writable copy of the tree: the flake source is read-only, and pytest,
       # mypy and the mutation check all write caches.
@@ -45,6 +47,18 @@
     {
       packages = each (pkgs: {
         default = app pkgs;
+
+        # The builder is nix; the user gets a wheel with no dependencies.
+        wheel = pkgs.runCommandLocal "council-wheel" {
+          nativeBuildInputs = [ (pythonEnv pkgs) ];
+        } ''
+          cp -r ${self} src
+          chmod -R u+w src
+          cd src
+          python -m pip wheel --no-deps --no-build-isolation --wheel-dir dist .
+          mkdir -p $out
+          cp dist/*.whl $out/
+        '';
 
         # The tool, not the reviewer: mount a hermes binary and a repository.
         image = pkgs.dockerTools.buildLayeredImage {
@@ -72,6 +86,7 @@
             cp -r ${src} work
             chmod -R u+w work
             cd work
+            set -e
             export HOME=$TMPDIR
             ${command}
             touch $out
@@ -96,6 +111,14 @@
 
           # v1.9.0's pinned verdicts beside this rule, on the same fixtures.
           differential = mkCheck "council-differential" "python tools/differential.py";
+
+          # The wheel is built and installed into a fresh prefix, then run.
+          wheel = mkCheck "council-wheel" ''
+            python -m pip wheel --no-deps --no-build-isolation --wheel-dir dist .
+            python -m pip install --no-index --target dist/site dist/*.whl
+            PYTHONPATH=dist/site python -m council --help > /dev/null
+            PYTHONPATH=dist/site python -c "import council; assert council.__version__ == '0.1.0'"
+          '';
         });
 
       devShells = each (pkgs: {

@@ -130,6 +130,12 @@ the tool, not the reviewer: mount one at `/bin/hermes` or pass `--reviewer`.
 Command proofs need user namespaces; a runtime that blocks them makes those
 proofs `UNRUNNABLE`, never unsandboxed.
 
+`nix build .#wheel` → `council-0.1.0-py3-none-any.whl`, with no dependencies:
+`pip install` it on any host with Python 3.11+. A wheel cannot carry `bwrap`, so
+`command` proofs on a bare host are `UNRUNNABLE` unless bubblewrap is installed;
+the image is the artifact where the sandbox travels with the tool. Nix builds
+both; a user needs neither nix nor this repository to run the wheel.
+
 ## Layout
 
 ```
