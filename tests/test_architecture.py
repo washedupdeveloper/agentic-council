@@ -15,7 +15,7 @@ from pathlib import Path
 import pytest
 
 #: The decision path. Everything here answers a question without touching the world.
-PURE = ("findings", "verdict", "merge", "schema", "prompt", "paths")
+PURE = ("findings", "verdict", "merge", "schema", "prompt", "paths", "changes", "context")
 
 FORBIDDEN_IMPORTS = frozenset({
     "subprocess", "urllib", "socket", "os", "time", "random", "shutil", "tempfile", "sys",

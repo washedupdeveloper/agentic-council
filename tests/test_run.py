@@ -85,6 +85,23 @@ def test_a_file_the_diff_cannot_carry_is_recorded(tmp_path: Path) -> None:
     assert [item.path for item in report.skipped] == ["logo.bin"]
 
 
+def test_the_context_of_a_changed_function_is_recorded_and_sent(tmp_path: Path) -> None:
+    repo, _ = make_repo(tmp_path)
+    (repo / "a.py").write_text("def target():\n    x = 1\n    return x\n", encoding="utf-8")
+    seen: list[str] = []
+
+    def runner(prompt: str) -> str:
+        seen.append(prompt)
+        return body()
+
+    report = review(ReviewRequest(repo=repo, run_id="r-ctx"), runner)
+    payload = json.loads((report.run_dir / "verdict.json").read_text(encoding="utf-8"))
+    assert [item["name"] for item in payload["context"]] == ["target"]
+    assert len(payload["context_digest"]) == 16
+    assert "def target():" in seen[0]
+    assert "## Context" in seen[0]
+
+
 def test_every_sample_is_written_even_when_one_fails(tmp_path: Path) -> None:
     repo, _ = make_repo(tmp_path)
     calls: list[int] = []

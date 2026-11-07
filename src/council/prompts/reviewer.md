@@ -49,6 +49,13 @@ Each finding is:
 - `file` is a path from the repository root, without a leading `./`.
 - `line` is 1-based and inside the file.
 
+## Context
+
+The functions around the change, for judging behaviour. This is not part of the
+change: a finding must still cite a line the diff touches.
+
+{{context}}
+
 ## The change
 
 Base revision: {{base}}

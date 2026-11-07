@@ -102,7 +102,9 @@ whole of the side effects.
 `verdict.json` records `base`, `head`, `worktree` (whether local edits were
 included), `diff_sha256`, and `skipped` — every file in the change the diff could
 not carry, with the reason (`too large`, `binary`, `not utf-8`, `unreadable`).
-A run states what it did not look at.
+It also records `context_digest`, the spans the model was shown, and
+`unresolved` — calls the context could not follow. A run states what it did not
+look at.
 
 ## The reviewer contract
 
@@ -112,10 +114,13 @@ the closed set (`absent`, `present`, `command`, `json`, `http`, `diff`)
 is refused by the parser, not by the prompt alone.
 
 The prompt ships with the tool at `src/council/prompts/reviewer.md`; `--prompt`
-names a different one. It is deliberately **not** read from the repository under
-review — otherwise the code being judged could supply a prompt that reports
-nothing. Every run records a digest over the template, the profile and the
-dimensions; two runs are comparable only when the digest matches.
+names a different one. It carries the change **and the functions around it**: for
+every changed Python file the enclosing function is included, then the repository
+functions it calls, two levels deep. Anything the resolver could not follow is
+named in the prompt rather than left out. It is deliberately **not** read from
+the repository under review — otherwise the code being judged could supply a
+prompt that reports nothing. Every run records a digest over the template, the
+profile and the dimensions; two runs are comparable only when the digest matches.
 
 ## Container
 
@@ -133,6 +138,8 @@ src/council/base.py       which revision the diff is taken against
 src/council/paths.py      where a run's artefacts live
 src/council/schema.py     the reviewer's output contract
 src/council/prompt.py     render the template, digest the instrument
+src/council/changes.py    the diff parser, shared by the diff proof and context
+src/council/context.py    the functions around the change, and their calls
 src/council/sample.py     one sample: run, retry once, record
 src/council/proofs.py     the six proof kinds
 src/council/sandbox.py    bubblewrap: no network, overlay tree

@@ -67,3 +67,7 @@ registry, so it cannot describe a claim that has no check.
 | `every-flag-is-documented` | Every flag the CLI accepts appears in the README. | `python3 -m pytest tests/test_docs.py::test_every_flag_is_documented -q` |
 | `a-file-the-diff-cannot-carry-is-named` | A binary untracked file is named as skipped, not silently dropped. | `python3 -m pytest tests/test_repo.py::test_a_binary_untracked_file_is_named_not_dropped -q` |
 | `a-run-records-what-it-reviewed` | verdict.json records worktree, diff_sha256 and every skipped file. | `python3 -m pytest tests/test_run.py::test_a_file_the_diff_cannot_carry_is_recorded -q` |
+| `the-context-includes-the-enclosing-function` | A change inside a function brings that function's whole body into the prompt. | `python3 -m pytest tests/test_context.py::test_the_enclosing_function_is_included -q` |
+| `the-context-follows-the-call-chain` | The context follows calls within the repository two deep, then stops. | `python3 -m pytest tests/test_context.py::test_the_call_chain_is_followed_two_deep_and_then_stops -q` |
+| `a-call-the-context-cannot-resolve-is-named` | A call the context cannot resolve is listed, not silently omitted. | `python3 -m pytest tests/test_context.py::test_an_unresolved_call_is_named_not_hidden -q` |
+| `a-run-records-and-sends-the-context` | verdict.json records the context, and the prompt the model receives contains it. | `python3 -m pytest tests/test_run.py::test_the_context_of_a_changed_function_is_recorded_and_sent -q` |

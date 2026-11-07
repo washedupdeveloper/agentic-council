@@ -14,18 +14,24 @@ CONTRACT = "|".join((*SEVERITIES, *PROOF_KINDS))
 
 BASE = "{{base}}"
 DIFF = "{{diff}}"
+CONTEXT = "{{context}}"
 
 
 class PromptError(ValueError):
     """The template is not usable."""
 
 
-def render(template: str, *, base: str, diff: str) -> str:
-    """Fill the template. A template missing a placeholder is an error, not a surprise."""
+def render(template: str, *, base: str, diff: str, context: str = "") -> str:
+    """Fill the template. A template missing a placeholder is an error, not a surprise.
+
+    `{{context}}` is optional: a prompt that does not ask for the surrounding
+    functions is not silently given them.
+    """
     missing = [name for name in (BASE, DIFF) if name not in template]
     if missing:
         raise PromptError(f"the prompt template is missing {', '.join(missing)}")
-    return template.replace(BASE, base).replace(DIFF, diff)
+    text = template.replace(BASE, base).replace(DIFF, diff)
+    return text.replace(CONTEXT, context) if CONTEXT in template else text
 
 
 def instrument_digest(template: str, *, profile: str,

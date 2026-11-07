@@ -113,6 +113,14 @@ def state_dir_ignored(root: Path) -> bool:
     return git(root, "check-ignore", "-q", ".council", timeout=30).returncode == 0
 
 
+def python_files(root: Path) -> tuple[str, ...]:
+    """Every Python file the checkout has, tracked or new — the context's search space."""
+    proc = git(root, "ls-files", "-z", "--cached", "--others", "--exclude-standard", "--", "*.py")
+    if proc.returncode != 0:
+        raise ReviewError(f"git ls-files failed: {proc.stderr.strip()}")
+    return tuple(rel for rel in proc.stdout.split("\0") if rel)
+
+
 def init(repo: Path) -> bool:
     """Add `.council/` to the repository's `.gitignore`. True if it was added."""
     top = root(repo)

@@ -59,7 +59,7 @@ MUTATIONS: tuple[Mutation, ...] = (
     Mutation("proof-allowlist-disabled",
              "proofs.py", "if binary not in ctx.allow:", "if False:"),
     Mutation("diff-context-not-counted",
-             "proofs.py",
+             "changes.py",
              'elif raw.startswith(" "):\n            old_line += 1\n            new_line += 1',
              'elif raw.startswith(" "):\n            pass'),
     Mutation("config-ignores-unknown-keys",
