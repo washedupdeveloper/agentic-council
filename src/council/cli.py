@@ -112,6 +112,12 @@ def main(argv: Sequence[str] | None = None) -> int:
             else "a merge is blocked until the missing evidence is obtained"
         print(f"council: INCOMPLETE — {stance}", file=sys.stderr)
 
+    if report.skipped:
+        listed = ", ".join(f"{item.path} ({item.reason})" for item in report.skipped[:5])
+        more = f", +{len(report.skipped) - 5} more" if len(report.skipped) > 5 else ""
+        print(f"note: {len(report.skipped)} file(s) in the change were not reviewed: "
+              f"{listed}{more}", file=sys.stderr)
+
     if not report.ignored:
         print("note: .council/ is not ignored here; run `council init` to keep git clean",
               file=sys.stderr)

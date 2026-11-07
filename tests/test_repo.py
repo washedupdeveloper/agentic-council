@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from council.repo import ReviewError, git, init, output
+from council.repo import ReviewError, Skipped, git, init, output, untracked_diff
 
 SRC = Path(__file__).resolve().parent.parent / "src" / "council"
 GIT_CALL = re.compile(r'subprocess\.run\(\s*\["git"')
@@ -38,3 +38,21 @@ def test_git_is_called_in_one_module() -> None:
         if GIT_CALL.search(path.read_text(encoding="utf-8"))
     )
     assert hits == ["repo.py"]
+
+
+def test_a_binary_untracked_file_is_named_not_dropped(tmp_path: Path) -> None:
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    (tmp_path / "logo.bin").write_bytes(b"\x00\x01\x02")
+    (tmp_path / "notes.txt").write_text("hello\n", encoding="utf-8")
+    patch, skipped = untracked_diff(tmp_path)
+    assert skipped == (Skipped("logo.bin", "binary"),)
+    assert "notes.txt" in patch
+    assert "logo.bin" not in patch
+
+
+def test_an_untracked_file_over_the_limit_is_named(tmp_path: Path) -> None:
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    (tmp_path / "big.txt").write_text("a" * 200_001, encoding="utf-8")
+    patch, skipped = untracked_diff(tmp_path)
+    assert patch == ""
+    assert skipped == (Skipped("big.txt", "too large"),)

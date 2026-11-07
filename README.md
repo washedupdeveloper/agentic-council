@@ -97,6 +97,13 @@ Everything that acts is in a module a reader can name: `repo` (git), `proofs` an
 file), `run` (writes the run), `cli` (stdout), `claims` (runs the registry). That is the
 whole of the side effects.
 
+## Evidence
+
+`verdict.json` records `base`, `head`, `worktree` (whether local edits were
+included), `diff_sha256`, and `skipped` — every file in the change the diff could
+not carry, with the reason (`too large`, `binary`, `not utf-8`, `unreadable`).
+A run states what it did not look at.
+
 ## The reviewer contract
 
 One call, five sections (`security`, `correctness`, `readability`,

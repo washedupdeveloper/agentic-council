@@ -66,10 +66,23 @@ def test_a_proven_finding_is_written_and_fails(tmp_path: Path) -> None:
     payload = json.loads((report.run_dir / "verdict.json").read_text(encoding="utf-8"))
     assert payload["verdict"] == "fail"
     assert payload["exit_code"] == 1
+    assert payload["worktree"] is True
+    assert len(payload["diff_sha256"]) == 64
+    assert payload["skipped"] == []
     assert payload["findings"][0]["state"] == "proven"
     assert [s["ok"] for s in payload["samples"]] == [True, True]
     assert (report.run_dir / "sample-1.json").exists()
     assert (report.run_dir / "sample-2.json").exists()
+
+
+def test_a_file_the_diff_cannot_carry_is_recorded(tmp_path: Path) -> None:
+    repo, _ = make_repo(tmp_path)
+    (repo / "logo.bin").write_bytes(b"\x00\x01")
+    report = review(ReviewRequest(repo=repo, run_id="r-skip"), lambda _: body())
+
+    payload = json.loads((report.run_dir / "verdict.json").read_text(encoding="utf-8"))
+    assert payload["skipped"] == [{"path": "logo.bin", "reason": "binary"}]
+    assert [item.path for item in report.skipped] == ["logo.bin"]
 
 
 def test_every_sample_is_written_even_when_one_fails(tmp_path: Path) -> None:

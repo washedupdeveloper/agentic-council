@@ -8,6 +8,7 @@ when git itself failed. One argument list, one timeout, one place to fix quoting
 from __future__ import annotations
 
 import subprocess
+from dataclasses import dataclass
 from pathlib import Path
 
 GIT_TIMEOUT = 60
@@ -17,6 +18,22 @@ MAX_UNTRACKED_BYTES = 200_000
 
 class ReviewError(RuntimeError):
     """The review cannot start: wrong directory, no prompt, no base."""
+
+
+@dataclass(frozen=True, slots=True)
+class Skipped:
+    """A file in the change that the diff could not carry, and why."""
+
+    path: str
+    reason: str
+
+
+@dataclass(frozen=True, slots=True)
+class Change:
+    """The patch under review, and what it could not include."""
+
+    patch: str
+    skipped: tuple[Skipped, ...] = ()
 
 
 def git(repo: Path, *args: str, timeout: int = GIT_TIMEOUT) -> subprocess.CompletedProcess[str]:
@@ -38,36 +55,49 @@ def output(repo: Path, *args: str, timeout: int = GIT_TIMEOUT) -> str:
     return proc.stdout
 
 
-def untracked_diff(root: Path) -> str:
-    """New files are part of the change; `git diff` does not show them."""
+def untracked_diff(root: Path) -> tuple[str, tuple[Skipped, ...]]:
+    """New files are part of the change; `git diff` does not show them.
+
+    A file too large, binary, unreadable or not UTF-8 cannot be carried by a
+    text diff. It is named in `skipped` rather than dropped, so a run says what
+    it did not look at.
+    """
     proc = git(root, "ls-files", "--others", "--exclude-standard", "-z")
     if proc.returncode != 0:
         raise ReviewError(f"git ls-files failed: {proc.stderr.strip()}")
     patches: list[str] = []
+    skipped: list[Skipped] = []
     for rel in proc.stdout.split("\0"):
         if not rel or rel.startswith(".council/"):
             continue
         try:
             data = (root / rel).read_bytes()
         except OSError:
+            skipped.append(Skipped(rel, "unreadable"))
             continue
-        if len(data) > MAX_UNTRACKED_BYTES or b"\0" in data[:8000]:
+        if len(data) > MAX_UNTRACKED_BYTES:
+            skipped.append(Skipped(rel, "too large"))
+            continue
+        if b"\0" in data[:8000]:
+            skipped.append(Skipped(rel, "binary"))
             continue
         try:
             text = data.decode("utf-8")
         except UnicodeDecodeError:
+            skipped.append(Skipped(rel, "not utf-8"))
             continue
         body = "".join(f"+{line}\n" for line in text.splitlines())
         patches.append(f"diff --git a/{rel} b/{rel}\nnew file mode 100644\n--- /dev/null\n"
                        f"+++ b/{rel}\n@@ -0,0 +1,{len(text.splitlines())} @@\n{body}")
-    return "".join(patches)
+    return "".join(patches), tuple(skipped)
 
 
-def diff(root: Path, base: str) -> str:
+def diff(root: Path, base: str) -> Change:
     """The change as a patch: tracked edits, plus new files git leaves out."""
     tracked = output(root, "-c", "color.ui=false", "-c", "diff.srcPrefix=a/",
                      "-c", "diff.dstPrefix=b/", "diff", "--no-color", "--no-ext-diff", base)
-    return tracked + untracked_diff(root)
+    untracked, skipped = untracked_diff(root)
+    return Change(tracked + untracked, skipped)
 
 
 def root(path: Path) -> Path:

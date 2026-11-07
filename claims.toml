@@ -288,3 +288,13 @@ check = "python3 -m pytest tests/test_architecture.py -q"
 id = "every-flag-is-documented"
 text = "Every flag the CLI accepts appears in the README."
 check = "python3 -m pytest tests/test_docs.py::test_every_flag_is_documented -q"
+
+[[claim]]
+id = "a-file-the-diff-cannot-carry-is-named"
+text = "A binary untracked file is named as skipped, not silently dropped."
+check = "python3 -m pytest tests/test_repo.py::test_a_binary_untracked_file_is_named_not_dropped -q"
+
+[[claim]]
+id = "a-run-records-what-it-reviewed"
+text = "verdict.json records worktree, diff_sha256 and every skipped file."
+check = "python3 -m pytest tests/test_run.py::test_a_file_the_diff_cannot_carry_is_recorded -q"

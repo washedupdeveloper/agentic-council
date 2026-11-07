@@ -11,12 +11,14 @@ import pytest
 
 import council.cli as cli
 from council.findings import Finding, State
+from council.repo import Skipped
 from council.run import Report, ReviewError
 from council.verdict import Result, Verdict
 
 
 def report(verdict: Verdict, *, run_dir: Path | None = None,
-           findings: tuple[Finding, ...] = ()) -> Report:
+           findings: tuple[Finding, ...] = (),
+           skipped: tuple[Skipped, ...] = ()) -> Report:
     return Report(
         run_dir=run_dir or Path("/nonexistent"),
         base="a" * 40,
@@ -24,6 +26,7 @@ def report(verdict: Verdict, *, run_dir: Path | None = None,
         digest="d" * 16,
         result=Result(verdict, "a reason", findings),
         samples=(),
+        skipped=skipped,
     )
 
 
@@ -53,6 +56,15 @@ def test_incomplete_is_announced_explicitly(monkeypatch: pytest.MonkeyPatch,
     err = capsys.readouterr().err
     assert "INCOMPLETE" in err
     assert "blocked" in err
+
+
+def test_a_file_the_diff_could_not_carry_is_announced(monkeypatch: pytest.MonkeyPatch,
+                                                      capsys: pytest.CaptureFixture[str]) -> None:
+    stub(monkeypatch, report(Verdict.PASS, skipped=(Skipped("logo.bin", "binary"),)))
+    cli.main(["review"])
+    err = capsys.readouterr().err
+    assert "not reviewed" in err
+    assert "logo.bin" in err
 
 
 def test_report_mode_exits_zero_even_on_failure(monkeypatch: pytest.MonkeyPatch) -> None:

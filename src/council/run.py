@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -15,7 +16,7 @@ from .merge import merge
 from .paths import run_dir as run_path
 from .prompt import instrument_digest, render
 from .proofs import ProofContext
-from .repo import ReviewError, diff, output, root as repo_root, state_dir_ignored
+from .repo import ReviewError, Skipped, diff, output, root as repo_root, state_dir_ignored
 from .sample import Runner, SampleResult, run_sample, write_sample
 from .verdict import Result, Verdict
 
@@ -55,6 +56,8 @@ class Report:
     samples: tuple[SampleResult, ...]
     prompt: Path | None = None
     ignored: bool = True
+    skipped: tuple[Skipped, ...] = ()
+    diff_sha256: str = ""
 
     @property
     def verdict(self) -> Verdict:
@@ -71,11 +74,15 @@ class Report:
 
 def _write_verdict(run_dir: Path, request: ReviewRequest, base: str, head: str,
                    digest: str, prompt: Path, ignored: bool,
-                   samples: tuple[SampleResult, ...], result: Result) -> None:
+                   samples: tuple[SampleResult, ...], result: Result, *,
+                   worktree: bool, diff_sha256: str,
+                   skipped: tuple[Skipped, ...]) -> None:
     payload = {
         "run": run_dir.name,
         "base": base,
         "head": head,
+        "worktree": worktree,
+        "diff_sha256": diff_sha256,
         "digest": digest,
         "prompt": str(prompt),
         "state_dir_ignored": ignored,
@@ -87,6 +94,7 @@ def _write_verdict(run_dir: Path, request: ReviewRequest, base: str, head: str,
              if sample.output is not None else 0}
             for sample in samples
         ],
+        "skipped": [{"path": item.path, "reason": item.reason} for item in skipped],
         "verdict": result.verdict.value,
         "exit_code": result.exit_code,
         "reason": result.reason,
@@ -111,7 +119,9 @@ def review(request: ReviewRequest, runner: Runner) -> Report:
     root = repo_root(request.repo)
     base = resolve_base(root, request.base)
     head = output(root, "rev-parse", "HEAD").strip()
-    patch = diff(root, base)
+    change = diff(root, base)
+    patch = change.patch
+    diff_sha256 = hashlib.sha256(patch.encode("utf-8")).hexdigest()
 
     prompt_file = request.prompt if request.prompt is not None else default_prompt()
     if not prompt_file.exists():
@@ -148,5 +158,7 @@ def review(request: ReviewRequest, runner: Runner) -> Report:
     result = verdict(adjudication)
     ignored = state_dir_ignored(root)
     _write_verdict(directory, request, base, head, digest, prompt_file, ignored,
-                   samples, result)
-    return Report(directory, base, head, digest, result, samples, prompt_file, ignored)
+                   samples, result, worktree=True, diff_sha256=diff_sha256,
+                   skipped=change.skipped)
+    return Report(directory, base, head, digest, result, samples, prompt_file, ignored,
+                  change.skipped, diff_sha256)
