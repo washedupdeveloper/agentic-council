@@ -7,7 +7,6 @@ import sys
 from pathlib import Path
 from typing import NoReturn, Sequence
 
-from . import claims as claim_registry
 from .config import ConfigError
 from .repo import ReviewError, init as init_repo
 from .run import DEFAULT_PROFILE, Report, ReviewRequest, review
@@ -38,36 +37,43 @@ class _Parser(argparse.ArgumentParser):
         self.exit(EXIT_ERROR, f"council: {message}\n")
 
 
+def _add_review_arguments(parser: argparse.ArgumentParser, *, advice: bool) -> None:
+    """The review surface, shared by `review` and `ci`.
+
+    `ci` is the gate without the advice switches: it always prints the verdict
+    as JSON and always exits with it. A CI entry that could be told to exit 0
+    is not a gate.
+    """
+    parser.add_argument("-C", "--repo", type=Path, default=Path("."),
+                        help="repository to review (default: the current directory)")
+    parser.add_argument("--base", help="revision to diff against (default: origin/HEAD, then HEAD~1)")
+    parser.add_argument("--samples", type=_samples, default=None,
+                        help="samples: N, or auto (default: 1 clean, 2 to confirm, 3 to break a tie)")
+    parser.add_argument("--profile", default=DEFAULT_PROFILE, help="Hermes profile to ask")
+    parser.add_argument("--reviewer", default="hermes",
+                        help="binary that answers a sample (default: hermes)")
+    parser.add_argument("--prompt", type=Path, default=None,
+                        help="reviewer prompt to use instead of the one shipped with council")
+    parser.add_argument("--run-id", default=None,
+                        help="name this run instead of using a timestamp (refused if it exists)")
+    parser.add_argument("--context-url", action="append", default=[], metavar="URL",
+                        help="fetch this URL as reference context (repeatable; never a proof)")
+    if advice:
+        parser.add_argument("--report", action="store_true",
+                            help="advice only: exit 0 whatever the verdict")
+        parser.add_argument("--json", action="store_true", help="print the run's verdict.json")
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = _Parser(prog="council", description="A review is a claim until a check settles it.")
     sub = parser.add_subparsers(dest="command", required=True)
 
     run = sub.add_parser("review", help="review a change; exits 0/1/2")
-    run.add_argument("-C", "--repo", type=Path, default=Path("."),
-                     help="repository to review (default: the current directory)")
-    run.add_argument("--base", help="revision to diff against (default: origin/HEAD, then HEAD~1)")
-    run.add_argument("--samples", type=_samples, default=None,
-                     help="samples: N, or auto (default: 1 clean, 2 to confirm, 3 to break a tie)")
-    run.add_argument("--profile", default=DEFAULT_PROFILE, help="Hermes profile to ask")
-    run.add_argument("--reviewer", default="hermes",
-                     help="binary that answers a sample (default: hermes)")
-    run.add_argument("--prompt", type=Path, default=None,
-                     help="reviewer prompt to use instead of the one shipped with council")
-    run.add_argument("--report", action="store_true",
-                     help="advice only: exit 0 whatever the verdict")
-    run.add_argument("--json", action="store_true", help="print the run's verdict.json")
-    run.add_argument("--run-id", default=None,
-                     help="name this run instead of using a timestamp (refused if it exists)")
-    run.add_argument("--context-url", action="append", default=[], metavar="URL",
-                     help="fetch this URL as reference context (repeatable; never a proof)")
+    _add_review_arguments(run, advice=True)
 
-    verify = sub.add_parser("verify", help="run every claim in the registry")
-    verify.add_argument("--registry", type=Path, default=Path("claims.toml"))
-    verify.add_argument("--list", action="store_true", help="list the claims without running them")
-    verify.add_argument("--write", type=Path, default=None,
-                        help="write the registry as markdown")
-    verify.add_argument("--check", type=Path, default=None,
-                        help="fail if the given markdown is not what the registry renders")
+    ci = sub.add_parser("ci", help="the gate for CI: prints verdict.json, exits 0/1/2")
+    _add_review_arguments(ci, advice=False)
+    ci.set_defaults(report=False, json=True)
 
     init = sub.add_parser("init", help="add .council/ to the repository's .gitignore")
     init.add_argument("-C", "--repo", type=Path, default=Path("."))
@@ -86,16 +92,6 @@ def _print_report(report: Report) -> None:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-
-    if args.command == "verify":
-        verify_argv = ["--registry", str(args.registry)]
-        if args.list:
-            verify_argv.append("--list")
-        if args.write is not None:
-            verify_argv += ["--write", str(args.write)]
-        if args.check is not None:
-            verify_argv += ["--check", str(args.check)]
-        return claim_registry.main(verify_argv)
 
     if args.command == "init":
         try:

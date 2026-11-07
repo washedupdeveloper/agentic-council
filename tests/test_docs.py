@@ -30,5 +30,10 @@ def test_every_flag_is_documented() -> None:
 
 def test_every_command_is_documented() -> None:
     text = README.read_text(encoding="utf-8")
-    missing = [name for name in ("review", "verify", "init") if f"council {name}" not in text]
+    parser = build_parser()
+    subcommands = next(
+        action for action in parser._actions  # noqa: SLF001
+        if isinstance(action, argparse._SubParsersAction)  # noqa: SLF001
+    )
+    missing = [name for name in subcommands.choices if f"council {name}" not in text]
     assert not missing, f"undocumented command(s): {', '.join(missing)}"

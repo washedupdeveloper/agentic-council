@@ -85,6 +85,11 @@ def test_a_timeout_is_a_failure(tmp_path: Path) -> None:
     assert "timed out" in result.detail
 
 
+def test_a_missing_registry_is_a_start_failure(tmp_path: Path) -> None:
+    """3 means could not start; 2 stays reserved for an incomplete review."""
+    assert main(["--registry", str(tmp_path / "nope.toml")]) == 3
+
+
 def test_a_missing_flag_value_is_a_start_failure() -> None:
     with pytest.raises(SystemExit) as raised:
         main(["--registry"])

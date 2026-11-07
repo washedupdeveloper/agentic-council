@@ -33,6 +33,7 @@ a trend; it cannot change it.
 
 ```sh
 council review                # gate: 0 pass, 1 fail, 2 incomplete, 3 could not start
+council ci                    # the same gate for CI: verdict.json on stdout
 council review --report       # advice only: always exits 0
 python3 -m pytest             # the suite
 ./bin/council-verify          # every claim this project makes, executed
@@ -41,10 +42,14 @@ python3 tools/differential.py     # v1.9.0's verdicts beside this rule
 ```
 
 `claims.toml` is the registry. Each entry is one sentence and the command that
-would falsify it; the loader refuses an entry with no check, and `verify` exits
-non-zero if any claim is false. `docs/CLAIMS.md` is generated from it
-(`council verify --write docs/CLAIMS.md`) and checked in the flake, so the page
+would falsify it; the loader refuses an entry with no check, and `council-verify`
+exits non-zero if any claim is false. `docs/CLAIMS.md` is generated from it
+(`council-verify --write docs/CLAIMS.md`) and checked in the flake, so the page
 cannot list a claim that has no check behind it.
+
+`council ci` is `council review` for a pipeline: it always prints the verdict as
+JSON and always exits with it. It deliberately does not accept `--report` — a
+gate that can be told to exit 0 is not a gate.
 
 ## Flags
 
@@ -67,7 +72,17 @@ Every flag the tool accepts, what it changes, and why it exists. `council <comma
 | `--context-url URL` | none | fetch a URL as reference context (repeatable) | retrieval is context, not evidence; the caller names it, never the model |
 | `-h, --help` | — | usage | — |
 
-### `council verify`
+### `council ci`
+
+Takes every flag in the `council review` table except `--report` and `--json`:
+it prints `verdict.json` unconditionally and always exits with the verdict
+(0 pass, 1 fail, 2 incomplete, 3 could not start). It exists so a pipeline names
+one stable entry point instead of remembering the flags.
+
+### `council-verify` (maintainer entry point)
+
+Not a `council` subcommand: the registry is the project's own contract, and the
+binary is installed beside `council` for whoever maintains it.
 
 | flag | default | what it does | why |
 |---|---|---|---|

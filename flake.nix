@@ -88,7 +88,11 @@
             cd work
             set -e
             export HOME=$TMPDIR
-            ${command}
+            # The subshell matters: `set -e` does not fire for the left side of
+            # a `&&` list, so a failing check joined with `&&` would fall through
+            # to `touch $out` and report success. In a subshell the list's
+            # failure is the subshell's status, and `set -e` sees it.
+            ( ${command} )
             touch $out
           '';
         in

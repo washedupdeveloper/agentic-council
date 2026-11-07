@@ -146,11 +146,28 @@ def test_the_run_id_is_passed_through(monkeypatch: pytest.MonkeyPatch) -> None:
     assert seen["request"].run_id == "abc"
 
 
-def test_verify_runs_the_registry_and_passes(tmp_path: Path) -> None:
-    registry = tmp_path / "claims.toml"
-    registry.write_text('[[claim]]\nid = "x"\ntext = "It holds."\ncheck = "true"\n',
-                        encoding="utf-8")
-    assert cli.main(["verify", "--registry", str(registry)]) == 0
+def test_ci_prints_the_verdict_as_json_and_exits_with_it(monkeypatch: pytest.MonkeyPatch,
+                                                         tmp_path: Path,
+                                                         capsys: pytest.CaptureFixture[str]) -> None:
+    payload = {"verdict": "fail", "exit_code": 1}
+    (tmp_path / "verdict.json").write_text(json.dumps(payload), encoding="utf-8")
+    stub(monkeypatch, report(Verdict.FAIL, run_dir=tmp_path))
+    assert cli.main(["ci"]) == 1
+    assert json.loads(capsys.readouterr().out) == payload
+
+
+def test_ci_has_no_advice_switch() -> None:
+    """A gate that can be told to exit 0 is not a gate."""
+    with pytest.raises(SystemExit) as raised:
+        cli.main(["ci", "--report"])
+    assert raised.value.code == 3
+
+
+def test_verify_is_not_a_subcommand() -> None:
+    """The registry is the maintainer's entry point: council-verify."""
+    with pytest.raises(SystemExit) as raised:
+        cli.main(["verify"])
+    assert raised.value.code == 3
 
 
 def test_the_reviewer_binary_is_passed_through(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -173,15 +190,6 @@ def test_init_adds_the_state_directory(tmp_path: Path) -> None:
     assert ".council/" in (tmp_path / ".gitignore").read_text(encoding="utf-8")
 
 
-def test_verify_writes_and_checks_the_page(tmp_path: Path) -> None:
-    registry = tmp_path / "claims.toml"
-    registry.write_text('[[claim]]\nid = "x"\ntext = "It holds."\ncheck = "true"\n',
-                        encoding="utf-8")
-    page = tmp_path / "CLAIMS.md"
-    assert cli.main(["verify", "--registry", str(registry), "--write", str(page)]) == 0
-    assert cli.main(["verify", "--registry", str(registry), "--check", str(page)]) == 0
-
-
 def test_a_bad_config_is_a_start_failure(tmp_path: Path,
                                          monkeypatch: pytest.MonkeyPatch) -> None:
     repo = tmp_path / "repo"
@@ -202,15 +210,3 @@ def test_a_bad_config_is_a_start_failure(tmp_path: Path,
                                                            "performance")}})
     monkeypatch.setattr(cli, "hermes_runner", lambda *a, **k: (lambda prompt: empty))
     assert cli.main(["review", "-C", str(repo), "--run-id", "cfg", "--report"]) == 3
-
-
-def test_verify_with_a_missing_registry_is_not_incomplete(tmp_path: Path) -> None:
-    """2 means a review is incomplete; a registry that cannot be read is 3."""
-    assert cli.main(["verify", "--registry", str(tmp_path / "nope.toml")]) == 3
-
-
-def test_verify_fails_when_a_claim_is_false(tmp_path: Path) -> None:
-    registry = tmp_path / "claims.toml"
-    registry.write_text('[[claim]]\nid = "x"\ntext = "It does not."\ncheck = "false"\n',
-                        encoding="utf-8")
-    assert cli.main(["verify", "--registry", str(registry)]) == 1
