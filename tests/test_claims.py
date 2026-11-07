@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from council.claims import Claim, RegistryError, load, run_all, run_one
+from council.claims import Claim, RegistryError, load, main, render, run_all, run_one
 
 VALID = """
 [[claim]]
@@ -83,6 +83,25 @@ def test_a_timeout_is_a_failure(tmp_path: Path) -> None:
     result = run_one(Claim("x", "It hangs.", "sleep 5"), tmp_path, timeout=1)
     assert not result.ok
     assert "timed out" in result.detail
+
+
+def test_the_document_is_generated_from_the_registry(tmp_path: Path) -> None:
+    """The page cannot list a claim the registry does not have, or miss one it does."""
+    registry = write(tmp_path, VALID)
+    document = tmp_path / "CLAIMS.md"
+
+    assert main(["--registry", str(registry), "--write", str(document)]) == 0
+    assert "| `one` | The first claim holds. | `true` |" in document.read_text(encoding="utf-8")
+    assert main(["--registry", str(registry), "--check", str(document)]) == 0
+
+    document.write_text(document.read_text(encoding="utf-8") + "a claim nobody checks\n",
+                        encoding="utf-8")
+    assert main(["--registry", str(registry), "--check", str(document)]) == 1
+
+
+def test_render_is_one_row_per_claim(tmp_path: Path) -> None:
+    text = render(load(write(tmp_path, VALID)))
+    assert text.count("\n| `") == 2
 
 
 def test_run_all_keeps_going_after_a_failure(tmp_path: Path) -> None:

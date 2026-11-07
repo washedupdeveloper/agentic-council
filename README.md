@@ -29,6 +29,8 @@ a trend; it cannot change it.
 ## Commands
 
 ```sh
+council review                # gate: 0 pass, 1 fail, 2 incomplete, 3 could not start
+council review --report       # advice only: always exits 0
 python3 -m pytest             # the suite
 ./bin/council-verify          # every claim this project makes, executed
 python3 tools/mutation_check.py   # prove the suite can fail
@@ -36,7 +38,9 @@ python3 tools/mutation_check.py   # prove the suite can fail
 
 `claims.toml` is the registry. Each entry is one sentence and the command that
 would falsify it; the loader refuses an entry with no check, and `verify` exits
-non-zero if any claim is false.
+non-zero if any claim is false. `docs/CLAIMS.md` is generated from it
+(`council verify --write docs/CLAIMS.md`) and checked in the flake, so the page
+cannot list a claim that has no check behind it.
 
 ## The reviewer contract
 

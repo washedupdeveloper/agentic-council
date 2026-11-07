@@ -153,3 +153,13 @@ check = "python3 -m pytest tests/test_run.py::test_the_reviewed_repository_canno
 id = "an-explicit-prompt-is-recorded-by-digest"
 text = "Choosing a prompt with --prompt changes the recorded instrument digest."
 check = "python3 -m pytest tests/test_run.py::test_an_explicit_prompt_is_used_and_its_digest_recorded -q"
+
+[[claim]]
+id = "a-run-id-can-be-chosen"
+text = "The CLI passes --run-id through, so a run's artefacts have a name you chose."
+check = "python3 -m pytest tests/test_cli.py::test_the_run_id_is_passed_through -q"
+
+[[claim]]
+id = "the-claims-document-matches-the-registry"
+text = "docs/CLAIMS.md is generated from claims.toml, so it cannot list a claim that has no check."
+check = "python3 -m pytest tests/test_claims.py::test_the_document_is_generated_from_the_registry -q"

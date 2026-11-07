@@ -101,6 +101,10 @@ def main() -> int:
         with tempfile.TemporaryDirectory(prefix="council-mut-") as raw:
             src = Path(raw) / "src"
             shutil.copytree(ROOT / "src", src)
+            # A copied tree can keep its source permissions (a store path or a
+            # read-only checkout); the mutations have to be writable.
+            for path in [src, *src.rglob("*")]:
+                path.chmod(0o755 if path.is_dir() else 0o644)
             target = src / "council" / mutation.file
             text = target.read_text(encoding="utf-8")
             if mutation.old not in text:

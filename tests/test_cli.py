@@ -99,6 +99,18 @@ def test_the_report_prints_every_finding(monkeypatch: pytest.MonkeyPatch,
     assert "proven" in out
 
 
+def test_the_run_id_is_passed_through(monkeypatch: pytest.MonkeyPatch) -> None:
+    seen: dict[str, Any] = {}
+
+    def capture(request: Any, runner: Any) -> Report:
+        seen["request"] = request
+        return report(Verdict.PASS)
+
+    monkeypatch.setattr(cli, "review", capture)
+    assert cli.main(["review", "--run-id", "abc"]) == 0
+    assert seen["request"].run_id == "abc"
+
+
 def test_verify_runs_the_registry_and_passes(tmp_path: Path) -> None:
     registry = tmp_path / "claims.toml"
     registry.write_text('[[claim]]\nid = "x"\ntext = "It holds."\ncheck = "true"\n',

@@ -43,6 +43,8 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--report", action="store_true",
                      help="advice only: exit 0 whatever the verdict")
     run.add_argument("--json", action="store_true", help="print the run's verdict.json")
+    run.add_argument("--run-id", default=None,
+                     help="name this run instead of using a timestamp (refused if it exists)")
 
     verify = sub.add_parser("verify", help="run every claim in the registry")
     verify.add_argument("--registry", type=Path, default=Path("claims.toml"))
@@ -72,7 +74,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         report = review(
             ReviewRequest(repo=args.repo, base=args.base, samples=args.samples,
-                          profile=args.profile, prompt=args.prompt),
+                          profile=args.profile, prompt=args.prompt,
+                          run_id=args.run_id),
             hermes_runner(args.profile),
         )
     except ReviewError as exc:
