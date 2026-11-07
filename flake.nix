@@ -67,7 +67,7 @@
           # Each check runs in a writable copy: the flake source in the store is
           # read-only, and pytest, mypy and the mutation check all write.
           mkCheck = name: command: pkgs.runCommand name {
-            nativeBuildInputs = [ py pkgs.git pkgs.bubblewrap ];
+            nativeBuildInputs = [ py pkgs.git pkgs.bubblewrap pkgs.ruff ];
           } ''
             cp -r ${src} work
             chmod -R u+w work
@@ -81,6 +81,9 @@
           tests = mkCheck "council-tests" "python -m pytest -q -p no:cacheprovider";
 
           types = mkCheck "council-types" "mypy src";
+
+          # F: a name that is imported and never used. E9: code that cannot run.
+          lint = mkCheck "council-lint" "ruff check --select F,E9 src tools tests";
 
           # The registry, executed: every sentence in claims.toml is a command
           # that must exit 0, so the documentation cannot outrun the code.

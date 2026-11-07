@@ -15,7 +15,7 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from council.findings import Finding, Severity, State  # noqa: E402
+from council.findings import Finding, State  # noqa: E402
 from council.verdict import Verdict, judge  # noqa: E402
 
 FIXTURES = Path(__file__).resolve().parent.parent / "fixtures" / "golden"
