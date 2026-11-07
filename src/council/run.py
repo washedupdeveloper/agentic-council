@@ -137,7 +137,8 @@ def review(request: ReviewRequest, runner: Runner) -> Report:
         write_sample(directory, sample)
 
     config = load_config(root / CONFIG_NAME)
-    merged = merge(samples)
+    merged = merge([sample.output.findings if sample.output is not None else ()
+                    for sample in samples])
     adjudication = adjudicate(
         merged,
         ProofContext(repo=root, allow=config.allow, diff=patch, timeout=config.timeout,

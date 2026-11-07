@@ -65,5 +65,9 @@ gate now runs `council-lint` (`ruff check --select F,E9`), and the import is gon
 
 ## Order
 
-1. `repo.py` (one `_git`), 2. `merge` takes findings, 3. one prompt/schema
-vocabulary, 4. one version. Then the image, then the corpus on the packed binary.
+1. `repo.py` — **done** (`29bcde6`): one `_git`, and `test_git_is_called_in_one_module`
+   fails if a second caller appears.
+2. `merge` takes findings — **done** (`M11.22`): it no longer imports `sample`, and a
+   failed sample stays a hole instead of renumbering the ones after it.
+3. one prompt/schema vocabulary, 4. one version. Then the image, then the corpus
+   on the packed binary.

@@ -6,7 +6,6 @@ from dataclasses import dataclass
 from typing import Any, Sequence
 
 from .findings import SEVERITIES
-from .sample import SampleResult
 from .schema import DIMENSIONS, RawFinding
 
 _RANK: dict[str, int] = {severity: index for index, severity in enumerate(SEVERITIES)}
@@ -26,15 +25,17 @@ class MergedFinding:
     proofs: tuple[tuple[str, dict[str, Any]], ...]
 
 
-def merge(results: Sequence[SampleResult]) -> tuple[MergedFinding, ...]:
-    """Merge parsed samples, deterministically. A failed sample contributes nothing."""
+def merge(samples: Sequence[Sequence[RawFinding]]) -> tuple[MergedFinding, ...]:
+    """Merge findings per sample, deterministically.
+
+    A failed sample is an empty list, and the sample number is its position, so
+    a failure stays a hole instead of renumbering the samples after it.
+    """
     buckets: dict[tuple[str, str, int], list[tuple[int, RawFinding]]] = {}
-    for result in results:
-        if result.output is None:
-            continue
-        for finding in result.output.findings:
+    for number, findings in enumerate(samples, start=1):
+        for finding in findings:
             key = (finding.dimension, finding.file, finding.line)
-            buckets.setdefault(key, []).append((result.index, finding))
+            buckets.setdefault(key, []).append((number, finding))
 
     merged: list[MergedFinding] = []
     for key in sorted(buckets, key=lambda k: (_ORDER[k[0]], k[1], k[2])):
