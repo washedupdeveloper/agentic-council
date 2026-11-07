@@ -9,6 +9,9 @@ description = "A review is a claim until a check settles it."
 requires-python = ">=3.11"
 dependencies = []
 
+[project.optional-dependencies]
+dev = ["hypothesis>=6", "mypy>=1.10", "pytest>=8"]
+
 [project.scripts]
 council = "council.cli:main"
 council-verify = "council.claims:main"

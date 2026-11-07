@@ -175,10 +175,12 @@ def proof_command(params: Mapping[str, Any], ctx: ProofContext) -> ProofOutcome:
 
 
 def _pointer(document: Any, pointer: str) -> Any:
-    if pointer in ("", "/"):
+    if pointer == "":
         return document
+    if not pointer.startswith("/"):
+        raise KeyError(pointer)
     current = document
-    for raw in pointer.lstrip("/").split("/"):
+    for raw in pointer[1:].split("/"):
         part = raw.replace("~1", "/").replace("~0", "~")
         if isinstance(current, list):
             current = current[int(part)]

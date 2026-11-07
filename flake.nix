@@ -34,7 +34,7 @@
       # One interpreter with the two tools the checks need, so `nix develop`,
       # `nix build` and `nix flake check` agree on the versions.
       pythonEnv = pkgs: pkgs.python3.withPackages (ps: [
-        ps.pytest ps.mypy ps.setuptools ps.pip ps.wheel
+        ps.pytest ps.hypothesis ps.mypy ps.setuptools ps.pip ps.wheel
       ]);
 
       # A writable copy of the tree: the flake source is read-only, and pytest,
