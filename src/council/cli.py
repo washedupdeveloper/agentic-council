@@ -9,8 +9,8 @@ from typing import NoReturn, Sequence
 
 from . import claims as claim_registry
 from .config import ConfigError
-from .run import (DEFAULT_PROFILE, DEFAULT_SAMPLES, Report, ReviewError, ReviewRequest,
-                  init as init_repo, review)
+from .repo import ReviewError, init as init_repo
+from .run import DEFAULT_PROFILE, DEFAULT_SAMPLES, Report, ReviewRequest, review
 from .runner import hermes_runner
 
 EXIT_ERROR = 3

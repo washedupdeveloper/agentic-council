@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import subprocess
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -16,12 +15,12 @@ from .merge import merge
 from .paths import run_dir as run_path
 from .prompt import instrument_digest, render
 from .proofs import ProofContext
+from .repo import ReviewError, diff, output, root as repo_root, state_dir_ignored
 from .sample import Runner, SampleResult, run_sample, write_sample
 from .verdict import Result, Verdict
 
 DEFAULT_SAMPLES = 1
 DEFAULT_PROFILE = "council-generalist"
-MAX_UNTRACKED_BYTES = 200_000
 
 
 def default_prompt() -> Path:
@@ -32,10 +31,6 @@ def default_prompt() -> Path:
     and the verdict would look exactly like a clean change.
     """
     return Path(__file__).parent / "prompts" / "reviewer.md"
-
-
-class ReviewError(RuntimeError):
-    """The review cannot start: wrong directory, no prompt, no base."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -72,80 +67,6 @@ class Report:
     @property
     def exit_code(self) -> int:
         return self.result.exit_code
-
-
-def _git(repo: Path, *args: str) -> str:
-    proc = subprocess.run(["git", *args], cwd=repo, capture_output=True, text=True, timeout=60)
-    if proc.returncode != 0:
-        raise ReviewError(f"git {' '.join(args)} failed: {proc.stderr.strip()}")
-    return proc.stdout
-
-
-def _untracked_diff(root: Path) -> str:
-    """New files are part of the change; `git diff` does not show them."""
-    proc = subprocess.run(["git", "ls-files", "--others", "--exclude-standard", "-z"],
-                          cwd=root, capture_output=True, timeout=60)
-    if proc.returncode != 0:
-        raise ReviewError(f"git ls-files failed: {proc.stderr.decode(errors='replace').strip()}")
-    patches: list[str] = []
-    for raw in proc.stdout.split(b"\0"):
-        if not raw:
-            continue
-        rel = raw.decode("utf-8", "surrogateescape")
-        if rel.startswith(".council/"):
-            continue
-        try:
-            data = (root / rel).read_bytes()
-        except OSError:
-            continue
-        if len(data) > MAX_UNTRACKED_BYTES or b"\0" in data[:8000]:
-            continue
-        try:
-            text = data.decode("utf-8")
-        except UnicodeDecodeError:
-            continue
-        body = "".join(f"+{line}\n" for line in text.splitlines())
-        patches.append(f"diff --git a/{rel} b/{rel}\nnew file mode 100644\n--- /dev/null\n"
-                       f"+++ b/{rel}\n@@ -0,0 +1,{len(text.splitlines())} @@\n{body}")
-    return "".join(patches)
-
-
-def _diff(root: Path, base: str) -> str:
-    """The change as a patch: tracked edits, plus new files git leaves out."""
-    tracked = _git(root, "-c", "color.ui=false", "-c", "diff.srcPrefix=a/",
-                   "-c", "diff.dstPrefix=b/", "diff", "--no-color", "--no-ext-diff", base)
-    return tracked + _untracked_diff(root)
-
-
-def repo_root(path: Path) -> Path:
-    """The top of the worktree; a review is about a repository, not a subdirectory."""
-    try:
-        return Path(_git(path, "rev-parse", "--show-toplevel").strip())
-    except (OSError, ReviewError) as exc:
-        raise ReviewError(f"{path} is not inside a git repository: {exc}") from exc
-
-
-def state_dir_ignored(root: Path) -> bool:
-    """Whether `.council/` is ignored here, so a review does not dirty `git status`."""
-    proc = subprocess.run(["git", "check-ignore", "-q", ".council"], cwd=root,
-                          capture_output=True, text=True, timeout=30)
-    return proc.returncode == 0
-
-
-IGNORE_LINE = ".council/"
-
-
-def init(repo: Path) -> bool:
-    """Add `.council/` to the repository's `.gitignore`. True if it was added."""
-    root = repo_root(repo)
-    path = root / ".gitignore"
-    existing = path.read_text(encoding="utf-8") if path.exists() else ""
-    if any(line.strip().rstrip("/") == ".council" for line in existing.splitlines()):
-        return False
-    prefix = "" if not existing or existing.endswith("\n") else "\n"
-    with path.open("a", encoding="utf-8", newline="\n") as handle:
-        handle.write(f"{prefix}{IGNORE_LINE}\n")
-    return True
 
 
 def _write_verdict(run_dir: Path, request: ReviewRequest, base: str, head: str,
@@ -189,8 +110,8 @@ def review(request: ReviewRequest, runner: Runner) -> Report:
 
     root = repo_root(request.repo)
     base = resolve_base(root, request.base)
-    head = _git(root, "rev-parse", "HEAD").strip()
-    diff = _diff(root, base)
+    head = output(root, "rev-parse", "HEAD").strip()
+    patch = diff(root, base)
 
     prompt_file = request.prompt if request.prompt is not None else default_prompt()
     if not prompt_file.exists():
@@ -209,7 +130,7 @@ def review(request: ReviewRequest, runner: Runner) -> Report:
     if directory.exists():
         raise ReviewError(f"run {run_id!r} already exists at {directory}")
 
-    prompt = render(template, base=base, diff=diff)
+    prompt = render(template, base=base, diff=patch)
     samples = tuple(run_sample(prompt, runner, index=index)
                     for index in range(1, request.samples + 1))
     for sample in samples:
@@ -219,7 +140,7 @@ def review(request: ReviewRequest, runner: Runner) -> Report:
     merged = merge(samples)
     adjudication = adjudicate(
         merged,
-        ProofContext(repo=root, allow=config.allow, diff=diff, timeout=config.timeout,
+        ProofContext(repo=root, allow=config.allow, diff=patch, timeout=config.timeout,
                      sandbox=config.sandbox),
         failed_samples=[sample.index for sample in samples if not sample.ok],
     )

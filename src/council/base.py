@@ -3,25 +3,18 @@ refuse. A wrong base looks like a healthy review, so each step is checked."""
 
 from __future__ import annotations
 
-import subprocess
 from pathlib import Path
 
-GIT_TIMEOUT = 30
+from .repo import git
 
 
 class BaseError(ValueError):
     """No usable base revision, or the one asked for does not exist."""
 
 
-def _git(repo: Path, *args: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        ["git", *args], cwd=repo, capture_output=True, text=True, timeout=GIT_TIMEOUT
-    )
-
-
 def _commit(repo: Path, rev: str) -> str | None:
     """The commit id `rev` names, or None when it does not name one here."""
-    proc = _git(repo, "rev-parse", "--verify", "--quiet", f"{rev}^{{commit}}")
+    proc = git(repo, "rev-parse", "--verify", "--quiet", f"{rev}^{{commit}}")
     if proc.returncode != 0:
         return None
     sha = proc.stdout.strip()
@@ -37,7 +30,7 @@ def resolve_base(repo: Path, explicit: str | None = None) -> str:
         return sha
 
     if _commit(repo, "origin/HEAD") is not None:
-        merge_base = _git(repo, "merge-base", "origin/HEAD", "HEAD")
+        merge_base = git(repo, "merge-base", "origin/HEAD", "HEAD")
         if merge_base.returncode == 0:
             sha = merge_base.stdout.strip()
             if sha:

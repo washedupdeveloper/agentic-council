@@ -58,3 +58,4 @@ registry, so it cannot describe a claim that has no check.
 | `any-proof-that-holds-settles-the-finding` | A finding is proven when any of its proofs holds, even if another is refuted. | `python3 -m pytest tests/test_adjudicate.py::test_any_proof_that_holds_settles_the_finding -q` |
 | `the-digest-covers-the-contract` | The instrument digest changes when the proof contract changes, not only the prompt. | `python3 -m pytest tests/test_prompt.py::test_the_digest_changes_with_the_contract -q` |
 | `a-command-proof-is-never-unsandboxed` | Without bubblewrap a command proof is UNRUNNABLE; it never falls back to running unsandboxed. | `python3 -m pytest tests/test_proofs.py::test_without_bwrap_a_command_proof_does_not_run -q` |
+| `git-is-read-in-one-place` | Every git call goes through one helper, so a fix is made once. | `python3 -m pytest tests/test_repo.py::test_git_is_called_in_one_module -q` |

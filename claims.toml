@@ -253,3 +253,8 @@ check = "python3 -m pytest tests/test_prompt.py::test_the_digest_changes_with_th
 id = "a-command-proof-is-never-unsandboxed"
 text = "Without bubblewrap a command proof is UNRUNNABLE; it never falls back to running unsandboxed."
 check = "python3 -m pytest tests/test_proofs.py::test_without_bwrap_a_command_proof_does_not_run -q"
+
+[[claim]]
+id = "git-is-read-in-one-place"
+text = "Every git call goes through one helper, so a fix is made once."
+check = "python3 -m pytest tests/test_repo.py::test_git_is_called_in_one_module -q"
