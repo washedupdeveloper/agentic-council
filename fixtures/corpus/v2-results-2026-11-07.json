@@ -1,0 +1,38 @@
+{
+  "level-0-run-1": {
+    "expected": "pass",
+    "got": "pass",
+    "findings": 0,
+    "stderr": "note: .council/ is not ignored here; run `council init` to keep git clean"
+  },
+  "level-0-run-2": {
+    "expected": "pass",
+    "got": "pass",
+    "findings": 0,
+    "stderr": "note: .council/ is not ignored here; run `council init` to keep git clean"
+  },
+  "level-0-run-3": {
+    "expected": "pass",
+    "got": "pass",
+    "findings": 0,
+    "stderr": "note: .council/ is not ignored here; run `council init` to keep git clean"
+  },
+  "level-1-run-1": {
+    "expected": "fail",
+    "got": "fail",
+    "findings": 2,
+    "stderr": "note: .council/ is not ignored here; run `council init` to keep git clean"
+  },
+  "level-1-run-2": {
+    "expected": "fail",
+    "got": "fail",
+    "findings": 2,
+    "stderr": "note: .council/ is not ignored here; run `council init` to keep git clean"
+  },
+  "level-1-run-3": {
+    "expected": "fail",
+    "got": "fail",
+    "findings": 2,
+    "stderr": "note: .council/ is not ignored here; run `council init` to keep git clean"
+  }
+}

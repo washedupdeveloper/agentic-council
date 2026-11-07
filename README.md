@@ -113,6 +113,9 @@ Everything that acts is in a module a reader can name: `repo` (git), `proofs` an
 file), `run` (writes the run), `cli` (stdout), `claims` (runs the registry). That is the
 whole of the side effects.
 
+The rebuild's acceptance criteria, every amendment to them, and the command that
+decides each one: `docs/M11.md`.
+
 ## Evidence
 
 `verdict.json` records `base`, `head`, `worktree` (whether local edits were
