@@ -178,3 +178,13 @@ check = "python3 -m pytest tests/test_run.py::test_init_adds_the_line_once tests
 id = "the-differential-explains-its-differences"
 text = "Against v1.9.0's fixtures: clean is PASS, defects is INCOMPLETE, and the difference is named."
 check = "python3 -m pytest tests/test_differential.py -q"
+
+[[claim]]
+id = "a-sample-inside-a-tool-transcript-is-read"
+text = "A reviewer answer that arrives inside a tool transcript is parsed, not discarded."
+check = "python3 -m pytest tests/test_schema.py::test_json_inside_a_tool_transcript_is_read -q"
+
+[[claim]]
+id = "a-failed-sample-keeps-what-it-said"
+text = "A sample that does not parse keeps the raw answer, so the failure can be read."
+check = "python3 -m pytest tests/test_sample.py::test_a_failed_sample_keeps_the_raw_answer -q"

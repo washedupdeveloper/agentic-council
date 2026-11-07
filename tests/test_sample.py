@@ -60,6 +60,15 @@ def test_attempts_can_be_one() -> None:
     assert len(calls) == 1
 
 
+def test_a_failed_sample_keeps_the_raw_answer(tmp_path: Path) -> None:
+    """A parse failure is diagnosable only if the answer is kept."""
+    result = run_sample("prompt", lambda _: "not json at all", attempts=1)
+    assert not result.ok
+    assert result.raw == "not json at all"
+    payload = json.loads(write_sample(tmp_path, result).read_text(encoding="utf-8"))
+    assert payload["raw"] == "not json at all"
+
+
 def test_a_written_sample_carries_its_error(tmp_path: Path) -> None:
     path = write_sample(tmp_path, run_sample("prompt", lambda _: BROKEN, attempts=1))
     payload = json.loads(path.read_text(encoding="utf-8"))

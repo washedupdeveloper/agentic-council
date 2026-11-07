@@ -22,6 +22,7 @@ class SampleResult:
     output: ReviewerOutput | None
     attempts: int
     error: str | None
+    raw: str = ""
 
     @property
     def ok(self) -> bool:
@@ -35,17 +36,19 @@ def run_sample(prompt: str, runner: Runner, *, index: int = 1,
         raise ValueError("attempts must be at least 1")
 
     last = "no attempt was made"
+    last_text = ""
     for attempt in range(1, attempts + 1):
         try:
             text = runner(prompt)
         except OSError as exc:
             last = f"the reviewer could not run: {exc}"
             continue
+        last_text = text
         try:
             return SampleResult(index, parse_reviewer_output(text), attempt, None)
         except SchemaError as exc:
             last = str(exc)
-    return SampleResult(index, None, attempts, last)
+    return SampleResult(index, None, attempts, last, last_text[-4000:])
 
 
 def write_sample(run_dir: Path, result: SampleResult) -> Path:
@@ -57,6 +60,7 @@ def write_sample(run_dir: Path, result: SampleResult) -> Path:
         "index": result.index,
         "attempts": result.attempts,
         "error": result.error,
+        "raw": result.raw,
         "findings": [
             {
                 "dimension": finding.dimension,

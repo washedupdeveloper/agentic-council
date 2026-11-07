@@ -73,6 +73,19 @@ def test_a_leading_dot_slash_is_refused() -> None:
         parse_reviewer_output(payload(security=[finding(file="./a.py")]))
 
 
+def test_a_literal_newline_inside_a_string_is_tolerated() -> None:
+    """The model writes multi-line claims without escaping; the bytes are unambiguous."""
+    body = payload(security=[finding(claim="first line\nsecond line")])
+    literal = body.replace("\\n", "\n")
+    assert parse_reviewer_output(literal).findings[0].claim == "first line\nsecond line"
+
+
+def test_json_inside_a_tool_transcript_is_read() -> None:
+    """The reviewer sometimes writes the file instead of answering; read the object."""
+    transcript = "│ +" + payload() + "\n│ /home/user/.cache/my_review.json\n"
+    assert parse_reviewer_output(transcript).findings == ()
+
+
 def test_non_json_is_refused() -> None:
     with pytest.raises(SchemaError, match="no JSON object"):
         parse_reviewer_output("I reviewed the change and it looks fine.")

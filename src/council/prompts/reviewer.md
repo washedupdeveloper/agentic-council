@@ -40,8 +40,11 @@ Each finding is:
 
 ## Rules
 
+- Do not call tools, write files, or explain: the JSON object is your whole reply.
+- Never quote a credential or secret value: cite the file and line, and use `diff`.
 - If you cannot name a proof for a finding, do not report the finding.
 - Report only what this change introduces or fails to fix.
+- Keep each `claim` under 160 characters: a long answer is a truncated answer.
 - Every section is present, even when empty.
 - `file` is a path from the repository root, without a leading `./`.
 - `line` is 1-based and inside the file.

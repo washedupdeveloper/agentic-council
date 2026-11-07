@@ -59,13 +59,17 @@ def _strip_fence(text: str) -> str:
 def _payload(text: str) -> dict[str, Any]:
     candidate = _strip_fence(text)
     try:
-        value = json.loads(candidate)
+        # strict=False accepts a literal newline inside a string: the model
+        # writes multi-line claims, and the bytes are unambiguous.
+        value = json.loads(candidate, strict=False)
     except json.JSONDecodeError:
-        start, end = candidate.find("{"), candidate.rfind("}")
-        if start == -1 or end <= start:
+        # The answer may arrive inside a tool transcript; the first complete
+        # object is the answer. Validation below is unchanged.
+        start = candidate.find("{")
+        if start == -1:
             raise SchemaError("the sample contains no JSON object") from None
         try:
-            value = json.loads(candidate[start:end + 1])
+            value, _ = json.JSONDecoder(strict=False).raw_decode(candidate[start:])
         except json.JSONDecodeError as exc:
             raise SchemaError(f"the sample is not valid JSON: {exc}") from exc
     if not isinstance(value, dict):
