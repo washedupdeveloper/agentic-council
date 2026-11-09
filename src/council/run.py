@@ -421,7 +421,7 @@ def review(request: ReviewRequest, runner: Runner) -> Report:
         adjudication = adjudicate(merged, proofs)
         result = verdict(adjudication)
         unreviewed = [unit.id for unit, _, _, _, ok in runs if not ok]
-        if unreviewed and result.verdict is Verdict.PASS:
+        if unreviewed:
             silent = [unit_id for unit_id in unreviewed if unit_id not in skipped_by_budget]
             late = [unit_id for unit_id in unreviewed if unit_id in skipped_by_budget]
             reasons = []
@@ -430,11 +430,17 @@ def review(request: ReviewRequest, runner: Runner) -> Report:
             if late:
                 reasons.append(f"unit(s) {', '.join(late)} were not reviewed within "
                                f"the {request.time_budget}s time budget")
-            result = Result(
-                Verdict.INCOMPLETE,
-                "; ".join(reasons) + ": the review is missing evidence",
-                result.findings,
-            )
+            note = "; ".join(reasons)
+            if result.verdict is Verdict.PASS:
+                result = Result(
+                    Verdict.INCOMPLETE,
+                    note + ": the review is missing evidence",
+                    result.findings,
+                )
+            else:
+                # FAIL and INCOMPLETE both outrank a missing unit, but the reason
+                # must still say what was never looked at.
+                result = Result(result.verdict, f"{result.reason}; {note}", result.findings)
         for unit, unit_samples, unit_run, unit_agreement, ok in runs:
             mine = [finding for finding in result.findings if _belongs(finding, unit)]
             units_payload.append({

@@ -500,6 +500,25 @@ def test_a_spent_time_budget_leaves_the_remaining_units_unreviewed(
     assert "time budget" in payload["reason"]
 
 
+def test_a_missing_unit_is_named_even_when_a_finding_is_unsettled(
+        tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    repo, prompt = make_two_changes(tmp_path)
+    clock = iter([0.0, 0.0, 100.0])
+    monkeypatch.setattr(time, "monotonic", lambda: next(clock))
+    finding = secret(proof={"kind": "command", "params": {
+        "argv": ["sh", "-c", "true"], "expect": {"exit": "zero"}}})
+
+    report = review(
+        ReviewRequest(repo=repo, base="HEAD", samples=1, run_id="budget-unsettled",
+                      prompt=prompt, max_prompt_bytes=200, time_budget=10),
+        lambda _: body({"security": [finding]}))
+
+    payload = json.loads((report.run_dir / "verdict.json").read_text(encoding="utf-8"))
+    assert payload["verdict"] == "incomplete"
+    assert "could not be settled" in payload["reason"]
+    assert "time budget" in payload["reason"]
+
+
 def test_a_unit_that_cannot_fit_at_depth_zero_is_refused_with_its_name(
         tmp_path: Path) -> None:
     repo = tmp_path / "repo"

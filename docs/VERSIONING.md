@@ -60,7 +60,7 @@ Three copies, and they must agree:
 3. prose claims of the shape `Current release vX.Y.Z` in `README.md` and
    `docs/**` (excluding `CHANGELOG.md` and run records, which are history).
 
-`python tools/release.py check` verifies all three, plus: `## [Unreleased]` is
+`python tools/release.py check` verifies all three, plus: `## Unreleased` is
 the first section, released versions are strictly descending, no version
 appears twice, and every release heading carries a valid date. `--tag vX.Y.Z`
 checks a pushed tag against the build metadata without asking git.

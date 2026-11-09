@@ -222,7 +222,7 @@ both; a user needs neither nix nor this repository to run the wheel.
 
 The version lives in `pyproject.toml`, the newest heading in `CHANGELOG.md`,
 and any prose that quotes it (`Current release vX.Y.Z`, or a wheel filename).
-`python tools/release.py check` asserts all three agree, that `## [Unreleased]`
+`python tools/release.py check` asserts all three agree, that `## Unreleased`
 is first, and that releases are unique, dated and descending; it is a check in
 the flake. `python tools/release.py bump --version X.Y.Z` moves the Unreleased
 entries under a dated heading, updates every copy, and prints the `git tag`

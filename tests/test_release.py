@@ -98,7 +98,7 @@ def test_bump_moves_the_entries_and_updates_all_three_copies(
     assert (repo / "pyproject.toml").read_text(encoding="utf-8").count('version = "2.0.0"') == 1
     text = (repo / "CHANGELOG.md").read_text(encoding="utf-8")
     assert text.startswith("# Changelog")
-    assert "## [Unreleased]\n\n## [2.0.0] — 2026-11-09" in text
+    assert "## Unreleased\n\n## [2.0.0] — 2026-11-09" in text
     assert "- Something new." in text
     assert "Current release v2.0.0" in (repo / "README.md").read_text(encoding="utf-8")
     assert "git tag -a v2.0.0" in capsys.readouterr().out

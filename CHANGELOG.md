@@ -7,7 +7,7 @@ project follows [Semantic Versioning](https://semver.org/). The policy — the
 public surface, the definitions, and the release procedure — is
 [`docs/VERSIONING.md`](docs/VERSIONING.md).
 
-## [Unreleased]
+## Unreleased
 
 ### Added
 
@@ -32,9 +32,6 @@ public surface, the definitions, and the release procedure — is
 - Property tests for the diff parser and proof-parameter normalisation.
 - A zero-dependency wheel (`pip install council-<version>-py3-none-any.whl`) and
   a container image that carries the tool, not the reviewer.
-
-### Added
-
 - `--sample-timeout N` (default 900 s): one sample attempt cannot outlast it.
 - `--time-budget N`: a sliced run stops starting units after N seconds; the
   units it did not reach are recorded as unreviewed, so the run cannot be PASS.
@@ -43,8 +40,8 @@ public surface, the definitions, and the release procedure — is
 
 ### Changed
 
-- Three user verbs: `review`, `ci`, `init`. The claims registry is the
-  maintainer entry point `council-verify`.
+- Three review verbs: `review`, `ci`, `init`; `council doctor` is a diagnostic.
+  The claims registry is the maintainer entry point `council-verify`.
 - A run records what it reviewed: `diff_sha256`, skipped files, context spans and
   their digest, unresolved calls, references, prompt size and limit.
 
@@ -52,6 +49,10 @@ public surface, the definitions, and the release procedure — is
 
 - Every shipped text file now ends with a newline, so diffs stop reporting
   `\ No newline at end of file` for the last line.
+- A run's reason names the units the time budget left unreviewed even when an
+  unresolved finding already made the verdict `incomplete`.
+- The changelog's duplicate `### Added` heading, literal `[Unreleased]` heading
+  and "three user verbs" wording, all found by a live review of this repository.
 
 ### Removed
 

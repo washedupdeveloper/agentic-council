@@ -22,7 +22,15 @@ from typing import Sequence
 
 SEMVER = re.compile(r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$")
 RELEASE = re.compile(r"^## \[(\d+\.\d+\.\d+)\] — (\d{4}-\d{2}-\d{2})\s*$")
-UNRELEASED = "## [Unreleased]"
+UNRELEASED = "## Unreleased"
+LEGACY_UNRELEASED = "## [Unreleased]"
+
+
+def is_unreleased(line: str) -> bool:
+    """Both spellings: a bracketed heading without a link renders literally."""
+    return line.strip() in (UNRELEASED, LEGACY_UNRELEASED)
+
+
 PROSE = re.compile(r"[Cc]urrent release\s+\*{0,2}v(\d+\.\d+\.\d+)")
 WHEEL = re.compile(r"council-(\d+\.\d+\.\d+)-py3-none-any\.whl")
 CLAIMS = (PROSE, WHEEL)
@@ -53,9 +61,9 @@ def split_changelog(text: str) -> tuple[str, str, str]:
     """(preamble, the Unreleased body, everything from the next release on)."""
     lines = text.splitlines(keepends=True)
     start = next((index for index, line in enumerate(lines)
-                  if line.strip() == UNRELEASED), None)
+                  if is_unreleased(line)), None)
     if start is None:
-        raise ValueError("CHANGELOG.md has no `## [Unreleased]` section")
+        raise ValueError(f"CHANGELOG.md has no `{UNRELEASED}` section")
     end = next((index for index in range(start + 1, len(lines))
                 if lines[index].startswith("## [")), len(lines))
     return "".join(lines[:start]), "".join(lines[start + 1:end]), "".join(lines[end:])
@@ -64,7 +72,7 @@ def split_changelog(text: str) -> tuple[str, str, str]:
 def released(text: str) -> list[Release]:
     found: list[Release] = []
     for line in text.splitlines():
-        if not line.startswith("## [") or line.strip() == UNRELEASED:
+        if not line.startswith("## [") or is_unreleased(line):
             continue
         match = RELEASE.match(line)
         if match is None:
@@ -95,8 +103,8 @@ def check(root: Path, *, tag: str | None = None) -> list[str]:
     except OSError as exc:
         return errors + [f"CHANGELOG.md: cannot read it: {exc}"]
 
-    headings = [line.strip() for line in text.splitlines() if line.startswith("## [")]
-    if not headings or headings[0] != UNRELEASED:
+    headings = [line.strip() for line in text.splitlines() if line.startswith("## ")]
+    if not headings or not is_unreleased(headings[0]):
         errors.append(f"CHANGELOG.md: the first section must be `{UNRELEASED}`")
     try:
         releases = released(text)
@@ -170,7 +178,7 @@ def bump(root: Path, version: str, day: str, *, dry_run: bool = False) -> list[P
     text = changelog.read_text(encoding="utf-8")
     head, body, rest = split_changelog(text)
     if "### " not in body:
-        raise ValueError("`## [Unreleased]` has no entries: there is nothing to release")
+        raise ValueError(f"`{UNRELEASED}` has no entries: there is nothing to release")
 
     new_text = (head + UNRELEASED + "\n\n" + f"## [{version}] — {day}\n\n"
                 + body.strip() + "\n\n" + rest.lstrip("\n"))
