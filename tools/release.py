@@ -155,7 +155,13 @@ def _rewrite_prose(root: Path, version: str) -> list[Path]:
         text = path.read_text(encoding="utf-8")
 
         def swap(match: re.Match[str]) -> str:
-            return f"{match.group(0)[:match.start(1) - match.start(0)]}{version}"
+            # Replace only the captured version, never the rest of the match: a
+            # wheel filename is `council-<version>-py3-none-any.whl`, and the
+            # suffix must survive. (A previous version dropped it.)
+            start, end = match.span(1)
+            begin = match.group(0)[:start - match.start(0)]
+            tail = match.group(0)[end - match.start(0):]
+            return f"{begin}{version}{tail}"
 
         edited = text
         for pattern in CLAIMS:

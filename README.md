@@ -170,7 +170,9 @@ whole of the side effects.
 
 The rebuild's acceptance criteria, every amendment to them, and the command that
 decides each one: `docs/M11.md`. The time budget and the doctor checks are
-decided in [`docs/M13.md`](docs/M13.md).
+decided in [`docs/M13.md`](docs/M13.md); release and adoption in
+[`docs/M14.md`](docs/M14.md), with the external run written up in
+[`docs/ADOPTION.md`](docs/ADOPTION.md).
 
 ## Evidence
 
@@ -212,7 +214,7 @@ the tool, not the reviewer: mount one at `/bin/hermes` or pass `--reviewer`.
 Command proofs need user namespaces; a runtime that blocks them makes those
 proofs `UNRUNNABLE`, never unsandboxed.
 
-`nix build .#wheel` → `council-0.1.0-py3-none-any.whl`, with no dependencies:
+`nix build .#wheel` → `council-2.0.0-py3-none-any.whl`, with no dependencies:
 `pip install` it on any host with Python 3.11+. A wheel cannot carry `bwrap`, so
 `command` proofs on a bare host are `UNRUNNABLE` unless bubblewrap is installed;
 the image is the artifact where the sandbox travels with the tool. Nix builds

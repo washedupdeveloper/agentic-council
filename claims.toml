@@ -428,3 +428,8 @@ check = "python3 -m pytest tests/test_doctor.py -q"
 id = "doctor-warns-when-bwrap-is-missing"
 text = "council doctor warns, but does not fail, when bwrap is absent."
 check = "python3 -m pytest tests/test_doctor.py::test_bwrap_missing_is_a_warning_not_a_failure -q"
+
+[[claim]]
+id = "the-package-version-is-the-released-version"
+text = "The version in pyproject.toml is a released heading in CHANGELOG.md, and both console scripts are declared."
+check = "python3 -m pytest tests/test_packaging.py -q"

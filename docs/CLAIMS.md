@@ -89,3 +89,4 @@ registry, so it cannot describe a claim that has no check.
 | `a-time-budget-leaves-late-units-unreviewed` | A run that spends its time budget records the units it did not reach as unreviewed and cannot PASS. | `python3 -m pytest tests/test_run.py::test_a_spent_time_budget_leaves_the_remaining_units_unreviewed -q` |
 | `doctor-reports-a-profile-that-cannot-answer` | council doctor fails when the profile does not answer its probe. | `python3 -m pytest tests/test_doctor.py -q` |
 | `doctor-warns-when-bwrap-is-missing` | council doctor warns, but does not fail, when bwrap is absent. | `python3 -m pytest tests/test_doctor.py::test_bwrap_missing_is_a_warning_not_a_failure -q` |
+| `the-package-version-is-the-released-version` | The version in pyproject.toml is a released heading in CHANGELOG.md, and both console scripts are declared. | `python3 -m pytest tests/test_packaging.py -q` |

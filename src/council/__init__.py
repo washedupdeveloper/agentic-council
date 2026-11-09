@@ -6,4 +6,10 @@ in the package exists to produce those two.
 """
 
 __all__ = ["findings", "verdict"]
-__version__ = "0.1.0"
+try:
+    from importlib.metadata import PackageNotFoundError
+    from importlib.metadata import version as _distribution_version
+
+    __version__ = _distribution_version("council")
+except PackageNotFoundError:  # a source checkout, not an installed distribution
+    __version__ = "0.0.0+source"

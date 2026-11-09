@@ -1,0 +1,39 @@
+{
+  "run": "adopt-sampleproject",
+  "base": "8603eaf898a2db2c89c36ad6b302f2994700ad6a",
+  "head": "621e4974ca25ce531773def586ba3ed8e736b3fc",
+  "worktree": true,
+  "diff_sha256": "d2022de47bf2cd5350dc5d7135977b1615a9ae70ba2f2ad654ab5dc2cc1e5429",
+  "digest": "7f548d9b439e266a",
+  "prompt": "/tmp/m14/venv/lib/python3.14/site-packages/council/prompts/reviewer.md",
+  "prompt_bytes": 7954,
+  "prompt_limit": 32768,
+  "prompt_acknowledged": false,
+  "sliced": false,
+  "time_budget": 300,
+  "units": [],
+  "state_dir_ignored": true,
+  "profile": "council-generalist",
+  "samples_requested": 1,
+  "samples_run": 1,
+  "agreement": null,
+  "samples": [
+    {
+      "index": 1,
+      "ok": false,
+      "attempts": 2,
+      "error": "the reviewer could not run: hermes did not answer within 90s",
+      "findings": 0
+    }
+  ],
+  "skipped": [],
+  "context_digest": "a65e6af84544bbd9",
+  "context_depth": 0,
+  "context": [],
+  "unresolved": [],
+  "references": [],
+  "verdict": "incomplete",
+  "exit_code": 2,
+  "reason": "sample(s) 1 returned nothing usable: the review is missing evidence",
+  "findings": []
+}

@@ -106,6 +106,14 @@ def test_bump_moves_the_entries_and_updates_all_three_copies(
     assert release.check(repo) == []
 
 
+def test_bump_keeps_the_suffix_of_a_wheel_filename(tmp_path: Path) -> None:
+    readme = "# council\n\n`council-0.1.0-py3-none-any.whl`\n"
+    repo = make(tmp_path / "repo", readme=readme)
+    release.bump(repo, "2.0.0", "2026-11-09")
+    text = (repo / "README.md").read_text(encoding="utf-8")
+    assert "council-2.0.0-py3-none-any.whl" in text
+
+
 def test_bump_refuses_an_empty_unreleased(tmp_path: Path) -> None:
     text = "# Changelog\n\n## [Unreleased]\n\n## [1.0.0] — 2026-01-01\n"
     repo = make(tmp_path / "repo", version="1.0.0", changelog=text)

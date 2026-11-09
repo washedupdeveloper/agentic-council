@@ -9,6 +9,13 @@ public surface, the definitions, and the release procedure — is
 
 ## Unreleased
 
+## [2.0.0] — 2026-11-09
+
+The first release of the rebuilt engine: the wheel installs with no
+dependencies, the image carries the tool and `bwrap`, and the CI action runs
+`council doctor` before `council ci`. Adoption on `pypa/sampleproject` is
+recorded in `docs/ADOPTION.md`.
+
 ### Added
 
 - A verdict derived from evidence states: `pass`, `fail`, `incomplete`. A finding
@@ -53,6 +60,8 @@ public surface, the definitions, and the release procedure — is
   unresolved finding already made the verdict `incomplete`.
 - The changelog's duplicate `### Added` heading, literal `[Unreleased]` heading
   and "three user verbs" wording, all found by a live review of this repository.
+- `tools/release.py bump` dropped the `-py3-none-any.whl` suffix from a wheel
+  filename in prose; it now replaces only the version, and a test holds it.
 
 ### Removed
 
@@ -61,3 +70,4 @@ public surface, the definitions, and the release procedure — is
   change it.
 - The `http` and `dom` proof kinds. Retrieval is caller-supplied context, and a
   browser claim is a `command` proof of the repository's own test.
+

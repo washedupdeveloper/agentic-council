@@ -1,0 +1,44 @@
+name: council
+
+# The runner must have Hermes and the review profile. A hosted runner does not;
+# this workflow is meant for a self-hosted one, and is manual on purpose: a
+# review costs real model time, so it is started by a person, not by every push.
+on:
+  workflow_dispatch:
+    inputs:
+      base:
+        description: Revision to diff against (empty means the repository default)
+        required: false
+        default: ""
+      samples:
+        description: Samples per unit
+        required: false
+        default: "1"
+      time-budget:
+        description: Seconds after which no new unit is started
+        required: false
+        default: "600"
+
+permissions:
+  contents: read
+
+jobs:
+  review:
+    name: council review
+    runs-on: self-hosted
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Build the wheel
+        run: python3 -m pip wheel --no-deps --no-build-isolation --wheel-dir dist .
+
+      - name: Review
+        uses: ./.github/actions/council
+        with:
+          dist: dist
+          base: ${{ inputs.base }}
+          samples: ${{ inputs.samples }}
+          time-budget: ${{ inputs.time-budget }}

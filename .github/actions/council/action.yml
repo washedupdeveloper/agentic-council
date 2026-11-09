@@ -1,0 +1,64 @@
+name: council
+description: Review a change with council; bounded by a sample timeout and a run budget.
+
+# A reviewer is a host capability, not something this action installs. Run it on
+# a runner that has `hermes` and the `council-generalist` profile.
+inputs:
+  dist:
+    description: Directory holding the council wheel
+    required: false
+    default: dist
+  base:
+    description: Revision to diff against (empty means the repository default)
+    required: false
+    default: ""
+  samples:
+    description: Samples per unit
+    required: false
+    default: "1"
+  context-depth:
+    description: 0 diff only, 1 enclosing function, 2 +one call level, 3 +two
+    required: false
+    default: "3"
+  sample-timeout:
+    description: Seconds one sample may take before it fails
+    required: false
+    default: "180"
+  time-budget:
+    description: Seconds after which no new unit is started
+    required: false
+    default: "600"
+  python:
+    description: Interpreter used to create the private environment
+    required: false
+    default: python3
+
+runs:
+  using: composite
+  steps:
+    - name: Install the wheel into a private environment
+      shell: bash
+      run: |
+        set -euo pipefail
+        "${{ inputs.python }}" -m venv "$RUNNER_TEMP/council-venv"
+        "$RUNNER_TEMP/council-venv/bin/python" -m pip install --disable-pip-version-check \
+          "${{ inputs.dist }}"/*.whl
+        echo "$RUNNER_TEMP/council-venv/bin" >> "$GITHUB_PATH"
+
+    - name: Check the reviewer before asking it anything
+      shell: bash
+      run: council doctor --json
+
+    - name: Review the change
+      shell: bash
+      env:
+        BASE: ${{ inputs.base }}
+      run: |
+        set -uo pipefail
+        args=(ci
+          --samples "${{ inputs.samples }}"
+          --sample-timeout "${{ inputs.sample-timeout }}"
+          --time-budget "${{ inputs.time-budget }}"
+          --context-depth "${{ inputs.context-depth }}")
+        if [ -n "$BASE" ]; then args+=(--base "$BASE"); fi
+        council "${args[@]}"

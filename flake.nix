@@ -8,10 +8,14 @@
       systems = [ "x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin" ];
       each = f: nixpkgs.lib.genAttrs systems (system: f nixpkgs.legacyPackages.${system});
 
+      # The version is written once, in pyproject.toml; the package, the image
+      # and the wheel check read it from there.
+      version = (builtins.fromTOML (builtins.readFile ./pyproject.toml)).project.version;
+
       # Defined once: the package and the image ship the same application.
       base = pkgs: pkgs.python3Packages.buildPythonApplication {
         pname = "council";
-        version = "0.1.0";
+        version = version;
         format = "pyproject";
         src = self;
         nativeBuildInputs = [ pkgs.python3Packages.setuptools ];
@@ -24,7 +28,7 @@
 
       # bwrap is on the binary's own PATH: a sandboxed proof must not depend on
       # whatever the caller's environment happens to contain.
-      app = pkgs: pkgs.runCommand "council-0.1.0" { nativeBuildInputs = [ pkgs.makeWrapper ]; } ''
+      app = pkgs: pkgs.runCommand "council-${version}" { nativeBuildInputs = [ pkgs.makeWrapper ]; } ''
         mkdir -p $out/bin
         makeWrapper ${base pkgs}/bin/council $out/bin/council \
           --prefix PATH : ${pkgs.bubblewrap}/bin
@@ -63,7 +67,7 @@
         # The tool, not the reviewer: mount a hermes binary and a repository.
         image = pkgs.dockerTools.buildLayeredImage {
           name = "council";
-          tag = "0.1.0";
+          tag = version;
           contents = [ pkgs.bash pkgs.coreutils pkgs.git pkgs.cacert pkgs.bubblewrap (app pkgs) ];
           config = {
             Entrypoint = [ "/bin/council" ];
@@ -125,7 +129,7 @@
             python -m pip wheel --no-deps --no-build-isolation --wheel-dir dist .
             python -m pip install --no-index --target dist/site dist/*.whl
             PYTHONPATH=dist/site python -m council --help > /dev/null
-            PYTHONPATH=dist/site python -c "import council; assert council.__version__ == '0.1.0'"
+            PYTHONPATH=dist/site python -c "import council; assert council.__version__ == '${version}'"
           '';
         });
 
