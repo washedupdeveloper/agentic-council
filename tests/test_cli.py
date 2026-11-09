@@ -292,6 +292,21 @@ def test_review_can_narrow_the_base(monkeypatch: pytest.MonkeyPatch) -> None:
     assert calls[1].base == "HEAD~4"
 
 
+def test_review_can_lower_the_context_depth(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[Any] = []
+
+    def fake(request: Any, runner: Any) -> Report:
+        calls.append(request)
+        if len(calls) == 1:
+            raise _oversize()
+        return report(Verdict.PASS)
+
+    monkeypatch.setattr(cli, "review", fake)
+    monkeypatch.setattr(cli.sys, "stdin", _Stdin(["context 1\n"]))
+    assert cli.main(["review"]) == 0
+    assert calls[1].context_depth == 1
+
+
 def test_silence_cancels_and_sends_nothing(monkeypatch: pytest.MonkeyPatch,
                                           capsys: pytest.CaptureFixture[str]) -> None:
     def fake(request: Any, runner: Any) -> Report:

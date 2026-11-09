@@ -68,6 +68,8 @@ def _add_review_arguments(parser: argparse.ArgumentParser, *, advice: bool) -> N
                         help="name this run instead of using a timestamp (refused if it exists)")
     parser.add_argument("--context-url", action="append", default=[], metavar="URL",
                         help="fetch this URL as reference context (repeatable; never a proof)")
+    parser.add_argument("--context-depth", type=int, choices=(0, 1, 2, 3), default=3,
+                        help="0 diff only, 1 enclosing function, 2 +one call level, 3 +two (default)")
     parser.add_argument("--max-prompt-bytes", type=_positive, default=PROMPT_LIMIT,
                         metavar="N",
                         help="refuse a prompt larger than N bytes (default: 32768)")
@@ -117,6 +119,7 @@ def _oversize_decision(exc: PromptTooLarge) -> tuple[str, int | str | None]:
         print("  allow           send it anyway\n"
               "  budget N        set the limit to N bytes and retry\n"
               "  base REV        review a narrower change\n"
+              "  context N       layers: 0 none, 1 enclosing, 2 +1 call, 3 +2\n"
               "  ?               explain the limit\n"
               "  cancel          stop (exit 3)", file=sys.stderr)
         line = sys.stdin.readline()
@@ -141,6 +144,16 @@ def _oversize_decision(exc: PromptTooLarge) -> tuple[str, int | str | None]:
                 print("council: base needs a revision", file=sys.stderr)
                 continue
             return ("base", rest)
+        if command == "context":
+            try:
+                depth = int(rest)
+            except ValueError:
+                print("council: context needs 0, 1, 2 or 3", file=sys.stderr)
+                continue
+            if depth not in (0, 1, 2, 3):
+                print("council: context needs 0, 1, 2 or 3", file=sys.stderr)
+                continue
+            return ("context", depth)
         if command in ("?", "help"):
             print(_OVERSIZE_HELP, file=sys.stderr)
             continue
@@ -162,7 +175,8 @@ def _review(args: argparse.Namespace) -> Report:
                                 profile=args.profile, prompt=args.prompt,
                                 run_id=args.run_id, context_urls=tuple(args.context_url),
                                 allow_large_prompt=allow,
-                                max_prompt_bytes=args.max_prompt_bytes)
+                                max_prompt_bytes=args.max_prompt_bytes,
+                                context_depth=args.context_depth)
         try:
             return review(request, runner)
         except PromptTooLarge as exc:
@@ -179,6 +193,8 @@ def _review(args: argparse.Namespace) -> Report:
                 args.max_prompt_bytes = value
             elif decision == "base" and isinstance(value, str):
                 args.base = value
+            elif decision == "context" and isinstance(value, int):
+                args.context_depth = value
             else:
                 raise PromptTooLarge(exc.size, exc.limit, declined=True) from exc
 

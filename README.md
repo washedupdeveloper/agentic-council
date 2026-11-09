@@ -70,6 +70,7 @@ Every flag the tool accepts, what it changes, and why it exists. `council <comma
 | `--json` | off | print `verdict.json` | the machine-readable form, byte-identical to the artefact |
 | `--run-id ID` | timestamp | name the run; refused if it exists | two runs are comparable only when they can be named |
 | `--context-url URL` | none | fetch a URL as reference context (repeatable) | retrieval is context, not evidence; the caller names it, never the model |
+| `--context-depth N` | `3` | `0` diff only, `1` enclosing function, `2` +one call level, `3` +two | the context is what makes a prompt large; the caller can trade depth for size |
 | `--max-prompt-bytes N` | `32768` | refuse a prompt larger than N bytes | a prompt past the model's practical envelope is a hang, not a review; refusal is immediate |
 | `--allow-large-prompt` | off | send an oversized prompt without asking | an autonomous caller that has measured the cost can say yes in advance |
 | `--autonomous` | off | never ask: refuse an oversized prompt, exit 3 | a script running in a terminal must not block on a question |
@@ -87,6 +88,7 @@ asks the person at the terminal what should happen:
 | `allow` | send this prompt anyway; the verdict records `prompt_acknowledged: true` |
 | `budget N` | change the limit to N bytes for this run and retry |
 | `base REV` | review a narrower change and retry |
+| `context N` | keep the diff, change the context depth to N (0–3) and retry |
 | `?` | explain why the limit exists |
 | `cancel`, empty line, or EOF | stop with exit 3 — silence is not consent |
 
@@ -163,7 +165,9 @@ is refused by the parser, not by the prompt alone.
 The prompt ships with the tool at `src/council/prompts/reviewer.md`; `--prompt`
 names a different one. It carries the change **and the functions around it**: for
 every changed Python file the enclosing function is included, then the repository
-functions it calls, two levels deep. Anything the resolver could not follow is
+functions it calls, two levels deep. `--context-depth` is the lever on that: `0`
+sends the diff alone, `1` the enclosing function, `2` one call level, `3` two (the
+default). Anything the resolver could not follow is
 named in the prompt rather than left out. It is deliberately **not** read from
 the repository under review — otherwise the code being judged could supply a
 prompt that reports nothing. Every run records a digest over the template, the

@@ -43,6 +43,24 @@ def test_two_changed_functions_are_both_included() -> None:
     assert [span.name for span in context.spans] == ["one", "two"]
 
 
+def test_no_context_is_the_diff_alone() -> None:
+    diff = ("diff --git a/pkg/a.py b/pkg/a.py\n--- a/pkg/a.py\n+++ b/pkg/a.py\n"
+            "@@ -4,3 +4,4 @@\n def target():\n+    x = 1\n     return x\n")
+    context = build(diff, reader({"pkg/a.py": A}), ["pkg/a.py"], max_depth=-1)
+    assert context.spans == ()
+    assert context.text == "_(context disabled by the caller)_"
+
+
+def test_the_enclosing_function_alone_excludes_its_calls() -> None:
+    source = ("def helper():\n    return 1\n\n\n"
+              "def target():\n    return helper()\n")
+    diff = ("diff --git a/f.py b/f.py\n--- a/f.py\n+++ b/f.py\n"
+            "@@ -5,2 +5,3 @@\n def target():\n+    x = 0\n     return helper()\n")
+    context = build(diff, reader({"f.py": source}), ["f.py"], max_depth=0)
+    assert [span.name for span in context.spans] == ["target"]
+    assert context.spans[0].depth == 0
+
+
 def test_the_call_chain_is_followed_two_deep_and_then_stops() -> None:
     source = (
         "def too_deep():\n    return 0\n\n\n"

@@ -69,6 +69,7 @@ class ReviewRequest:
     context_urls: tuple[str, ...] = ()
     allow_large_prompt: bool = False
     max_prompt_bytes: int = PROMPT_LIMIT
+    context_depth: int = 3
 
 
 @dataclass(frozen=True, slots=True)
@@ -192,6 +193,7 @@ def _write_verdict(run_dir: Path, request: ReviewRequest, base: str, head: str,
         ],
         "skipped": [{"path": item.path, "reason": item.reason} for item in skipped],
         "context_digest": context.digest,
+        "context_depth": request.context_depth,
         "context": [{"file": span.file, "start": span.start, "end": span.end,
                      "name": span.name, "reason": span.reason} for span in context.spans],
         "unresolved": list(context.unresolved),
@@ -231,7 +233,8 @@ def review(request: ReviewRequest, runner: Runner) -> Report:
     change = diff(root, base)
     patch = change.patch
     diff_sha256 = hashlib.sha256(patch.encode("utf-8")).hexdigest()
-    context = build_context(patch, _reader(root), python_files(root))
+    context = build_context(patch, _reader(root), python_files(root),
+                           max_depth=request.context_depth - 1)
     try:
         references = tuple(fetch(url) for url in request.context_urls)
     except FetchError as exc:

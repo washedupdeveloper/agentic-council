@@ -164,8 +164,19 @@ def _resolve_call(name: str, module: str | None, current: str, files: Sequence[s
     return None
 
 
-def build(patch: str, read: Reader, files: Sequence[str]) -> Context:
-    """Select the spans around the change, then the functions they call."""
+def build(patch: str, read: Reader, files: Sequence[str],
+          max_depth: int = MAX_DEPTH) -> Context:
+    """Select the spans around the change, then the functions they call.
+
+    `max_depth` is the lever the caller has over the prompt's size: 0 is the
+    diff alone, 1 adds the enclosing function, 2 also follows its calls. The
+    line and span limits below bound each level; this bounds how many levels
+    exist at all.
+    """
+    if max_depth < 0:
+        text = "_(context disabled by the caller)_"
+        digest = hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
+        return Context((), (), text, digest)
     changes = change_lines(patch)
     cache: dict[str, tuple[list[_Function], ast.Module] | None] = {}
     spans: list[Span] = []
@@ -203,7 +214,7 @@ def build(patch: str, read: Reader, files: Sequence[str]) -> Context:
             continue
         spans.append(Span(path, function.start, function.end, function.name, reason, depth))
         budget -= function.lines
-        if depth >= MAX_DEPTH:
+        if depth >= max_depth:
             continue
 
         parsed = _parse(path, read, cache)
