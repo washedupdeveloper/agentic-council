@@ -39,6 +39,7 @@ python3 -m pytest             # the suite
 ./bin/council-verify          # every claim this project makes, executed
 python3 tools/mutation_check.py   # prove the suite can fail
 python3 tools/differential.py     # v1.9.0's verdicts beside this rule
+python3 tools/release.py check    # version, changelog and prose agree
 ```
 
 `claims.toml` is the registry. Each entry is one sentence and the command that
@@ -185,6 +186,19 @@ proofs `UNRUNNABLE`, never unsandboxed.
 `command` proofs on a bare host are `UNRUNNABLE` unless bubblewrap is installed;
 the image is the artifact where the sandbox travels with the tool. Nix builds
 both; a user needs neither nix nor this repository to run the wheel.
+
+## Releasing
+
+The version lives in `pyproject.toml`, the newest heading in `CHANGELOG.md`,
+and any prose that quotes it (`Current release vX.Y.Z`, or a wheel filename).
+`python tools/release.py check` asserts all three agree, that `## [Unreleased]`
+is first, and that releases are unique, dated and descending; it is a check in
+the flake. `python tools/release.py bump --version X.Y.Z` moves the Unreleased
+entries under a dated heading, updates every copy, and prints the `git tag`
+command rather than running it — tagging is a person's decision.
+
+The policy, the public surface and the definitions are
+[`docs/VERSIONING.md`](docs/VERSIONING.md).
 
 ## Layout
 

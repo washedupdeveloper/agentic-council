@@ -116,6 +116,10 @@
           # v1.9.0's pinned verdicts beside this rule, on the same fixtures.
           differential = mkCheck "council-differential" "python tools/differential.py";
 
+          # The version, the changelog and every prose claim agree, and the
+          # changelog is ordered. Maintainer tool: it is not a shipped verb.
+          release = mkCheck "council-release" "python tools/release.py check";
+
           # The wheel is built and installed into a fresh prefix, then run.
           wheel = mkCheck "council-wheel" ''
             python -m pip wheel --no-deps --no-build-isolation --wheel-dir dist .
