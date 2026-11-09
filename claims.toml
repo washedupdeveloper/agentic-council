@@ -408,3 +408,8 @@ falsifier = "slicing-disabled"
 id = "an-unreviewed-unit-cannot-pass"
 text = "A unit whose samples did not answer makes the run INCOMPLETE, never PASS."
 check = "python3 -m pytest tests/test_run.py::test_an_unreviewed_unit_makes_the_run_incomplete -q"
+
+[[claim]]
+id = "every-text-file-ends-with-a-newline"
+text = "Every text file the repository ships ends with a newline."
+check = "python3 -m pytest tests/test_files.py -q"

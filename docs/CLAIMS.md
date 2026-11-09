@@ -85,3 +85,4 @@ registry, so it cannot describe a claim that has no check.
 | `an-oversize-prompt-is-refused-before-the-reviewer-is-asked` | A prompt past its budget never reaches the reviewer and writes no run directory. | `python3 -m pytest tests/test_run.py::test_an_oversized_prompt_is_refused_before_the_reviewer_is_asked -q` |
 | `an-oversized-change-is-sliced-not-refused` | A change too large for one prompt is reviewed as units, and the run records them. | `python3 -m pytest tests/test_run.py::test_a_change_too_large_for_one_prompt_is_sliced_by_file -q` |
 | `an-unreviewed-unit-cannot-pass` | A unit whose samples did not answer makes the run INCOMPLETE, never PASS. | `python3 -m pytest tests/test_run.py::test_an_unreviewed_unit_makes_the_run_incomplete -q` |
+| `every-text-file-ends-with-a-newline` | Every text file the repository ships ends with a newline. | `python3 -m pytest tests/test_files.py -q` |

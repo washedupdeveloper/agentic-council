@@ -40,6 +40,11 @@ public surface, the definitions, and the release procedure — is
 - A run records what it reviewed: `diff_sha256`, skipped files, context spans and
   their digest, unresolved calls, references, prompt size and limit.
 
+### Fixed
+
+- Every shipped text file now ends with a newline, so diffs stop reporting
+  `\ No newline at end of file` for the last line.
+
 ### Removed
 
 - The hybrid score, the threshold and the calibration laboratory. The blocking
