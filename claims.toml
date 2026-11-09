@@ -392,3 +392,8 @@ id = "a-missing-prompt-is-refused"
 text = "A prompt path that does not exist stops the run before the reviewer is asked."
 check = "python3 -m pytest tests/test_run.py::test_an_explicit_prompt_that_does_not_exist_is_refused -q"
 falsifier = "a-missing-prompt-is-not-refused"
+
+[[claim]]
+id = "an-oversize-prompt-is-refused-before-the-reviewer-is-asked"
+text = "A prompt past its budget never reaches the reviewer and writes no run directory."
+check = "python3 -m pytest tests/test_run.py::test_an_oversized_prompt_is_refused_before_the_reviewer_is_asked -q"

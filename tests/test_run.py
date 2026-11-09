@@ -11,8 +11,8 @@ import pytest
 
 from council.prompt import instrument_digest
 from council.repo import init
-from council.run import (DEFAULT_PROFILE, ReviewError, ReviewRequest, default_prompt,
-                         review)
+from council.run import (DEFAULT_PROFILE, PromptTooLarge, ReviewError, ReviewRequest,
+                         default_prompt, review)
 from council.schema import DIMENSIONS
 from council.verdict import Verdict
 
@@ -330,3 +330,42 @@ def test_init_keeps_an_existing_file_intact(tmp_path: Path) -> None:
     (repo / ".gitignore").write_text("*.log", encoding="utf-8")
     assert init(repo) is True
     assert (repo / ".gitignore").read_text(encoding="utf-8") == "*.log\n.council/\n"
+
+
+def test_an_oversized_prompt_is_refused_before_the_reviewer_is_asked(
+        tmp_path: Path) -> None:
+    repo, _ = make_repo(tmp_path)
+    asked: list[str] = []
+
+    def runner(prompt: str) -> str:
+        asked.append(prompt)
+        return body()
+
+    with pytest.raises(PromptTooLarge) as raised:
+        review(ReviewRequest(repo=repo, run_id="too-big", max_prompt_bytes=10), runner)
+
+    assert asked == []
+    assert not (repo / ".council" / "runs" / "too-big").exists()
+    assert "allow-large-prompt" in str(raised.value)
+    assert "max-prompt-bytes" in str(raised.value)
+
+
+def test_an_acknowledged_oversized_prompt_is_sent_and_recorded(tmp_path: Path) -> None:
+    repo, _ = make_repo(tmp_path)
+    report = review(ReviewRequest(repo=repo, run_id="big-ok", max_prompt_bytes=10,
+                                  allow_large_prompt=True),
+                    lambda _: body())
+    payload = json.loads((report.run_dir / "verdict.json").read_text(encoding="utf-8"))
+
+    assert payload["prompt_bytes"] > 10
+    assert payload["prompt_limit"] == 10
+    assert payload["prompt_acknowledged"] is True
+
+
+def test_a_budget_that_fits_needs_no_acknowledgement(tmp_path: Path) -> None:
+    repo, _ = make_repo(tmp_path)
+    report = review(ReviewRequest(repo=repo, run_id="budget-ok", max_prompt_bytes=10_000_000),
+                    lambda _: body())
+    payload = json.loads((report.run_dir / "verdict.json").read_text(encoding="utf-8"))
+    assert payload["prompt_limit"] == 10_000_000
+    assert payload["prompt_acknowledged"] is False

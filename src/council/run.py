@@ -26,6 +26,26 @@ from .verdict import Result, Verdict
 
 DEFAULT_PROFILE = "council-generalist"
 AUTO_MAX = 3
+# A prompt past this size is not sent to the reviewer without a person's word.
+# The failure is silent and expensive otherwise: the model can sit for its whole
+# timeout and the sample is retried once.
+PROMPT_LIMIT = 32 * 1024
+
+
+class PromptTooLarge(ReviewError):
+    """The prompt is over the limit and nobody has allowed it."""
+
+    def __init__(self, size: int, limit: int, *, declined: bool = False) -> None:
+        self.size = size
+        self.limit = limit
+        if declined:
+            tail = "Nothing was asked: proceeding was declined."
+        else:
+            tail = ("Nothing was asked. Narrow the change with --base, raise the "
+                    "budget with --max-prompt-bytes, or allow it with "
+                    "--allow-large-prompt.")
+        super().__init__(
+            f"the prompt is {size:,} bytes; the limit is {limit:,}. {tail}")
 
 
 def default_prompt() -> Path:
@@ -47,6 +67,8 @@ class ReviewRequest:
     run_id: str | None = None
     prompt: Path | None = None
     context_urls: tuple[str, ...] = ()
+    allow_large_prompt: bool = False
+    max_prompt_bytes: int = PROMPT_LIMIT
 
 
 @dataclass(frozen=True, slots=True)
@@ -143,7 +165,9 @@ def _write_verdict(run_dir: Path, request: ReviewRequest, base: str, head: str,
                    worktree: bool, diff_sha256: str,
                    skipped: tuple[Skipped, ...], context: Context,
                    references: tuple[Reference, ...],
-                   samples_run: int, agreement: bool | None) -> None:
+                   samples_run: int, agreement: bool | None,
+                   prompt_bytes: int, prompt_limit: int,
+                   prompt_acknowledged: bool) -> None:
     payload = {
         "run": run_dir.name,
         "base": base,
@@ -152,6 +176,9 @@ def _write_verdict(run_dir: Path, request: ReviewRequest, base: str, head: str,
         "diff_sha256": diff_sha256,
         "digest": digest,
         "prompt": str(prompt),
+        "prompt_bytes": prompt_bytes,
+        "prompt_limit": prompt_limit,
+        "prompt_acknowledged": prompt_acknowledged,
         "state_dir_ignored": ignored,
         "profile": request.profile,
         "samples_requested": request.samples if request.samples is not None else "auto",
@@ -187,7 +214,14 @@ def _write_verdict(run_dir: Path, request: ReviewRequest, base: str, head: str,
 
 
 def review(request: ReviewRequest, runner: Runner) -> Report:
-    """Run one review and write every artefact under `.council/runs/<id>/`."""
+    """Run one review and write every artefact under `.council/runs/<id>/`.
+
+    A prompt over `request.max_prompt_bytes` is not sent. The call refuses with
+    `PromptTooLarge` before the reviewer is asked and before any run directory
+    exists; the caller either narrows the change, raises the budget, or sets
+    `allow_large_prompt`. The decision belongs to a person (or to an explicit
+    flag), never to the tool guessing.
+    """
     if request.samples is not None and request.samples < 1:
         raise ReviewError("samples must be at least 1")
 
@@ -224,6 +258,11 @@ def review(request: ReviewRequest, runner: Runner) -> Report:
         raise ReviewError(f"run {run_id!r} already exists at {directory}")
 
     prompt = render(template, base=base, diff=patch, context=prompt_context)
+    prompt_bytes = len(prompt.encode("utf-8"))
+    limit = request.max_prompt_bytes
+    acknowledged = request.allow_large_prompt
+    if prompt_bytes > limit and not acknowledged:
+        raise PromptTooLarge(prompt_bytes, limit)
     samples, samples_run, agreement = _samples(prompt, runner, request.samples)
     for sample in samples:
         write_sample(directory, sample)
@@ -242,6 +281,8 @@ def review(request: ReviewRequest, runner: Runner) -> Report:
     _write_verdict(directory, request, base, head, digest, prompt_file, ignored,
                    samples, result, worktree=True, diff_sha256=diff_sha256,
                    skipped=change.skipped, context=context, references=references,
-                   samples_run=samples_run, agreement=agreement)
+                   samples_run=samples_run, agreement=agreement,
+                   prompt_bytes=prompt_bytes, prompt_limit=limit,
+                   prompt_acknowledged=acknowledged)
     return Report(directory, base, head, digest, result, samples, prompt_file, ignored,
                   change.skipped, diff_sha256, context.digest)

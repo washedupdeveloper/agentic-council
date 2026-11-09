@@ -70,14 +70,42 @@ Every flag the tool accepts, what it changes, and why it exists. `council <comma
 | `--json` | off | print `verdict.json` | the machine-readable form, byte-identical to the artefact |
 | `--run-id ID` | timestamp | name the run; refused if it exists | two runs are comparable only when they can be named |
 | `--context-url URL` | none | fetch a URL as reference context (repeatable) | retrieval is context, not evidence; the caller names it, never the model |
+| `--max-prompt-bytes N` | `32768` | refuse a prompt larger than N bytes | a prompt past the model's practical envelope is a hang, not a review; refusal is immediate |
+| `--allow-large-prompt` | off | send an oversized prompt without asking | an autonomous caller that has measured the cost can say yes in advance |
+| `--autonomous` | off | never ask: refuse an oversized prompt, exit 3 | a script running in a terminal must not block on a question |
 | `-h, --help` | — | usage | — |
+
+### When the prompt is too large
+
+Before the reviewer is called, `council review` measures the prompt. Above
+`--max-prompt-bytes` it **stops**: nothing is sent, no run directory is written,
+and it says how large the prompt is and what the limit is. By default it then
+asks the person at the terminal what should happen:
+
+| answer | effect |
+|---|---|
+| `allow` | send this prompt anyway; the verdict records `prompt_acknowledged: true` |
+| `budget N` | change the limit to N bytes for this run and retry |
+| `base REV` | review a narrower change and retry |
+| `?` | explain why the limit exists |
+| `cancel`, empty line, or EOF | stop with exit 3 — silence is not consent |
+
+`council ci` never asks: a pipeline has nobody to answer. It refuses unless
+`--allow-large-prompt` is given. The same is true of `council review` with no
+terminal attached, or with `--autonomous`.
+
+The default is a starting point measured, not assumed: a 2.8 KB prompt was
+answered by the reviewer, a 60 KB prompt was not, on the same profile. A run
+that needs more says so before the wait rather than after it.
 
 ### `council ci`
 
-Takes every flag in the `council review` table except `--report` and `--json`:
-it prints `verdict.json` unconditionally and always exits with the verdict
-(0 pass, 1 fail, 2 incomplete, 3 could not start). It exists so a pipeline names
-one stable entry point instead of remembering the flags.
+Takes every flag in the `council review` table except `--report`, `--json` and
+`--autonomous`: it prints `verdict.json` unconditionally and always exits with
+the verdict (0 pass, 1 fail, 2 incomplete, 3 could not start). It exists so a
+pipeline names one stable entry point instead of remembering the flags. It
+refuses an oversized prompt rather than asking; `--allow-large-prompt` is the
+explicit way to send one.
 
 ### `council-verify` (maintainer entry point)
 

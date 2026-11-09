@@ -12,7 +12,7 @@ import pytest
 import council.cli as cli
 from council.findings import Finding, State
 from council.repo import Skipped
-from council.run import Report, ReviewError
+from council.run import PromptTooLarge, Report, ReviewError
 from council.verdict import Result, Verdict
 
 
@@ -210,3 +210,114 @@ def test_a_bad_config_is_a_start_failure(tmp_path: Path,
                                                            "performance")}})
     monkeypatch.setattr(cli, "hermes_runner", lambda *a, **k: (lambda prompt: empty))
     assert cli.main(["review", "-C", str(repo), "--run-id", "cfg", "--report"]) == 3
+
+
+class _Stdin:
+    """A terminal that answers from a script."""
+
+    def __init__(self, lines: list[str], *, tty: bool = True) -> None:
+        self._lines = list(lines)
+        self._tty = tty
+
+    def isatty(self) -> bool:
+        return self._tty
+
+    def readline(self) -> str:
+        return self._lines.pop(0) if self._lines else ""
+
+
+class _NoRead(_Stdin):
+    def readline(self) -> str:
+        raise AssertionError("this path must not read stdin")
+
+
+def _oversize() -> PromptTooLarge:
+    return PromptTooLarge(60_000, 32_768)
+
+
+def test_ci_refuses_an_oversized_prompt_without_reading_input(
+        monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    def boom(request: Any, runner: Any) -> Report:
+        raise _oversize()
+
+    monkeypatch.setattr(cli, "review", boom)
+    monkeypatch.setattr(cli.sys, "stdin", _NoRead([]))
+    assert cli.main(["ci"]) == 3
+    err = capsys.readouterr().err
+    assert "60,000" in err and "allow-large-prompt" in err
+
+
+def test_review_asks_and_allow_sends_it(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[Any] = []
+
+    def fake(request: Any, runner: Any) -> Report:
+        calls.append(request)
+        if len(calls) == 1:
+            raise _oversize()
+        return report(Verdict.PASS)
+
+    monkeypatch.setattr(cli, "review", fake)
+    monkeypatch.setattr(cli.sys, "stdin", _Stdin(["allow\n"]))
+    assert cli.main(["review"]) == 0
+    assert calls[1].allow_large_prompt is True
+
+
+def test_review_can_raise_the_budget(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[Any] = []
+
+    def fake(request: Any, runner: Any) -> Report:
+        calls.append(request)
+        if len(calls) == 1:
+            raise _oversize()
+        return report(Verdict.PASS)
+
+    monkeypatch.setattr(cli, "review", fake)
+    monkeypatch.setattr(cli.sys, "stdin", _Stdin(["budget 999999\n"]))
+    assert cli.main(["review"]) == 0
+    assert calls[1].max_prompt_bytes == 999999
+
+
+def test_review_can_narrow_the_base(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[Any] = []
+
+    def fake(request: Any, runner: Any) -> Report:
+        calls.append(request)
+        if len(calls) == 1:
+            raise _oversize()
+        return report(Verdict.PASS)
+
+    monkeypatch.setattr(cli, "review", fake)
+    monkeypatch.setattr(cli.sys, "stdin", _Stdin(["base HEAD~4\n"]))
+    assert cli.main(["review"]) == 0
+    assert calls[1].base == "HEAD~4"
+
+
+def test_silence_cancels_and_sends_nothing(monkeypatch: pytest.MonkeyPatch,
+                                          capsys: pytest.CaptureFixture[str]) -> None:
+    def fake(request: Any, runner: Any) -> Report:
+        raise _oversize()
+
+    monkeypatch.setattr(cli, "review", fake)
+    monkeypatch.setattr(cli.sys, "stdin", _Stdin([]))
+    assert cli.main(["review"]) == 3
+    assert "declined" in capsys.readouterr().err
+
+
+def test_autonomous_refuses_without_asking(monkeypatch: pytest.MonkeyPatch) -> None:
+    def boom(request: Any, runner: Any) -> Report:
+        raise _oversize()
+
+    monkeypatch.setattr(cli, "review", boom)
+    monkeypatch.setattr(cli.sys, "stdin", _NoRead([]))
+    assert cli.main(["review", "--autonomous"]) == 3
+
+
+def test_a_question_is_answered_before_a_decision(monkeypatch: pytest.MonkeyPatch,
+                                                  capsys: pytest.CaptureFixture[str]) -> None:
+    def boom(request: Any, runner: Any) -> Report:
+        raise _oversize()
+
+    monkeypatch.setattr(cli, "review", boom)
+    monkeypatch.setattr(cli.sys, "stdin", _Stdin(["?\n", "cancel\n"]))
+    assert cli.main(["review"]) == 3
+    assert "why there is a limit" in capsys.readouterr().err

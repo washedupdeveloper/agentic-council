@@ -82,3 +82,4 @@ registry, so it cannot describe a claim that has no check.
 | `an-unknown-top-level-key-is-refused` | An unknown top-level key in council.toml is an error. | `python3 -m pytest tests/test_config.py::test_an_unknown_top_level_key_is_refused -q` |
 | `a-failed-sample-makes-the-run-incomplete` | A run whose reviewer never answered is incomplete, and its samples are still written. | `python3 -m pytest tests/test_run.py::test_every_sample_is_written_even_when_one_fails -q` |
 | `a-missing-prompt-is-refused` | A prompt path that does not exist stops the run before the reviewer is asked. | `python3 -m pytest tests/test_run.py::test_an_explicit_prompt_that_does_not_exist_is_refused -q` |
+| `an-oversize-prompt-is-refused-before-the-reviewer-is-asked` | A prompt past its budget never reaches the reviewer and writes no run directory. | `python3 -m pytest tests/test_run.py::test_an_oversized_prompt_is_refused_before_the_reviewer_is_asked -q` |
