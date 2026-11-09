@@ -21,6 +21,9 @@ public surface, the definitions, and the release procedure — is
   (`--context-depth`, 0–3).
 - `council ci`: the gate for a pipeline — `verdict.json` on stdout, the verdict
   as the exit code, no advice switches.
+- Slicing: a change larger than one prompt is reviewed as units — whole files
+  where they fit, hunks of a file that does not — with findings merged and every
+  unit's coverage recorded. An unreviewed unit makes the run `incomplete`.
 - A prompt budget (`--max-prompt-bytes`, default 32 KiB). An oversized prompt is
   refused before the reviewer is called and before any run directory exists;
   an interactive `review` asks a person what to do (`allow`, `budget N`,

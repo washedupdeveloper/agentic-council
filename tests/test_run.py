@@ -369,3 +369,133 @@ def test_a_budget_that_fits_needs_no_acknowledgement(tmp_path: Path) -> None:
     payload = json.loads((report.run_dir / "verdict.json").read_text(encoding="utf-8"))
     assert payload["prompt_limit"] == 10_000_000
     assert payload["prompt_acknowledged"] is False
+
+
+SLICE_PROMPT = "Base {{base}}\n\n{{diff}}\n"
+
+
+def make_two_changes(tmp_path: Path) -> tuple[Path, Path]:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    make_repo(repo)
+    (repo / "b.py").write_text("one\ntwo\n", encoding="utf-8")
+    prompt = tmp_path / "prompt.md"
+    prompt.write_text(SLICE_PROMPT, encoding="utf-8")
+    return repo, prompt
+
+
+def test_a_change_too_large_for_one_prompt_is_sliced_by_file(tmp_path: Path) -> None:
+    repo, prompt = make_two_changes(tmp_path)
+    report = review(
+        ReviewRequest(repo=repo, base="HEAD", samples=1, run_id="sliced", prompt=prompt,
+                      max_prompt_bytes=200),
+        lambda _: body())
+
+    payload = json.loads((report.run_dir / "verdict.json").read_text(encoding="utf-8"))
+    assert payload["sliced"] is True
+    assert [unit["files"] for unit in payload["units"]] == [["a.py"], ["b.py"]]
+    assert [unit["verdict"] for unit in payload["units"]] == ["pass", "pass"]
+    assert report.verdict is Verdict.PASS
+    for unit in ("unit-001", "unit-002"):
+        assert (report.run_dir / "units" / unit / "sample-1.json").exists()
+
+
+def test_a_finding_in_one_unit_fails_the_run(tmp_path: Path) -> None:
+    repo, prompt = make_two_changes(tmp_path)
+
+    def runner(text: str) -> str:
+        if "a.py" in text and "b.py" not in text:
+            return body({"security": [secret()]})
+        return body()
+
+    report = review(
+        ReviewRequest(repo=repo, base="HEAD", samples=1, run_id="slice-fail", prompt=prompt,
+                      max_prompt_bytes=200),
+        runner)
+
+    payload = json.loads((report.run_dir / "verdict.json").read_text(encoding="utf-8"))
+    assert report.verdict is Verdict.FAIL
+    assert [unit["verdict"] for unit in payload["units"]] == ["fail", "pass"]
+    assert len(payload["findings"]) == 1
+
+
+def test_an_unreviewed_unit_makes_the_run_incomplete(tmp_path: Path) -> None:
+    repo, prompt = make_two_changes(tmp_path)
+
+    def runner(text: str) -> str:
+        if "b.py" in text:
+            raise OSError("the reviewer is down")
+        return body()
+
+    report = review(
+        ReviewRequest(repo=repo, base="HEAD", samples=1, run_id="slice-hole", prompt=prompt,
+                      max_prompt_bytes=200),
+        runner)
+
+    payload = json.loads((report.run_dir / "verdict.json").read_text(encoding="utf-8"))
+    assert report.verdict is Verdict.INCOMPLETE
+    assert payload["units"][1]["ok"] is False
+    assert "unit-002" in payload["reason"]
+
+
+def test_a_file_too_large_is_split_by_hunk_and_keeps_its_name(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    git(repo, "init", "-q")
+    git(repo, "config", "user.email", "test@example.invalid")
+    git(repo, "config", "user.name", "test")
+    lines = [f"line {number}" for number in range(20)]
+    (repo / "f.py").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    git(repo, "add", "-A")
+    git(repo, "commit", "-qm", "base")
+    lines[1] = "changed near the top"
+    lines[18] = "changed near the bottom"
+    (repo / "f.py").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    prompt = tmp_path / "prompt.md"
+    prompt.write_text(SLICE_PROMPT, encoding="utf-8")
+
+    report = review(
+        ReviewRequest(repo=repo, base="HEAD", samples=1, run_id="hunks", prompt=prompt,
+                      max_prompt_bytes=230),
+        lambda _: body())
+
+    payload = json.loads((report.run_dir / "verdict.json").read_text(encoding="utf-8"))
+    assert payload["sliced"] is True
+    assert len(payload["units"]) == 2
+    assert [unit["files"] for unit in payload["units"]] == [["f.py"], ["f.py"]]
+    assert all(len(unit["ranges"]) == 1 for unit in payload["units"])
+
+
+def test_the_same_place_reported_by_two_units_is_merged_once(tmp_path: Path) -> None:
+    repo, prompt = make_two_changes(tmp_path)
+
+    report = review(
+        ReviewRequest(repo=repo, base="HEAD", samples=1, run_id="slice-dupe", prompt=prompt,
+                      max_prompt_bytes=200),
+        lambda _: body({"security": [secret()]}))
+
+    payload = json.loads((report.run_dir / "verdict.json").read_text(encoding="utf-8"))
+    assert len(payload["findings"]) == 1
+    assert len(payload["units"]) == 2
+
+
+def test_a_unit_that_cannot_fit_at_depth_zero_is_refused_with_its_name(
+        tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    git(repo, "init", "-q")
+    git(repo, "config", "user.email", "test@example.invalid")
+    git(repo, "config", "user.name", "test")
+    (repo / "base.py").write_text("# base\n", encoding="utf-8")
+    git(repo, "add", "-A")
+    git(repo, "commit", "-qm", "base")
+    (repo / "a.py").write_text("one\ntwo\n", encoding="utf-8")
+    prompt = tmp_path / "prompt.md"
+    prompt.write_text(SLICE_PROMPT, encoding="utf-8")
+
+    with pytest.raises(PromptTooLarge) as raised:
+        review(ReviewRequest(repo=repo, base="HEAD", run_id="slice-tiny", prompt=prompt,
+                             max_prompt_bytes=20),
+               lambda _: body())
+
+    assert "for a.py" in str(raised.value)

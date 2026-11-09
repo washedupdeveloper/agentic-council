@@ -90,8 +90,11 @@ MUTATIONS: tuple[Mutation, ...] = (
     Mutation("a-run-may-overwrite-an-old-one",
              "run.py", "if directory.is_symlink() or directory.exists():", "if False:"),
     Mutation("failed-samples-are-forgotten",
-             "run.py", "failed_samples=[sample.index for sample in samples if not sample.ok],",
-             "failed_samples=[],"),
+             "run.py", "failed_samples=[sample.index for sample in samples if not sample.ok])",
+             "failed_samples=[]),"),
+    Mutation("slicing-disabled",
+             "run.py", "sliced = prompt_bytes > limit and not acknowledged",
+             "sliced = False"),
     Mutation("a-missing-prompt-is-not-refused",
              "run.py", "if not prompt_file.exists():", "if False:"),
 )

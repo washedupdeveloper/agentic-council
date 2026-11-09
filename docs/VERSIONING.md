@@ -23,7 +23,8 @@ Enumerated from the tool, not from memory (`council --help`, `council review
 - exit codes: `0` pass, `1` fail, `2` incomplete, `3` could not start;
 - `verdict.json` and its fields, including `verdict`, `findings[].state`,
   `prompt_bytes`, `prompt_limit`, `prompt_acknowledged`, `context_depth`,
-  `diff_sha256`, `skipped`, `context`, `unresolved`, `references`;
+  `diff_sha256`, `skipped`, `context`, `unresolved`, `references`, `sliced` and
+  `units[]` (each unit's files, ranges, digest, prompt size, depth and verdict);
 - the shipped reviewer prompt's contract: one JSON object with five sections,
   and the closed proof-kind set (`absent`, `present`, `command`, `json`, `diff`);
 - the wheel (`council-<version>-py3-none-any.whl`) and the OCI image

@@ -58,7 +58,7 @@ def _add_review_arguments(parser: argparse.ArgumentParser, *, advice: bool) -> N
                         help="repository to review (default: the current directory)")
     parser.add_argument("--base", help="revision to diff against (default: origin/HEAD, then HEAD~1)")
     parser.add_argument("--samples", type=_samples, default=None,
-                        help="samples: N, or auto (default: 1 clean, 2 to confirm, 3 to break a tie)")
+                        help="samples: N, or auto (default: 1 clean, 2 to confirm, 3 to break a tie); per unit when sliced")
     parser.add_argument("--profile", default=DEFAULT_PROFILE, help="Hermes profile to ask")
     parser.add_argument("--reviewer", default="hermes",
                         help="binary that answers a sample (default: hermes)")

@@ -397,3 +397,14 @@ falsifier = "a-missing-prompt-is-not-refused"
 id = "an-oversize-prompt-is-refused-before-the-reviewer-is-asked"
 text = "A prompt past its budget never reaches the reviewer and writes no run directory."
 check = "python3 -m pytest tests/test_run.py::test_an_oversized_prompt_is_refused_before_the_reviewer_is_asked -q"
+
+[[claim]]
+id = "an-oversized-change-is-sliced-not-refused"
+text = "A change too large for one prompt is reviewed as units, and the run records them."
+check = "python3 -m pytest tests/test_run.py::test_a_change_too_large_for_one_prompt_is_sliced_by_file -q"
+falsifier = "slicing-disabled"
+
+[[claim]]
+id = "an-unreviewed-unit-cannot-pass"
+text = "A unit whose samples did not answer makes the run INCOMPLETE, never PASS."
+check = "python3 -m pytest tests/test_run.py::test_an_unreviewed_unit_makes_the_run_incomplete -q"

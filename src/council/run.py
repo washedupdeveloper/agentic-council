@@ -4,16 +4,17 @@ from __future__ import annotations
 
 import hashlib
 import json
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
 from .adjudicate import adjudicate, verdict
 from .base import resolve_base
+from .changes import file_sections, hunk_range, hunk_sections
 from .config import CONFIG_NAME, load as load_config
 from .context import Context, build as build_context
-from .findings import Finding, blocks
+from .findings import OPEN_STATES, Finding, State, blocks
 from .merge import merge
 from .paths import run_dir as run_path
 from .prompt import instrument_digest, render
@@ -22,6 +23,7 @@ from .reference import FetchError, Reference, fetch
 from .repo import (ReviewError, Skipped, diff, output, python_files,
                    root as repo_root, state_dir_ignored)
 from .sample import Runner, SampleResult, run_sample, write_sample
+from .schema import RawFinding
 from .verdict import Result, Verdict
 
 DEFAULT_PROFILE = "council-generalist"
@@ -35,17 +37,20 @@ PROMPT_LIMIT = 32 * 1024
 class PromptTooLarge(ReviewError):
     """The prompt is over the limit and nobody has allowed it."""
 
-    def __init__(self, size: int, limit: int, *, declined: bool = False) -> None:
+    def __init__(self, size: int, limit: int, *, declined: bool = False,
+                 unit: str | None = None) -> None:
         self.size = size
         self.limit = limit
+        self.unit = unit
         if declined:
             tail = "Nothing was asked: proceeding was declined."
         else:
             tail = ("Nothing was asked. Narrow the change with --base, raise the "
                     "budget with --max-prompt-bytes, or allow it with "
                     "--allow-large-prompt.")
+        where = f" for {unit}" if unit else ""
         super().__init__(
-            f"the prompt is {size:,} bytes; the limit is {limit:,}. {tail}")
+            f"the prompt{where} is {size:,} bytes; the limit is {limit:,}. {tail}")
 
 
 def default_prompt() -> Path:
@@ -99,6 +104,106 @@ class Report:
     @property
     def exit_code(self) -> int:
         return self.result.exit_code
+
+
+@dataclass(frozen=True, slots=True)
+class Unit:
+    """One prompt-sized slice of the change."""
+
+    id: str
+    files: tuple[str, ...]
+    ranges: tuple[tuple[str, int, int], ...]
+    patch: str
+    prompt: str
+    depth: int
+    bytes: int
+    context_digest: str
+
+
+@dataclass(frozen=True, slots=True)
+class Fitted:
+    prompt: str
+    context: Context
+    depth: int
+    bytes: int
+
+
+def _prompt_for(template: str, base: str, patch: str, root: Path, depth: int,
+                references: tuple[Reference, ...]) -> Fitted:
+    context = build_context(patch, _reader(root), python_files(root),
+                            max_depth=depth - 1)
+    text = context.text
+    if references:
+        text = f"{text}\n\n{_reference_text(references)}"
+    prompt = render(template, base=base, diff=patch, context=text)
+    return Fitted(prompt, context, depth, len(prompt.encode("utf-8")))
+
+
+def _fit(template: str, base: str, patch: str, root: Path, depth: int,
+         references: tuple[Reference, ...], limit: int) -> Fitted | None:
+    """The deepest context depth whose prompt fits, or None if even depth 0 does not."""
+    for candidate in range(depth, -1, -1):
+        fitted = _prompt_for(template, base, patch, root, candidate, references)
+        if fitted.bytes <= limit:
+            return fitted
+    return None
+
+
+def _build_units(template: str, base: str, patch: str, root: Path,
+                 request: ReviewRequest, references: tuple[Reference, ...]) -> list[Unit]:
+    """File first, then hunks; deterministic, and each unit fits the budget."""
+    limit = request.max_prompt_bytes
+    units: list[Unit] = []
+
+    def add(files: tuple[str, ...], ranges: tuple[tuple[str, int, int], ...],
+            text: str, fitted: Fitted) -> None:
+        units.append(Unit(f"unit-{len(units) + 1:03d}", files, ranges, text,
+                          fitted.prompt, fitted.depth, fitted.bytes,
+                          fitted.context.digest))
+
+    for section in file_sections(patch):
+        hunks = hunk_sections(section.text)
+        if not hunks:
+            continue
+        ranges = tuple((section.path, *hunk_range(hunk)) for hunk in hunks)
+        fitted = _fit(template, base, section.text, root, request.context_depth,
+                      references, limit)
+        if fitted is not None:
+            add((section.path,), ranges, section.text, fitted)
+            continue
+        for hunk in hunks:
+            fitted = _fit(template, base, hunk, root, request.context_depth,
+                          references, limit)
+            if fitted is None:
+                smallest = _prompt_for(template, base, hunk, root, 0, references)
+                raise PromptTooLarge(smallest.bytes, limit, unit=section.path)
+            add((section.path,), ((section.path, *hunk_range(hunk)),), hunk, fitted)
+    if not units:
+        raise ReviewError("the change has no reviewable file section")
+    return units
+
+
+def _belongs(finding: Finding, unit: Unit) -> bool:
+    try:
+        path, raw = finding.location.rsplit(":", 1)
+        line = int(raw)
+    except ValueError:
+        return False
+    if path not in unit.files:
+        return False
+    if not unit.ranges:
+        return True
+    return any(file == path and start <= line <= end for file, start, end in unit.ranges)
+
+
+def _unit_verdict(findings: Sequence[Finding], ok: bool) -> str:
+    if not ok:
+        return "incomplete"
+    if any(finding.blocks and finding.state is State.PROVEN for finding in findings):
+        return "fail"
+    if any(finding.blocks and finding.state in OPEN_STATES for finding in findings):
+        return "incomplete"
+    return "pass"
 
 
 def _blocking_key(sample: SampleResult) -> frozenset[tuple[str, str, int, str]] | None:
@@ -168,7 +273,9 @@ def _write_verdict(run_dir: Path, request: ReviewRequest, base: str, head: str,
                    references: tuple[Reference, ...],
                    samples_run: int, agreement: bool | None,
                    prompt_bytes: int, prompt_limit: int,
-                   prompt_acknowledged: bool) -> None:
+                   prompt_acknowledged: bool,
+                   sliced: bool = False,
+                   units: Sequence[dict[str, object]] = ()) -> None:
     payload = {
         "run": run_dir.name,
         "base": base,
@@ -180,6 +287,8 @@ def _write_verdict(run_dir: Path, request: ReviewRequest, base: str, head: str,
         "prompt_bytes": prompt_bytes,
         "prompt_limit": prompt_limit,
         "prompt_acknowledged": prompt_acknowledged,
+        "sliced": sliced,
+        "units": list(units),
         "state_dir_ignored": ignored,
         "profile": request.profile,
         "samples_requested": request.samples if request.samples is not None else "auto",
@@ -233,15 +342,10 @@ def review(request: ReviewRequest, runner: Runner) -> Report:
     change = diff(root, base)
     patch = change.patch
     diff_sha256 = hashlib.sha256(patch.encode("utf-8")).hexdigest()
-    context = build_context(patch, _reader(root), python_files(root),
-                           max_depth=request.context_depth - 1)
     try:
         references = tuple(fetch(url) for url in request.context_urls)
     except FetchError as exc:
         raise ReviewError(str(exc)) from exc
-    prompt_context = context.text
-    if references:
-        prompt_context = f"{prompt_context}\n\n{_reference_text(references)}"
 
     prompt_file = request.prompt if request.prompt is not None else default_prompt()
     if not prompt_file.exists():
@@ -260,32 +364,88 @@ def review(request: ReviewRequest, runner: Runner) -> Report:
     if directory.is_symlink() or directory.exists():
         raise ReviewError(f"run {run_id!r} already exists at {directory}")
 
-    prompt = render(template, base=base, diff=patch, context=prompt_context)
-    prompt_bytes = len(prompt.encode("utf-8"))
     limit = request.max_prompt_bytes
     acknowledged = request.allow_large_prompt
-    if prompt_bytes > limit and not acknowledged:
-        raise PromptTooLarge(prompt_bytes, limit)
-    samples, samples_run, agreement = _samples(prompt, runner, request.samples)
-    for sample in samples:
-        write_sample(directory, sample)
+    full_context = build_context(patch, _reader(root), python_files(root),
+                                 max_depth=request.context_depth - 1)
+    prompt_context = full_context.text
+    if references:
+        prompt_context = f"{prompt_context}\n\n{_reference_text(references)}"
+    prompt = render(template, base=base, diff=patch, context=prompt_context)
+    prompt_bytes = len(prompt.encode("utf-8"))
+    sliced = prompt_bytes > limit and not acknowledged
 
     config = load_config(root / CONFIG_NAME)
-    merged = merge([sample.output.findings if sample.output is not None else ()
-                    for sample in samples])
-    adjudication = adjudicate(
-        merged,
-        ProofContext(repo=root, allow=config.allow, diff=patch, timeout=config.timeout,
-                     sandbox=config.sandbox),
-        failed_samples=[sample.index for sample in samples if not sample.ok],
-    )
-    result = verdict(adjudication)
+    proofs = ProofContext(repo=root, allow=config.allow, diff=patch,
+                          timeout=config.timeout, sandbox=config.sandbox)
+    units_payload: list[dict[str, object]] = []
+
+    if not sliced:
+        samples, samples_run, agreement = _samples(prompt, runner, request.samples)
+        for sample in samples:
+            write_sample(directory, sample)
+        merged = merge([sample.output.findings if sample.output is not None else ()
+                        for sample in samples])
+        adjudication = adjudicate(
+            merged, proofs,
+            failed_samples=[sample.index for sample in samples if not sample.ok])
+        result = verdict(adjudication)
+        reported_context = full_context
+    else:
+        units = _build_units(template, base, patch, root, request, references)
+        runs: list[tuple[Unit, tuple[SampleResult, ...], int, bool | None, bool]] = []
+        raw: list[RawFinding] = []
+        for unit in units:
+            unit_samples, unit_run, unit_agreement = _samples(
+                unit.prompt, runner, request.samples)
+            for sample in unit_samples:
+                write_sample(directory / "units" / unit.id, sample)
+            ok = all(sample.ok for sample in unit_samples)
+            runs.append((unit, unit_samples, unit_run, unit_agreement, ok))
+            for sample in unit_samples:
+                if sample.output is not None:
+                    raw.extend(sample.output.findings)
+        merged = merge([raw])
+        adjudication = adjudicate(merged, proofs)
+        result = verdict(adjudication)
+        unreviewed = [unit.id for unit, _, _, _, ok in runs if not ok]
+        if unreviewed and result.verdict is Verdict.PASS:
+            result = Result(
+                Verdict.INCOMPLETE,
+                f"unit(s) {', '.join(unreviewed)} returned nothing usable: "
+                "the review is missing evidence",
+                result.findings,
+            )
+        for unit, unit_samples, unit_run, unit_agreement, ok in runs:
+            mine = [finding for finding in result.findings if _belongs(finding, unit)]
+            units_payload.append({
+                "id": unit.id,
+                "files": list(unit.files),
+                "ranges": [{"file": file, "start": start, "end": end}
+                           for file, start, end in unit.ranges],
+                "diff_sha256": hashlib.sha256(unit.patch.encode("utf-8")).hexdigest(),
+                "context_digest": unit.context_digest,
+                "context_depth": unit.depth,
+                "prompt_bytes": unit.bytes,
+                "samples_run": unit_run,
+                "agreement": unit_agreement,
+                "ok": ok,
+                "findings": len(mine),
+                "verdict": _unit_verdict(mine, ok),
+            })
+        samples = ()
+        samples_run = sum(run[2] for run in runs)
+        agreement = None
+        reported_context = Context((), (), "", "")
+
     ignored = state_dir_ignored(root)
     _write_verdict(directory, request, base, head, digest, prompt_file, ignored,
                    samples, result, worktree=True, diff_sha256=diff_sha256,
-                   skipped=change.skipped, context=context, references=references,
+                   skipped=change.skipped, context=reported_context,
+                   references=references,
                    samples_run=samples_run, agreement=agreement,
                    prompt_bytes=prompt_bytes, prompt_limit=limit,
-                   prompt_acknowledged=acknowledged)
+                   prompt_acknowledged=acknowledged,
+                   sliced=sliced, units=units_payload)
     return Report(directory, base, head, digest, result, samples, prompt_file, ignored,
-                  change.skipped, diff_sha256, context.digest)
+                  change.skipped, diff_sha256, reported_context.digest)

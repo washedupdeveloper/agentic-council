@@ -63,7 +63,7 @@ Every flag the tool accepts, what it changes, and why it exists. `council <comma
 |---|---|---|---|
 | `-C, --repo PATH` | `.` | the checkout to review | a review is about a repository, not a shell's idea of a directory |
 | `--base REV` | `origin/HEAD`, else `HEAD~1` | where the diff starts | a wrong base still produces a confident verdict, so the default is a chain and each step is checked |
-| `--samples N` | auto | samples to ask: N, or auto — 1 clean, 2 to confirm a finding, 3 to break a tie | one sample is cheap; a second confirms a finding; a third only when the model disagrees with itself |
+| `--samples N` | auto | samples to ask: N, or auto — 1 clean, 2 to confirm a finding, 3 to break a tie; per unit when a change is sliced | one sample is cheap; a second confirms a finding; a third only when the model disagrees with itself |
 | `--profile NAME` | `council-generalist` | the Hermes profile asked | the instrument is a profile, not a string in the prompt |
 | `--reviewer BIN` | `hermes` | the binary that answers a sample | the corpus harness needs a stub, and another host may need another binary |
 | `--prompt PATH` | the shipped prompt | a different instrument | experiments must not edit the prompt the gate uses |
@@ -79,8 +79,13 @@ Every flag the tool accepts, what it changes, and why it exists. `council <comma
 
 ### When the prompt is too large
 
-Before the reviewer is called, `council review` measures the prompt. Above
-`--max-prompt-bytes` it **stops**: nothing is sent, no run directory is written,
+Before the reviewer is called, `council review` measures the prompt. A change
+larger than one prompt is **sliced** first: whole files where they fit, hunks of
+a file that does not, each reviewed within the same budget (see
+[`docs/M12.md`](docs/M12.md)). The refusal below is for a single unit that
+cannot fit at all, at any context depth.
+
+Above `--max-prompt-bytes` it **stops**: nothing is sent, no run directory is written,
 and it says how large the prompt is and what the limit is. By default it then
 asks the person at the terminal what should happen:
 
@@ -155,6 +160,12 @@ not carry, with the reason (`too large`, `binary`, `not utf-8`, `unreadable`).
 It also records `context_digest`, the spans the model was shown,
 `unresolved` — calls the context could not follow — and `references`, the URLs
 the caller asked for, with a digest each. A run states what it did not look at.
+
+When the change was too large for one prompt, `verdict.json` also carries
+`sliced: true` and `units[]`: each unit's files, line ranges, diff digest,
+prompt size, context depth, samples, findings and its own verdict. Units whose
+reviewer never answered make the run `incomplete`; a run with an unreviewed unit
+can never be `pass`.
 
 ## The reviewer contract
 

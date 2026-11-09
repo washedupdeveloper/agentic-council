@@ -13,7 +13,7 @@ import difflib
 from hypothesis import given
 from hypothesis import strategies as st
 
-from council.changes import change_lines
+from council.changes import change_lines, file_sections, hunk_range, hunk_sections
 
 # Lines that cannot confuse the diff format with a newline of their own.
 LINE = st.text(alphabet=st.characters(blacklist_categories=("Cc", "Cs")), max_size=20)
@@ -96,6 +96,34 @@ def test_a_new_file_uses_new_side_numbers() -> None:
         difflib.unified_diff([], ["one\n", "two\n"], fromfile="/dev/null", tofile="b/new.py")
     )
     assert change_lines(diff) == {"new.py": ({1, 2}, set())}
+
+
+def test_a_diff_splits_into_one_section_per_file() -> None:
+    patch = ("diff --git a/a.py b/a.py\n--- a/a.py\n+++ b/a.py\n"
+             "@@ -1 +1 @@\n-x = 1\n+x = 2\n"
+             "diff --git a/b.py b/b.py\n--- a/b.py\n+++ b/b.py\n"
+             "@@ -1 +1 @@\n-y = 1\n+y = 2\n")
+    sections = file_sections(patch)
+    assert [section.path for section in sections] == ["a.py", "b.py"]
+    assert "a.py" not in sections[1].text
+
+
+def test_a_section_splits_into_hunks_that_keep_the_file_header() -> None:
+    diff = ("diff --git a/f.py b/f.py\n--- a/f.py\n+++ b/f.py\n"
+            "@@ -1,2 +1,2 @@\n a\n-b\n+B\n"
+            "@@ -10,2 +10,2 @@\n j\n-k\n+K\n")
+    hunks = hunk_sections(diff)
+    assert len(hunks) == 2
+    for hunk in hunks:
+        assert hunk.startswith("diff --git a/f.py b/f.py")
+        assert "+++ b/f.py" in hunk
+    assert "@@ -1,2" in hunks[0]
+    assert "@@ -10,2" in hunks[1]
+
+
+def test_a_hunk_range_is_the_new_side() -> None:
+    assert hunk_range("diff --git a/f b/f\n@@ -5,2 +7,3 @@\n") == (7, 9)
+    assert hunk_range("@@ -5 +7 @@\n") == (7, 7)
 
 
 def test_a_deleted_file_keeps_its_removed_lines() -> None:
