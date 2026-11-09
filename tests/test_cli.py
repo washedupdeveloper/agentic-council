@@ -184,6 +184,19 @@ def test_the_reviewer_binary_is_passed_through(monkeypatch: pytest.MonkeyPatch) 
     assert seen["binary"] == "/bin/other"
 
 
+def test_the_sample_timeout_reaches_the_runner(monkeypatch: pytest.MonkeyPatch) -> None:
+    seen: dict[str, Any] = {}
+
+    def fake_runner(profile: str, **kwargs: Any) -> Any:
+        seen.update(kwargs)
+        return lambda prompt: "{}"
+
+    monkeypatch.setattr(cli, "hermes_runner", fake_runner)
+    stub(monkeypatch, report(Verdict.PASS))
+    assert cli.main(["review", "--sample-timeout", "120"]) == 0
+    assert seen["timeout"] == 120
+
+
 def test_init_adds_the_state_directory(tmp_path: Path) -> None:
     subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
     assert cli.main(["init", "-C", str(tmp_path)]) == 0

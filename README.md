@@ -66,6 +66,7 @@ Every flag the tool accepts, what it changes, and why it exists. `council <comma
 | `--samples N` | auto | samples to ask: N, or auto — 1 clean, 2 to confirm a finding, 3 to break a tie; per unit when a change is sliced | one sample is cheap; a second confirms a finding; a third only when the model disagrees with itself |
 | `--profile NAME` | `council-generalist` | the Hermes profile asked | the instrument is a profile, not a string in the prompt |
 | `--reviewer BIN` | `hermes` | the binary that answers a sample | the corpus harness needs a stub, and another host may need another binary |
+| `--sample-timeout N` | `900` | give up on one sample after N seconds | a model that never answers must fail in bounded time, not hold the run |
 | `--prompt PATH` | the shipped prompt | a different instrument | experiments must not edit the prompt the gate uses |
 | `--report` | off | exit 0 whatever the verdict | advice in a hook that must not block |
 | `--json` | off | print `verdict.json` | the machine-readable form, byte-identical to the artefact |
@@ -239,6 +240,22 @@ overlay — a proof may write, and the writes vanish with it. A write anywhere
 else is `UNRUNNABLE`, not refuted. `[proofs] sandbox = false` opts out; without
 `bwrap` on `PATH` the same proofs are `UNRUNNABLE` and never fall back to
 running unsandboxed.
+
+## Known limits
+
+The reviewer is an external process, and its speed is not the tool's. On the
+provider measured on 2026-11-09: a trivial prompt answered in 11–22 s; a 2.8 KB
+review (the docs commit) completed three samples; review prompts of 5.8 KB,
+31 KB and 84 KB did not return within 6–10 minutes. A sliced run makes one call
+per unit, so a slow provider makes a large change slow even when every unit fits.
+
+`--sample-timeout` (default 900 s) bounds one attempt; a sample that does not
+answer is a failed sample, and a run with one is `INCOMPLETE` — never a pass.
+`--context-depth` and `--samples` are the cost levers, and a narrower `--base`
+is the reliable one.
+
+This is a property of the instrument, not of the verdict: the tool never trades
+a missing answer for a pass.
 
 ## What is not here
 

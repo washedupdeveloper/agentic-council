@@ -62,6 +62,8 @@ def _add_review_arguments(parser: argparse.ArgumentParser, *, advice: bool) -> N
     parser.add_argument("--profile", default=DEFAULT_PROFILE, help="Hermes profile to ask")
     parser.add_argument("--reviewer", default="hermes",
                         help="binary that answers a sample (default: hermes)")
+    parser.add_argument("--sample-timeout", type=_positive, default=900, metavar="SECONDS",
+                        help="give up on one sample after N seconds (default: 900)")
     parser.add_argument("--prompt", type=Path, default=None,
                         help="reviewer prompt to use instead of the one shipped with council")
     parser.add_argument("--run-id", default=None,
@@ -169,7 +171,8 @@ def _review(args: argparse.Namespace) -> Report:
     never asks: it refuses. `--allow-large-prompt` never asks either: it sends.
     """
     allow = args.allow_large_prompt
-    runner = hermes_runner(args.profile, binary=args.reviewer)
+    runner = hermes_runner(args.profile, binary=args.reviewer,
+                           timeout=args.sample_timeout)
     while True:
         request = ReviewRequest(repo=args.repo, base=args.base, samples=args.samples,
                                 profile=args.profile, prompt=args.prompt,
