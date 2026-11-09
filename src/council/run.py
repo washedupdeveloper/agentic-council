@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import time
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -75,6 +76,7 @@ class ReviewRequest:
     allow_large_prompt: bool = False
     max_prompt_bytes: int = PROMPT_LIMIT
     context_depth: int = 3
+    time_budget: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -275,6 +277,7 @@ def _write_verdict(run_dir: Path, request: ReviewRequest, base: str, head: str,
                    prompt_bytes: int, prompt_limit: int,
                    prompt_acknowledged: bool,
                    sliced: bool = False,
+                   time_budget: int = 0,
                    units: Sequence[dict[str, object]] = ()) -> None:
     payload = {
         "run": run_dir.name,
@@ -288,6 +291,7 @@ def _write_verdict(run_dir: Path, request: ReviewRequest, base: str, head: str,
         "prompt_limit": prompt_limit,
         "prompt_acknowledged": prompt_acknowledged,
         "sliced": sliced,
+        "time_budget": time_budget,
         "units": list(units),
         "state_dir_ignored": ignored,
         "profile": request.profile,
@@ -395,7 +399,15 @@ def review(request: ReviewRequest, runner: Runner) -> Report:
         units = _build_units(template, base, patch, root, request, references)
         runs: list[tuple[Unit, tuple[SampleResult, ...], int, bool | None, bool]] = []
         raw: list[RawFinding] = []
+        skipped_by_budget: set[str] = set()
+        started = time.monotonic()
         for unit in units:
+            if request.time_budget and time.monotonic() - started >= request.time_budget:
+                # The budget stops starting units; the one in flight was allowed
+                # to finish. A unit never asked is unreviewed, not clean.
+                skipped_by_budget.add(unit.id)
+                runs.append((unit, (), 0, None, False))
+                continue
             unit_samples, unit_run, unit_agreement = _samples(
                 unit.prompt, runner, request.samples)
             for sample in unit_samples:
@@ -410,10 +422,17 @@ def review(request: ReviewRequest, runner: Runner) -> Report:
         result = verdict(adjudication)
         unreviewed = [unit.id for unit, _, _, _, ok in runs if not ok]
         if unreviewed and result.verdict is Verdict.PASS:
+            silent = [unit_id for unit_id in unreviewed if unit_id not in skipped_by_budget]
+            late = [unit_id for unit_id in unreviewed if unit_id in skipped_by_budget]
+            reasons = []
+            if silent:
+                reasons.append(f"unit(s) {', '.join(silent)} returned nothing usable")
+            if late:
+                reasons.append(f"unit(s) {', '.join(late)} were not reviewed within "
+                               f"the {request.time_budget}s time budget")
             result = Result(
                 Verdict.INCOMPLETE,
-                f"unit(s) {', '.join(unreviewed)} returned nothing usable: "
-                "the review is missing evidence",
+                "; ".join(reasons) + ": the review is missing evidence",
                 result.findings,
             )
         for unit, unit_samples, unit_run, unit_agreement, ok in runs:
@@ -430,6 +449,8 @@ def review(request: ReviewRequest, runner: Runner) -> Report:
                 "samples_run": unit_run,
                 "agreement": unit_agreement,
                 "ok": ok,
+                "error": ("time budget exhausted"
+                          if unit.id in skipped_by_budget else None),
                 "findings": len(mine),
                 "verdict": _unit_verdict(mine, ok),
             })
@@ -446,6 +467,7 @@ def review(request: ReviewRequest, runner: Runner) -> Report:
                    samples_run=samples_run, agreement=agreement,
                    prompt_bytes=prompt_bytes, prompt_limit=limit,
                    prompt_acknowledged=acknowledged,
-                   sliced=sliced, units=units_payload)
+                   sliced=sliced, time_budget=request.time_budget,
+                   units=units_payload)
     return Report(directory, base, head, digest, result, samples, prompt_file, ignored,
                   change.skipped, diff_sha256, reported_context.digest)

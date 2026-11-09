@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
+from dataclasses import asdict
 from pathlib import Path
 from typing import NoReturn, Sequence
 
+from . import doctor as diagnostics
 from .config import ConfigError
 from .repo import ReviewError, init as init_repo
 from .run import DEFAULT_PROFILE, PROMPT_LIMIT, PromptTooLarge, Report, ReviewRequest, review
@@ -20,9 +23,9 @@ def _positive(value: str) -> int:
     try:
         number = int(value)
     except ValueError as exc:
-        raise argparse.ArgumentTypeError("expected a number of bytes") from exc
+        raise argparse.ArgumentTypeError("expected a positive number") from exc
     if number < 1:
-        raise argparse.ArgumentTypeError("expected at least 1 byte")
+        raise argparse.ArgumentTypeError("expected at least 1")
     return number
 
 
@@ -64,6 +67,8 @@ def _add_review_arguments(parser: argparse.ArgumentParser, *, advice: bool) -> N
                         help="binary that answers a sample (default: hermes)")
     parser.add_argument("--sample-timeout", type=_positive, default=900, metavar="SECONDS",
                         help="give up on one sample after N seconds (default: 900)")
+    parser.add_argument("--time-budget", type=_positive, default=0, metavar="SECONDS",
+                        help="stop starting units after N seconds (default: no budget)")
     parser.add_argument("--prompt", type=Path, default=None,
                         help="reviewer prompt to use instead of the one shipped with council")
     parser.add_argument("--run-id", default=None,
@@ -98,6 +103,14 @@ def build_parser() -> argparse.ArgumentParser:
 
     init = sub.add_parser("init", help="add .council/ to the repository's .gitignore")
     init.add_argument("-C", "--repo", type=Path, default=Path("."))
+
+    doctor = sub.add_parser("doctor", help="check that this machine can run a review")
+    doctor.add_argument("--profile", default=DEFAULT_PROFILE, help="Hermes profile to ask")
+    doctor.add_argument("--reviewer", default="hermes",
+                        help="binary that answers a sample (default: hermes)")
+    doctor.add_argument("--probe-timeout", type=_positive, default=60, metavar="SECONDS",
+                        help="how long the profile has to answer the probe (default: 60)")
+    doctor.add_argument("--json", action="store_true", help="print the checks as JSON")
     return parser
 
 
@@ -179,7 +192,8 @@ def _review(args: argparse.Namespace) -> Report:
                                 run_id=args.run_id, context_urls=tuple(args.context_url),
                                 allow_large_prompt=allow,
                                 max_prompt_bytes=args.max_prompt_bytes,
-                                context_depth=args.context_depth)
+                                context_depth=args.context_depth,
+                                time_budget=args.time_budget)
         try:
             return review(request, runner)
         except PromptTooLarge as exc:
@@ -212,8 +226,25 @@ def _print_report(report: Report) -> None:
     print(f"  run:    {report.run_dir}")
 
 
+def _doctor(args: argparse.Namespace) -> int:
+    """Report what this machine can do. A fail is exit 1; a warning is not."""
+    runner = hermes_runner(args.profile, binary=args.reviewer,
+                           timeout=args.probe_timeout)
+    checks = diagnostics.run(args.profile, runner=runner, binary=args.reviewer,
+                             probe_timeout=args.probe_timeout)
+    if args.json:
+        print(json.dumps([asdict(check) for check in checks], indent=2))
+    else:
+        for check in checks:
+            print(check.line())
+    return 1 if any(check.status == diagnostics.FAIL for check in checks) else 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+
+    if args.command == "doctor":
+        return _doctor(args)
 
     if args.command == "init":
         try:

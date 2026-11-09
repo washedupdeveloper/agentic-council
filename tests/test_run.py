@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+import time
 from pathlib import Path
 from typing import Any
 
@@ -477,6 +478,26 @@ def test_the_same_place_reported_by_two_units_is_merged_once(tmp_path: Path) -> 
     payload = json.loads((report.run_dir / "verdict.json").read_text(encoding="utf-8"))
     assert len(payload["findings"]) == 1
     assert len(payload["units"]) == 2
+
+
+def test_a_spent_time_budget_leaves_the_remaining_units_unreviewed(
+        tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    repo, prompt = make_two_changes(tmp_path)
+    clock = iter([0.0, 0.0, 100.0])
+    monkeypatch.setattr(time, "monotonic", lambda: next(clock))
+
+    report = review(
+        ReviewRequest(repo=repo, base="HEAD", samples=1, run_id="budget", prompt=prompt,
+                      max_prompt_bytes=200, time_budget=10),
+        lambda _: body())
+
+    payload = json.loads((report.run_dir / "verdict.json").read_text(encoding="utf-8"))
+    assert payload["time_budget"] == 10
+    assert [unit["ok"] for unit in payload["units"]] == [True, False]
+    assert [unit["samples_run"] for unit in payload["units"]] == [1, 0]
+    assert payload["units"][1]["error"] == "time budget exhausted"
+    assert payload["verdict"] == "incomplete"
+    assert "time budget" in payload["reason"]
 
 
 def test_a_unit_that_cannot_fit_at_depth_zero_is_refused_with_its_name(

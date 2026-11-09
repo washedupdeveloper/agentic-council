@@ -34,6 +34,7 @@ a trend; it cannot change it.
 ```sh
 council review                # gate: 0 pass, 1 fail, 2 incomplete, 3 could not start
 council ci                    # the same gate for CI: verdict.json on stdout
+council doctor                # can this machine run a review? measure, don't assume
 council review --report       # advice only: always exits 0
 python3 -m pytest             # the suite
 ./bin/council-verify          # every claim this project makes, executed
@@ -67,6 +68,7 @@ Every flag the tool accepts, what it changes, and why it exists. `council <comma
 | `--profile NAME` | `council-generalist` | the Hermes profile asked | the instrument is a profile, not a string in the prompt |
 | `--reviewer BIN` | `hermes` | the binary that answers a sample | the corpus harness needs a stub, and another host may need another binary |
 | `--sample-timeout N` | `900` | give up on one sample after N seconds | a model that never answers must fail in bounded time, not hold the run |
+| `--time-budget N` | none | stop starting units after N seconds; the unit in flight finishes | a large sliced review must end by a deadline even when the instrument is slow |
 | `--prompt PATH` | the shipped prompt | a different instrument | experiments must not edit the prompt the gate uses |
 | `--report` | off | exit 0 whatever the verdict | advice in a hook that must not block |
 | `--json` | off | print `verdict.json` | the machine-readable form, byte-identical to the artefact |
@@ -136,6 +138,22 @@ binary is installed beside `council` for whoever maintains it.
 | `-C, --repo PATH` | `.` | the checkout to add `.council/` to | the state directory is per repository |
 | `-h, --help` | — | usage | — |
 
+### `council doctor`
+
+Checks what a review needs on this machine and prints one line per check:
+`git`, the reviewer binary, `bwrap`, and whether the profile answers a one-line
+probe within `--probe-timeout`. A `fail` exits 1; a `warn` (for example, no
+`bwrap`) exits 0 and says what will be `UNRUNNABLE`. `--json` prints the checks
+as objects.
+
+| flag | default | what it does | why |
+|---|---|---|---|
+| `--profile NAME` | `council-generalist` | the profile asked the probe | the same instrument the review will use |
+| `--reviewer BIN` | `hermes` | the binary to look for and ask | a wrapper or another host may use another name |
+| `--probe-timeout N` | `60` | how long the profile has to answer | a dead profile must be reported in a minute, not after a review times out |
+| `--json` | off | machine-readable checks | CI can assert the machine is ready before it reviews |
+| `-h, --help` | — | usage | — |
+
 ## Architecture
 
 A pure core and an enumerated effect shell. `findings`, `verdict`, `merge`, `schema`,
@@ -151,7 +169,8 @@ file), `run` (writes the run), `cli` (stdout), `claims` (runs the registry). Tha
 whole of the side effects.
 
 The rebuild's acceptance criteria, every amendment to them, and the command that
-decides each one: `docs/M11.md`.
+decides each one: `docs/M11.md`. The time budget and the doctor checks are
+decided in [`docs/M13.md`](docs/M13.md).
 
 ## Evidence
 
@@ -251,8 +270,11 @@ per unit, so a slow provider makes a large change slow even when every unit fits
 
 `--sample-timeout` (default 900 s) bounds one attempt; a sample that does not
 answer is a failed sample, and a run with one is `INCOMPLETE` — never a pass.
+`--time-budget` stops starting units after N seconds; the units still to come are
+recorded as unreviewed (`units[].error`), and the run cannot be `PASS`.
 `--context-depth` and `--samples` are the cost levers, and a narrower `--base`
-is the reliable one.
+is the reliable one. `council doctor` reports what this machine can do before a
+review depends on it.
 
 This is a property of the instrument, not of the verdict: the tool never trades
 a missing answer for a pass.

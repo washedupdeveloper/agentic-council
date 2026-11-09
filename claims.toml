@@ -413,3 +413,18 @@ check = "python3 -m pytest tests/test_run.py::test_an_unreviewed_unit_makes_the_
 id = "every-text-file-ends-with-a-newline"
 text = "Every text file the repository ships ends with a newline."
 check = "python3 -m pytest tests/test_files.py -q"
+
+[[claim]]
+id = "a-time-budget-leaves-late-units-unreviewed"
+text = "A run that spends its time budget records the units it did not reach as unreviewed and cannot PASS."
+check = "python3 -m pytest tests/test_run.py::test_a_spent_time_budget_leaves_the_remaining_units_unreviewed -q"
+
+[[claim]]
+id = "doctor-reports-a-profile-that-cannot-answer"
+text = "council doctor fails when the profile does not answer its probe."
+check = "python3 -m pytest tests/test_doctor.py -q"
+
+[[claim]]
+id = "doctor-warns-when-bwrap-is-missing"
+text = "council doctor warns, but does not fail, when bwrap is absent."
+check = "python3 -m pytest tests/test_doctor.py::test_bwrap_missing_is_a_warning_not_a_failure -q"

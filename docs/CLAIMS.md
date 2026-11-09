@@ -86,3 +86,6 @@ registry, so it cannot describe a claim that has no check.
 | `an-oversized-change-is-sliced-not-refused` | A change too large for one prompt is reviewed as units, and the run records them. | `python3 -m pytest tests/test_run.py::test_a_change_too_large_for_one_prompt_is_sliced_by_file -q` |
 | `an-unreviewed-unit-cannot-pass` | A unit whose samples did not answer makes the run INCOMPLETE, never PASS. | `python3 -m pytest tests/test_run.py::test_an_unreviewed_unit_makes_the_run_incomplete -q` |
 | `every-text-file-ends-with-a-newline` | Every text file the repository ships ends with a newline. | `python3 -m pytest tests/test_files.py -q` |
+| `a-time-budget-leaves-late-units-unreviewed` | A run that spends its time budget records the units it did not reach as unreviewed and cannot PASS. | `python3 -m pytest tests/test_run.py::test_a_spent_time_budget_leaves_the_remaining_units_unreviewed -q` |
+| `doctor-reports-a-profile-that-cannot-answer` | council doctor fails when the profile does not answer its probe. | `python3 -m pytest tests/test_doctor.py -q` |
+| `doctor-warns-when-bwrap-is-missing` | council doctor warns, but does not fail, when bwrap is absent. | `python3 -m pytest tests/test_doctor.py::test_bwrap_missing_is_a_warning_not_a_failure -q` |
