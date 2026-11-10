@@ -14,8 +14,14 @@ DEFAULT_TIMEOUT = 900
 
 
 def hermes_runner(profile: str, *, timeout: int = DEFAULT_TIMEOUT,
-                  binary: str = DEFAULT_BINARY) -> Runner:
-    """Build a runner that asks one Hermes profile one question."""
+                  binary: str = DEFAULT_BINARY,
+                  reasoning: str | None = None) -> Runner:
+    """Build a runner that asks one Hermes profile one question.
+
+    `reasoning` overrides the profile's `reasoning_effort` for this call. It
+    matters: a profile set to `ultra` can spend minutes thinking on a review
+    prompt, while the same prompt at `none` answers in seconds.
+    """
 
     def run(prompt: str) -> str:
         with tempfile.TemporaryDirectory(prefix="council-prompt-") as raw:
@@ -23,6 +29,8 @@ def hermes_runner(profile: str, *, timeout: int = DEFAULT_TIMEOUT,
             path.write_text(prompt, encoding="utf-8", newline="\n")
             argv = [binary, "-p", profile, "chat", "--query-file", str(path),
                     "--oneshot", "-Q"]
+            if reasoning is not None:
+                argv.extend(["--reasoning", reasoning])
             try:
                 proc = subprocess.run(argv, capture_output=True, text=True,
                                       timeout=timeout, check=False)

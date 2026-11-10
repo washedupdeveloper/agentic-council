@@ -42,6 +42,8 @@ recorded in `docs/ADOPTION.md`.
 - `--sample-timeout N` (default 900 s): one sample attempt cannot outlast it.
 - `--time-budget N`: a sliced run stops starting units after N seconds; the
   units it did not reach are recorded as unreviewed, so the run cannot be PASS.
+- `--reasoning LEVEL`: overrides the profile's reasoning effort for the review;
+  the level is recorded in `verdict.json` and hashed into the instrument digest.
 - `council doctor`: measures `git`, the reviewer binary, `bwrap` and whether the
   profile answers a probe; `--json` for CI.
 

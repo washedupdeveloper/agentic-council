@@ -69,6 +69,7 @@ Every flag the tool accepts, what it changes, and why it exists. `council <comma
 | `--reviewer BIN` | `hermes` | the binary that answers a sample | the corpus harness needs a stub, and another host may need another binary |
 | `--sample-timeout N` | `900` | give up on one sample after N seconds | a model that never answers must fail in bounded time, not hold the run |
 | `--time-budget N` | none | stop starting units after N seconds; the unit in flight finishes | a large sliced review must end by a deadline even when the instrument is slow |
+| `--reasoning LEVEL` | the profile's | reasoning effort for this review: `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max`, `ultra` | a profile set to `ultra` can spend minutes on a review prompt; `none` answered the same prompt in 21 s |
 | `--prompt PATH` | the shipped prompt | a different instrument | experiments must not edit the prompt the gate uses |
 | `--report` | off | exit 0 whatever the verdict | advice in a hook that must not block |
 | `--json` | off | print `verdict.json` | the machine-readable form, byte-identical to the artefact |
@@ -280,6 +281,13 @@ review depends on it.
 
 This is a property of the instrument, not of the verdict: the tool never trades
 a missing answer for a pass.
+
+The profile on this host sets `reasoning_effort: ultra`. The 7,954-byte external
+prompt answered in 21 s at `--reasoning none`, and `none` caught a planted AWS
+key as `critical` in 11 s, while `low` did not return within 150 s. When a host
+stalls, set `--reasoning none` or `minimal`; the level is recorded in
+`verdict.json` and is part of the instrument digest, because the same prompt at
+two levels is not the same review.
 
 ## What is not here
 

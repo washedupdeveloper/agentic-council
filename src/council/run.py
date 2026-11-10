@@ -77,6 +77,7 @@ class ReviewRequest:
     max_prompt_bytes: int = PROMPT_LIMIT
     context_depth: int = 3
     time_budget: int = 0
+    reasoning: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -295,6 +296,7 @@ def _write_verdict(run_dir: Path, request: ReviewRequest, base: str, head: str,
         "units": list(units),
         "state_dir_ignored": ignored,
         "profile": request.profile,
+        "reasoning": request.reasoning or "profile-default",
         "samples_requested": request.samples if request.samples is not None else "auto",
         "samples_run": samples_run,
         "agreement": agreement,
@@ -355,7 +357,8 @@ def review(request: ReviewRequest, runner: Runner) -> Report:
     if not prompt_file.exists():
         raise ReviewError(f"no reviewer prompt at {prompt_file}: a review needs an instrument")
     template = prompt_file.read_text(encoding="utf-8")
-    digest = instrument_digest(template, profile=request.profile)
+    digest = instrument_digest(template, profile=request.profile,
+                               reasoning=request.reasoning)
 
     run_id = (request.run_id if request.run_id is not None
               else datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S"))

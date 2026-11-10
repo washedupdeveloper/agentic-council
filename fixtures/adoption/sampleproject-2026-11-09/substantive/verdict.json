@@ -1,0 +1,64 @@
+{
+  "run": "adopt-substantive",
+  "base": "8603eaf898a2db2c89c36ad6b302f2994700ad6a",
+  "head": "621e4974ca25ce531773def586ba3ed8e736b3fc",
+  "worktree": true,
+  "diff_sha256": "d2022de47bf2cd5350dc5d7135977b1615a9ae70ba2f2ad654ab5dc2cc1e5429",
+  "digest": "7362f2c8d1801807",
+  "prompt": "/home/nixolotl/projects/review-council-v2/src/council/prompts/reviewer.md",
+  "prompt_bytes": 7954,
+  "prompt_limit": 32768,
+  "prompt_acknowledged": false,
+  "sliced": false,
+  "time_budget": 600,
+  "units": [],
+  "state_dir_ignored": true,
+  "profile": "council-generalist",
+  "reasoning": "none",
+  "samples_requested": 3,
+  "samples_run": 3,
+  "agreement": null,
+  "samples": [
+    {
+      "index": 1,
+      "ok": true,
+      "attempts": 2,
+      "error": null,
+      "findings": 0
+    },
+    {
+      "index": 2,
+      "ok": true,
+      "attempts": 1,
+      "error": null,
+      "findings": 0
+    },
+    {
+      "index": 3,
+      "ok": true,
+      "attempts": 1,
+      "error": null,
+      "findings": 1
+    }
+  ],
+  "skipped": [],
+  "context_digest": "a65e6af84544bbd9",
+  "context_depth": 0,
+  "context": [],
+  "unresolved": [],
+  "references": [],
+  "verdict": "pass",
+  "exit_code": 0,
+  "reason": "no proven blocking findings",
+  "findings": [
+    {
+      "id": "F-01",
+      "dimension": "correctness",
+      "severity": "low",
+      "state": "refuted",
+      "location": "noxfile.py:43",
+      "claim": "Dropping Python 3.8 from nox tests while pyproject requires-python goes to >=3.9 is consistent; no defect, but build_and_check_dists still runs twine check without installing twine in tests session.",
+      "detail": "noxfile.py:43 says '@nox.session(python=[\"3.9\", \"3.10\", \"3.11\", \"3.12\", \"3.13\"])'"
+    }
+  ]
+}

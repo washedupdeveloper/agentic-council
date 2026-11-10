@@ -28,6 +28,10 @@ inputs:
     description: Seconds after which no new unit is started
     required: false
     default: "600"
+  reasoning:
+    description: Reasoning effort (empty means the profile's setting)
+    required: false
+    default: "none"
   python:
     description: Interpreter used to create the private environment
     required: false
@@ -53,6 +57,7 @@ runs:
       shell: bash
       env:
         BASE: ${{ inputs.base }}
+        REASONING: ${{ inputs.reasoning }}
       run: |
         set -uo pipefail
         args=(ci
@@ -61,4 +66,5 @@ runs:
           --time-budget "${{ inputs.time-budget }}"
           --context-depth "${{ inputs.context-depth }}")
         if [ -n "$BASE" ]; then args+=(--base "$BASE"); fi
+        if [ -n "$REASONING" ]; then args+=(--reasoning "$REASONING"); fi
         council "${args[@]}"

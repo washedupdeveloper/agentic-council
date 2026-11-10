@@ -90,3 +90,5 @@ registry, so it cannot describe a claim that has no check.
 | `doctor-reports-a-profile-that-cannot-answer` | council doctor fails when the profile does not answer its probe. | `python3 -m pytest tests/test_doctor.py -q` |
 | `doctor-warns-when-bwrap-is-missing` | council doctor warns, but does not fail, when bwrap is absent. | `python3 -m pytest tests/test_doctor.py::test_bwrap_missing_is_a_warning_not_a_failure -q` |
 | `the-package-version-is-the-released-version` | The version in pyproject.toml is a released heading in CHANGELOG.md, and both console scripts are declared. | `python3 -m pytest tests/test_packaging.py -q` |
+| `the-reasoning-level-reaches-the-reviewer` | The reasoning level is passed to the reviewer process, and omitted when the profile decides. | `python3 -m pytest tests/test_runner.py -q` |
+| `the-reasoning-level-is-part-of-the-instrument` | A run records its reasoning level, and two levels produce different instrument digests. | `python3 -m pytest tests/test_run.py::test_the_reasoning_level_is_recorded_and_changes_the_instrument -q` |

@@ -500,6 +500,19 @@ def test_a_spent_time_budget_leaves_the_remaining_units_unreviewed(
     assert "time budget" in payload["reason"]
 
 
+def test_the_reasoning_level_is_recorded_and_changes_the_instrument(
+        tmp_path: Path) -> None:
+    repo, _ = make_repo(tmp_path)
+    plain = review(ReviewRequest(repo=repo, samples=1, run_id="plain"),
+                   lambda _: body())
+    quiet = review(ReviewRequest(repo=repo, samples=1, run_id="quiet",
+                                 reasoning="none"),
+                   lambda _: body())
+    payload = json.loads((quiet.run_dir / "verdict.json").read_text(encoding="utf-8"))
+    assert payload["reasoning"] == "none"
+    assert quiet.digest != plain.digest
+
+
 def test_a_missing_unit_is_named_even_when_a_finding_is_unsettled(
         tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     repo, prompt = make_two_changes(tmp_path)

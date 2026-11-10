@@ -433,3 +433,13 @@ check = "python3 -m pytest tests/test_doctor.py::test_bwrap_missing_is_a_warning
 id = "the-package-version-is-the-released-version"
 text = "The version in pyproject.toml is a released heading in CHANGELOG.md, and both console scripts are declared."
 check = "python3 -m pytest tests/test_packaging.py -q"
+
+[[claim]]
+id = "the-reasoning-level-reaches-the-reviewer"
+text = "The reasoning level is passed to the reviewer process, and omitted when the profile decides."
+check = "python3 -m pytest tests/test_runner.py -q"
+
+[[claim]]
+id = "the-reasoning-level-is-part-of-the-instrument"
+text = "A run records its reasoning level, and two levels produce different instrument digests."
+check = "python3 -m pytest tests/test_run.py::test_the_reasoning_level_is_recorded_and_changes_the_instrument -q"

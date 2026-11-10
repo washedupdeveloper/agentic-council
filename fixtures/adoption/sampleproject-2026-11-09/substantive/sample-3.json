@@ -1,0 +1,23 @@
+{
+  "index": 3,
+  "attempts": 1,
+  "error": null,
+  "raw": "",
+  "findings": [
+    {
+      "dimension": "correctness",
+      "severity": "low",
+      "file": "noxfile.py",
+      "line": 43,
+      "claim": "Dropping Python 3.8 from nox tests while pyproject requires-python goes to >=3.9 is consistent; no defect, but build_and_check_dists still runs twine check without installing twine in tests session.",
+      "proof": {
+        "kind": "present",
+        "params": {
+          "path": "noxfile.py",
+          "line": 43,
+          "text": "def tests(session):"
+        }
+      }
+    }
+  ]
+}

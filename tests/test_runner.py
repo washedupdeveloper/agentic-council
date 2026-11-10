@@ -24,6 +24,19 @@ def test_the_prompt_is_passed_as_a_file_and_the_profile_as_a_flag(tmp_path: Path
     assert "--oneshot" in output
 
 
+def test_the_reasoning_level_is_passed_to_the_process(tmp_path: Path) -> None:
+    binary = script(tmp_path, 'printf "%s" "$*"')
+    output = hermes_runner("council-generalist", binary=str(binary), timeout=10,
+                           reasoning="none")("hello")
+    assert "--reasoning none" in output
+
+
+def test_no_reasoning_flag_when_the_profile_decides(tmp_path: Path) -> None:
+    binary = script(tmp_path, 'printf "%s" "$*"')
+    output = hermes_runner("p", binary=str(binary), timeout=10)("hello")
+    assert "--reasoning" not in output
+
+
 def test_the_answer_is_returned_unchanged(tmp_path: Path) -> None:
     binary = script(tmp_path, 'printf \'{"sections": {}}\'')
     assert hermes_runner("p", binary=str(binary), timeout=10)("q") == '{"sections": {}}'

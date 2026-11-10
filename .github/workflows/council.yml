@@ -18,6 +18,10 @@ on:
         description: Seconds after which no new unit is started
         required: false
         default: "600"
+      reasoning:
+        description: Reasoning effort (empty means the profile's setting)
+        required: false
+        default: "none"
 
 permissions:
   contents: read
@@ -42,3 +46,4 @@ jobs:
           base: ${{ inputs.base }}
           samples: ${{ inputs.samples }}
           time-budget: ${{ inputs.time-budget }}
+          reasoning: ${{ inputs.reasoning }}

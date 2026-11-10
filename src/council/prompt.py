@@ -36,7 +36,8 @@ def render(template: str, *, base: str, diff: str, context: str = "") -> str:
 
 def instrument_digest(template: str, *, profile: str,
                       dimensions: Sequence[str] = DIMENSIONS,
-                      contract: str = CONTRACT) -> str:
+                      contract: str = CONTRACT,
+                      reasoning: str | None = None) -> str:
     """A short hash of everything that decides what a sample means.
 
     Deliberately excludes the diff: the digest identifies the instrument, so two
@@ -44,7 +45,8 @@ def instrument_digest(template: str, *, profile: str,
     it.
     """
     digest = hashlib.sha256()
-    for part in ("council-prompt-v2", contract, template, profile, *dimensions):
+    for part in ("council-prompt-v2", contract, template, profile,
+                 reasoning or "profile-default", *dimensions):
         digest.update(part.encode("utf-8"))
         digest.update(b"\x00")
     return digest.hexdigest()[:16]

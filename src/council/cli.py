@@ -69,6 +69,10 @@ def _add_review_arguments(parser: argparse.ArgumentParser, *, advice: bool) -> N
                         help="give up on one sample after N seconds (default: 900)")
     parser.add_argument("--time-budget", type=_positive, default=0, metavar="SECONDS",
                         help="stop starting units after N seconds (default: no budget)")
+    parser.add_argument("--reasoning", default=None,
+                        choices=("none", "minimal", "low", "medium", "high",
+                                 "xhigh", "max", "ultra"),
+                        help="reasoning effort for this review (default: the profile's setting)")
     parser.add_argument("--prompt", type=Path, default=None,
                         help="reviewer prompt to use instead of the one shipped with council")
     parser.add_argument("--run-id", default=None,
@@ -185,7 +189,7 @@ def _review(args: argparse.Namespace) -> Report:
     """
     allow = args.allow_large_prompt
     runner = hermes_runner(args.profile, binary=args.reviewer,
-                           timeout=args.sample_timeout)
+                           timeout=args.sample_timeout, reasoning=args.reasoning)
     while True:
         request = ReviewRequest(repo=args.repo, base=args.base, samples=args.samples,
                                 profile=args.profile, prompt=args.prompt,
@@ -193,7 +197,8 @@ def _review(args: argparse.Namespace) -> Report:
                                 allow_large_prompt=allow,
                                 max_prompt_bytes=args.max_prompt_bytes,
                                 context_depth=args.context_depth,
-                                time_budget=args.time_budget)
+                                time_budget=args.time_budget,
+                                reasoning=args.reasoning)
         try:
             return review(request, runner)
         except PromptTooLarge as exc:
