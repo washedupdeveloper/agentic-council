@@ -282,6 +282,58 @@ def test_pr_does_not_accept_a_base() -> None:
     assert stopped.value.code == 3
 
 
+def test_ephemeral_removes_the_run_after_the_verdict(
+        tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    root = tmp_path / "ephemeral"
+    monkeypatch.setattr(cli.tempfile, "mkdtemp", lambda prefix: str(root))
+
+    def fake_review(request: object, runner: object) -> Report:
+        run = request.state_dir  # type: ignore[attr-defined]
+        run.mkdir(parents=True)
+        (run / "verdict.json").write_text("{}", encoding="utf-8")
+        return Report(run, "a" * 40, "b" * 40, "d" * 16,
+                      Result(Verdict.PASS, "ok", ()), ())
+
+    monkeypatch.setattr(cli, "review", fake_review)
+    assert cli.main(["review", "--ephemeral", "--run-id", "e"]) == 0
+    assert not root.exists()
+
+
+def test_keep_copies_the_run_before_removing_it(
+        tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    root = tmp_path / "ephemeral"
+    keep = tmp_path / "kept"
+    monkeypatch.setattr(cli.tempfile, "mkdtemp", lambda prefix: str(root))
+
+    def fake_review(request: object, runner: object) -> Report:
+        run = request.state_dir  # type: ignore[attr-defined]
+        run.mkdir(parents=True)
+        (run / "verdict.json").write_text("{}", encoding="utf-8")
+        return Report(run, "a" * 40, "b" * 40, "d" * 16,
+                      Result(Verdict.PASS, "ok", ()), ())
+
+    monkeypatch.setattr(cli, "review", fake_review)
+    assert cli.main(["review", "--keep", str(keep), "--run-id", "k"]) == 0
+    assert (keep / "k" / "verdict.json").is_file()
+    assert not root.exists()
+
+
+def test_the_sandbox_defaults_on_when_bwrap_exists_and_can_be_disabled(
+        monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(cli.shutil, "which",
+                        lambda name: "/usr/bin/bwrap" if name == "bwrap" else None)
+    seen: list[bool] = []
+
+    def fake_review(request: object, runner: object) -> Report:
+        seen.append(request.sandbox)  # type: ignore[attr-defined]
+        return report(Verdict.PASS)
+
+    monkeypatch.setattr(cli, "review", fake_review)
+    assert cli.main(["review"]) == 0
+    assert cli.main(["review", "--no-sandbox"]) == 0
+    assert seen == [True, False]
+
+
 def test_init_adds_the_state_directory(tmp_path: Path) -> None:
     subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
     assert cli.main(["init", "-C", str(tmp_path)]) == 0

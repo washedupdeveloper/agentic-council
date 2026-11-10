@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+import shutil
 from pathlib import Path
 
 import pytest
@@ -106,6 +107,33 @@ print(json.dumps({"type": "result", "exit_code": 3, "text": ""}))
     with pytest.raises(OSError, match="exited 3"):
         hermes_runner("p", binary=str(binary), timeout=10, stream=True,
                       idle_timeout=5)("q")
+
+
+def test_a_sandboxed_reviewer_cannot_write_to_the_host(tmp_path: Path) -> None:
+    if shutil.which("bwrap") is None:
+        pytest.skip("bwrap is not available")
+    marker_home = Path.home() / "council-sandbox-leak"
+    marker_tmp = Path("/tmp/council-sandbox-leak")
+    for marker in (marker_home, marker_tmp):
+        marker.unlink(missing_ok=True)
+    binary = py_script(tmp_path, '''
+from pathlib import Path
+Path.home().joinpath("council-sandbox-leak").write_text("x")
+Path("/tmp/council-sandbox-leak").write_text("x")
+print(json.dumps({"sections": {}}))
+''')
+    answer = hermes_runner("p", binary=str(binary), timeout=20, sandbox=True)("q")
+    assert answer.strip() == '{"sections": {}}'
+    assert not marker_home.exists()
+    assert not marker_tmp.exists()
+
+
+def test_the_sandbox_needs_bwrap(tmp_path: Path,
+                                 monkeypatch: pytest.MonkeyPatch) -> None:
+    binary = py_script(tmp_path, 'print(json.dumps({"sections": {}}))')
+    monkeypatch.setattr("council.runner.shutil.which", lambda name: None)
+    with pytest.raises(OSError, match="bwrap is required"):
+        hermes_runner("p", binary=str(binary), timeout=10, sandbox=True)("q")
 
 
 def test_the_answer_is_returned_unchanged(tmp_path: Path) -> None:

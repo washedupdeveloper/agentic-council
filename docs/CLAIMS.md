@@ -108,3 +108,9 @@ registry, so it cannot describe a claim that has no check.
 | `a-pull-request-takes-its-base-from-github` | The PR command uses GitHub's base and records the pull request in the request. | `python3 -m pytest tests/test_cli.py::test_pr_takes_its_base_from_github_and_records_it -q` |
 | `a-plan-writes-no-run-directory` | A plan names its units and creates no run directory. | `python3 -m pytest tests/test_run.py::test_a_plan_names_the_units_and_writes_nothing -q` |
 | `the-cli-prints-a-plan` | council review --plan prints the plan and exits 0. | `python3 -m pytest tests/test_cli.py::test_plan_prints_and_writes_nothing -q` |
+| `a-sandboxed-reviewer-cannot-write-to-the-host` | A sandboxed reviewer's writes to HOME and /tmp do not reach the host. | `python3 -m pytest tests/test_runner.py::test_a_sandboxed_reviewer_cannot_write_to_the_host -q` |
+| `the-reviewer-sandbox-needs-bwrap` | The sandbox fails rather than running unsandboxed when bwrap is absent. | `python3 -m pytest tests/test_runner.py::test_the_sandbox_needs_bwrap -q` |
+| `the-reviewer-sandbox-defaults-on-when-bwrap-exists` | The reviewer is sandboxed by default when bwrap is present; --no-sandbox turns it off. | `python3 -m pytest tests/test_cli.py::test_the_sandbox_defaults_on_when_bwrap_exists_and_can_be_disabled -q` |
+| `an-ephemeral-run-uses-only-its-state-directory` | An ephemeral run writes its verdict only to its state directory, not to the repository. | `python3 -m pytest tests/test_run.py::test_an_ephemeral_run_writes_only_to_its_state_directory -q` |
+| `an-ephemeral-run-is-removed-after-the-verdict` | An ephemeral run's temporary tree is removed after the verdict. | `python3 -m pytest tests/test_cli.py::test_ephemeral_removes_the_run_after_the_verdict -q` |
+| `keep-copies-the-run-before-removal` | --keep copies the run directory before the ephemeral tree is removed. | `python3 -m pytest tests/test_cli.py::test_keep_copies_the_run_before_removing_it -q` |

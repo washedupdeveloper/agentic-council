@@ -58,6 +58,11 @@ recorded in `docs/ADOPTION.md`.
 - `--plan` on `review` and `pr`: print units, file ranges, prompt bytes, context
   depth and skipped files without calling the reviewer or writing a run.
 - README gains the `council pr` entry and the plan documentation.
+- The reviewer now runs in a bwrap sandbox by default where bwrap is present:
+  read-only root, private `/tmp` and a tmpfs overlay of `$HOME`; the choice is
+  recorded as `reviewer_sandbox`. `--no-sandbox` opts out, `--sandbox` requires it.
+- `--ephemeral` keeps the run in a private temporary tree and removes it after
+  the verdict; `--keep DIR` copies the evidence there first.
 - `council doctor`: measures `git`, the reviewer binary, `bwrap` and whether the
   profile answers a probe; `--json` for CI.
 

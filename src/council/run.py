@@ -81,6 +81,8 @@ class ReviewRequest:
     reasoning: str | None = None
     stream: bool = False
     idle_timeout: int = 120
+    sandbox: bool = False
+    state_dir: Path | None = None
     pull_request: PullRequest | None = None
 
 
@@ -337,6 +339,8 @@ def _write_verdict(run_dir: Path, request: ReviewRequest, base: str, head: str,
         "reasoning": request.reasoning or "profile-default",
         "transport": "stream" if request.stream else "plain",
         "idle_timeout": request.idle_timeout,
+        "reviewer_sandbox": request.sandbox,
+        "ephemeral": request.state_dir is not None,
         "pull_request": None if request.pull_request is None else {
             "number": request.pull_request.number,
             "url": request.pull_request.url,
@@ -456,10 +460,11 @@ def review(request: ReviewRequest, runner: Runner) -> Report:
     if not run_id.strip():
         raise ReviewError("--run-id must not be empty")
     try:
-        directory = run_path(root, run_id)
+        directory = (request.state_dir if request.state_dir is not None
+                     else run_path(root, run_id))
     except ValueError as exc:
         raise ReviewError(str(exc)) from exc
-    if directory.is_symlink() or directory.exists():
+    if request.state_dir is None and (directory.is_symlink() or directory.exists()):
         raise ReviewError(f"run {run_id!r} already exists at {directory}")
 
     config = load_config(root / CONFIG_NAME)
@@ -548,7 +553,7 @@ def review(request: ReviewRequest, runner: Runner) -> Report:
         agreement = None
         reported_context = Context((), (), "", "")
 
-    ignored = state_dir_ignored(root)
+    ignored = True if request.state_dir is not None else state_dir_ignored(root)
     _write_verdict(directory, request, base, head, digest, prompt_file, ignored,
                    samples, result, worktree=True, diff_sha256=diff_sha256,
                    skipped=prepared.skipped, context=reported_context,

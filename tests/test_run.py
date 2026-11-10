@@ -513,6 +513,19 @@ def test_the_reasoning_level_is_recorded_and_changes_the_instrument(
     assert quiet.digest != plain.digest
 
 
+def test_an_ephemeral_run_writes_only_to_its_state_directory(tmp_path: Path) -> None:
+    repo, _ = make_repo(tmp_path)
+    state = tmp_path / "ephemeral-run"
+    report = review(ReviewRequest(repo=repo, samples=1, run_id="eph",
+                                  state_dir=state),
+                    lambda _: body())
+    assert report.run_dir == state
+    assert (state / "verdict.json").is_file()
+    assert not (repo / ".council").exists()
+    payload = json.loads((state / "verdict.json").read_text(encoding="utf-8"))
+    assert payload["ephemeral"] is True
+
+
 def test_a_plan_is_one_prompt_when_it_fits(tmp_path: Path) -> None:
     repo, _ = make_repo(tmp_path)
     prompt = tmp_path / "prompt.md"

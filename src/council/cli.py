@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import argparse
 import json
+import shutil
 import sys
+import tempfile
 from dataclasses import asdict
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import NoReturn, Sequence
 
@@ -84,6 +87,12 @@ def _add_review_arguments(parser: argparse.ArgumentParser, *, advice: bool,
     parser.add_argument("--idle-timeout", type=_positive, default=DEFAULT_IDLE_TIMEOUT,
                         metavar="SECONDS",
                         help="kill a stream with no event for N seconds (default: 120)")
+    parser.add_argument("--sandbox", action=argparse.BooleanOptionalAction, default=None,
+                        help="run the reviewer in a bwrap sandbox (default: on when bwrap is available)")
+    parser.add_argument("--ephemeral", action="store_true",
+                        help="keep run state in a temp directory and remove it after the verdict")
+    parser.add_argument("--keep", type=Path, default=None, metavar="DIR",
+                        help="with --ephemeral, copy the run directory here before removing it")
     parser.add_argument("--prompt", type=Path, default=None,
                         help="reviewer prompt to use instead of the one shipped with council")
     parser.add_argument("--sarif", type=Path, default=None, metavar="PATH",
@@ -219,6 +228,8 @@ def _request(args: argparse.Namespace, *, allow: bool | None = None) -> ReviewRe
         reasoning=args.reasoning,
         stream=args.stream,
         idle_timeout=args.idle_timeout,
+        sandbox=bool(getattr(args, "sandbox", False)),
+        state_dir=getattr(args, "state_dir", None),
         pull_request=getattr(args, "pull_request", None),
     )
 
@@ -238,9 +249,24 @@ def _review(args: argparse.Namespace) -> Report:
     never asks: it refuses. `--allow-large-prompt` never asks either: it sends.
     """
     allow = args.allow_large_prompt
+    if args.keep is not None:
+        args.ephemeral = True
+    if args.ephemeral:
+        if getattr(args, "ephemeral_root", None) is None:
+            args.ephemeral_root = Path(tempfile.mkdtemp(prefix="council-ephemeral-"))
+        if args.run_id is None:
+            args.run_id = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+        args.state_dir = args.ephemeral_root / args.run_id
+    sandbox = args.sandbox
+    if sandbox is None:
+        sandbox = shutil.which("bwrap") is not None
+    if sandbox and shutil.which("bwrap") is None:
+        raise ReviewError("--sandbox needs bwrap on PATH; install bubblewrap or use --no-sandbox")
+    args.sandbox = sandbox
     runner = hermes_runner(args.profile, binary=args.reviewer,
                            timeout=args.sample_timeout, reasoning=args.reasoning,
-                           stream=args.stream, idle_timeout=args.idle_timeout)
+                           stream=args.stream, idle_timeout=args.idle_timeout,
+                           sandbox=sandbox)
     while True:
         request = _request(args, allow=allow)
         try:
@@ -263,6 +289,24 @@ def _review(args: argparse.Namespace) -> Report:
                 args.context_depth = value
             else:
                 raise PromptTooLarge(exc.size, exc.limit, declined=True) from exc
+
+
+def _finish_ephemeral(args: argparse.Namespace, report: Report | None) -> None:
+    """Copy evidence if asked, then remove the temporary run tree."""
+    root = getattr(args, "ephemeral_root", None)
+    if root is None:
+        return
+    keep = getattr(args, "keep", None)
+    if keep is not None and report is not None:
+        target = Path(keep) / report.run_dir.name
+        try:
+            shutil.copytree(report.run_dir, target, dirs_exist_ok=True)
+            print(f"council: kept {target}", file=sys.stderr)
+        except OSError as exc:
+            print(f"council: could not keep {target}: {exc}; "
+                  f"evidence left at {report.run_dir}", file=sys.stderr)
+            return
+    shutil.rmtree(root, ignore_errors=True)
 
 
 def _print_report(report: Report) -> None:
@@ -365,6 +409,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         report = _review(args)
     except (ReviewError, ConfigError) as exc:
+        _finish_ephemeral(args, None)
         print(f"council: {exc}", file=sys.stderr)
         return EXIT_ERROR
 
@@ -396,6 +441,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     if not report.ignored:
         print("note: .council/ is not ignored here; run `council init` to keep git clean",
               file=sys.stderr)
+
+    if getattr(args, "ephemeral", False):
+        print("council: ephemeral run; evidence removed after this verdict", file=sys.stderr)
+    _finish_ephemeral(args, report)
 
     return 0 if args.report else report.exit_code
 

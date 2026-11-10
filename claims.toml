@@ -523,3 +523,33 @@ check = "python3 -m pytest tests/test_run.py::test_a_plan_names_the_units_and_wr
 id = "the-cli-prints-a-plan"
 text = "council review --plan prints the plan and exits 0."
 check = "python3 -m pytest tests/test_cli.py::test_plan_prints_and_writes_nothing -q"
+
+[[claim]]
+id = "a-sandboxed-reviewer-cannot-write-to-the-host"
+text = "A sandboxed reviewer's writes to HOME and /tmp do not reach the host."
+check = "python3 -m pytest tests/test_runner.py::test_a_sandboxed_reviewer_cannot_write_to_the_host -q"
+
+[[claim]]
+id = "the-reviewer-sandbox-needs-bwrap"
+text = "The sandbox fails rather than running unsandboxed when bwrap is absent."
+check = "python3 -m pytest tests/test_runner.py::test_the_sandbox_needs_bwrap -q"
+
+[[claim]]
+id = "the-reviewer-sandbox-defaults-on-when-bwrap-exists"
+text = "The reviewer is sandboxed by default when bwrap is present; --no-sandbox turns it off."
+check = "python3 -m pytest tests/test_cli.py::test_the_sandbox_defaults_on_when_bwrap_exists_and_can_be_disabled -q"
+
+[[claim]]
+id = "an-ephemeral-run-uses-only-its-state-directory"
+text = "An ephemeral run writes its verdict only to its state directory, not to the repository."
+check = "python3 -m pytest tests/test_run.py::test_an_ephemeral_run_writes_only_to_its_state_directory -q"
+
+[[claim]]
+id = "an-ephemeral-run-is-removed-after-the-verdict"
+text = "An ephemeral run's temporary tree is removed after the verdict."
+check = "python3 -m pytest tests/test_cli.py::test_ephemeral_removes_the_run_after_the_verdict -q"
+
+[[claim]]
+id = "keep-copies-the-run-before-removal"
+text = "--keep copies the run directory before the ephemeral tree is removed."
+check = "python3 -m pytest tests/test_cli.py::test_keep_copies_the_run_before_removing_it -q"

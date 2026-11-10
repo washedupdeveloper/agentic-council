@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import signal
 import subprocess
 import tempfile
@@ -30,6 +31,30 @@ def _tail(stream: TextIO) -> str:
     stream.seek(0)
     lines = stream.read().strip().splitlines()
     return f": {lines[-1]}" if lines else ""
+
+
+def _sandbox_argv(argv: list[str], prompt_dir: Path) -> list[str]:
+    """Run the reviewer with a read-only root, a private /tmp and an overlay home.
+
+    The reviewer can read the host and reach the network, but every write lands
+    in a tmpfs overlay of `$HOME` or the private `/tmp`; both vanish with the
+    process. The prompt directory and the binary are bound back because the
+    private `/tmp` would otherwise hide them.
+    """
+    bwrap = shutil.which("bwrap")
+    if bwrap is None:
+        raise OSError("bwrap is required for the reviewer sandbox but is not on PATH")
+    binary = shutil.which(argv[0]) or argv[0]
+    home = str(Path.home())
+    return [
+        bwrap, "--die-with-parent", "--unshare-pid",
+        "--ro-bind", "/", "/",
+        "--dev", "/dev", "--proc", "/proc", "--tmpfs", "/tmp",
+        "--ro-bind", str(prompt_dir), str(prompt_dir),
+        "--ro-bind", binary, binary,
+        "--overlay-src", home, "--tmp-overlay", home,
+        "--chdir", "/", "--", *argv,
+    ]
 
 
 def _terminate(proc: subprocess.Popen[str]) -> None:
@@ -133,7 +158,8 @@ def hermes_runner(profile: str, *, timeout: int = DEFAULT_TIMEOUT,
                   binary: str = DEFAULT_BINARY,
                   reasoning: str | None = None,
                   stream: bool = False,
-                  idle_timeout: int = DEFAULT_IDLE_TIMEOUT) -> Runner:
+                  idle_timeout: int = DEFAULT_IDLE_TIMEOUT,
+                  sandbox: bool = False) -> Runner:
     """Build a runner that asks one Hermes profile one question.
 
     `reasoning` overrides the profile's `reasoning_effort` for this call.
@@ -149,6 +175,8 @@ def hermes_runner(profile: str, *, timeout: int = DEFAULT_TIMEOUT,
                     "--oneshot", "-Q"]
             if reasoning is not None:
                 argv.extend(["--reasoning", reasoning])
+            if sandbox:
+                argv = _sandbox_argv(argv, path.parent)
             if stream:
                 argv.extend(["--format", "stream-json"])
                 return _read_stream(argv, timeout, idle_timeout)
