@@ -69,7 +69,7 @@ Every flag the tool accepts, what it changes, and why it exists. `council <comma
 | `--reviewer BIN` | `hermes` | the binary that answers a sample | the corpus harness needs a stub, and another host may need another binary |
 | `--sample-timeout N` | `900` | give up on one sample after N seconds | a model that never answers must fail in bounded time, not hold the run |
 | `--time-budget N` | none | stop starting units after N seconds; the unit in flight finishes | a large sliced review must end by a deadline even when the instrument is slow |
-| `--reasoning LEVEL` | the profile's | reasoning effort for this review: `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max`, `ultra` | a profile set to `ultra` can spend minutes on a review prompt; `none` answered the same prompt in 21 s |
+| `--reasoning LEVEL` | the profile's | reasoning effort for this review: `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max`, `ultra` | the profile's level may be the wrong cost for a given run; whatever is used is recorded and hashed into the instrument |
 | `--prompt PATH` | the shipped prompt | a different instrument | experiments must not edit the prompt the gate uses |
 | `--report` | off | exit 0 whatever the verdict | advice in a hook that must not block |
 | `--json` | off | print `verdict.json` | the machine-readable form, byte-identical to the artefact |
@@ -282,13 +282,15 @@ review depends on it.
 This is a property of the instrument, not of the verdict: the tool never trades
 a missing answer for a pass.
 
-The profile on this host sets `reasoning_effort: ultra`. The 7,954-byte external
-prompt answered in 21 s at `--reasoning none`, and `none` caught a planted AWS
-key as `critical` in 11 s. `low` needed 206 s with a 300 s sample timeout; a
-three-sample `low` run reached `PASS` in 600 s with two proven low findings.
-When a host stalls, raise `--sample-timeout` for `low`, or use `none` for the
-fast path; the level is recorded in `verdict.json` and is part of the instrument
-digest, because the same prompt at two levels is not the same review.
+The profile on this host sets `reasoning_effort: ultra`. The same 7,954-byte
+prompt answered in 84 s (plain) and 69 s (streamed), and a two-sample `ultra`
+review of an external repository reached `PASS` in 239 s with five proven
+findings; earlier attempts at the same level did not answer in 90 s. Usage shows
+one API call, ~4.5k reasoning tokens at `ultra` and ~5.2k at `none`, and
+`finish_reason=stop` when it answers: the failures were provider stalls, not
+reasoning overruns. `--reasoning` still names the instrument in `verdict.json`
+and in the digest, but it is not a reliability lever; `--sample-timeout 300` and
+the single retry are what keep a stall from becoming a false pass.
 
 ## What is not here
 

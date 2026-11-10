@@ -58,6 +58,14 @@ council review --base HEAD~1 --samples 3 --context-depth 0 \
   --run-id adopt-low-3
 ```
 
+and at `ultra`, the profile default, with auto-sampling:
+
+```sh
+council review --base HEAD~1 --context-depth 0 \
+  --reasoning ultra --sample-timeout 300 --time-budget 900 \
+  --run-id adopt-ultra
+```
+
 ## Results
 
 | run | entry | reviewer | verdict | exit | evidence |
@@ -68,28 +76,37 @@ council review --base HEAD~1 --samples 3 --context-depth 0 \
 | `adopt-substantive` | `review` | `council-generalist --reasoning none` | `PASS` | 0 | 3 samples, 155 s: sample 3 reported one low correctness finding that its own proof **refuted**; digest `7362f2c8d1801807` |
 | `adopt-low` | `review` | `council-generalist --reasoning low` | `PASS` | 0 | 1 sample, 61 s, clean; digest `7344e056e4d4cf5f` |
 | `adopt-low-3` | `review` | `council-generalist --reasoning low` | `PASS` | 0 | 3 samples, 600 s: samples 1–2 clean, sample 3 reported two low readability findings, both **proven**, neither blocking; digest `7344e056e4d4cf5f` |
+| `adopt-ultra` | `review` | `council-generalist --reasoning ultra` | `PASS` | 0 | 2 samples, 239 s, 5 proven low findings (readability/architecture), none blocking; digest `f624bb509229c8b5` |
 
-All six run directories are preserved under
-`fixtures/adoption/sampleproject-2026-11-09/{provider,stub,ci,substantive,low,low-3}/`
+All seven run directories are preserved under
+`fixtures/adoption/sampleproject-2026-11-09/{provider,stub,ci,substantive,low,low-3,ultra}/`
 (`verdict.json` and the sample files).
 
-## Why the first runs stalled, and what fixed it
+## Why the first runs stalled, and what it was not
 
-The profile sets `reasoning_effort: ultra`. The same 7,954-byte prompt:
+The failures were not `ultra` reasoning running away. The same 7,954-byte
+prompt, measured later:
 
-| reasoning | result |
+| measurement | result |
 |---|---|
-| profile default (`ultra`) | no answer in 90 s, twice |
-| `low`, 150 s timeout | no answer |
-| `low`, 300 s timeout | **206 s** on a direct call |
-| `low`, 3 samples at 300 s each | **600 s** total, `PASS` with two proven low findings |
-| `minimal`, 150 s timeout | empty at the boundary |
-| `none` | **21 s**, and caught a planted `AKIA…` key as `critical` in 11 s |
+| plain, `ultra` | 84 s, `finish_reason=stop` |
+| streamed, `ultra` | 69 s, 20 events |
+| `council review`, `ultra`, 2 samples | 239 s, `PASS`, 5 proven findings |
+| `council review`, `low`, 3 samples | 600 s, `PASS` |
+| `council review`, `none`, 3 samples | 155 s, `PASS` |
+| earlier attempts, same level | no answer in 90 s or 150 s |
 
-`--reasoning` was added to council for this; the level is recorded in
-`verdict.json` and hashed into the instrument digest. The substantive `PASS` is
-at `low` (`7344e056e4d4cf5f`); the `none` run is the fast path
-(`7362f2c8d1801807`). Neither is passed off as the profile’s `ultra`.
+The usage record explains more than the level names: one API call, 14,096 input
+tokens, ~4.5k reasoning tokens at `ultra` and ~5.2k at `none`, `finish_reason=stop`
+when it answers. The provider's effort labels do not map cleanly to work done,
+and the earlier timeouts were **provider/gateway stalls** — no tokens, no
+finish — not a reasoning overrun. A warm prompt cache saves tens of seconds
+(`cache_read` 0 vs 14k), not minutes.
+
+`--reasoning` is still recorded in `verdict.json` and hashed into the instrument
+digest, because it names the instrument that produced a verdict. It is not the
+explanation for the stalls, and these runs do not establish that one level is
+more reliable than another.
 
 ## What this proves
 
@@ -102,18 +119,18 @@ at `low` (`7344e056e4d4cf5f`); the `none` run is the fast path
   pass: the provider run is `INCOMPLETE` with the exact error and attempt count.
 - With an answering reviewer the same change reaches a verdict, so the
   pipeline is not the variable.
-- A **substantive external verdict** exists at `low`, the highest level that
-  answers on this host: `PASS` on `pypa/sampleproject` with three samples, two
-  proven low readability findings, and no blocking finding. A faster `none`
-  run is kept beside it, not merged into it.
+- A **substantive external verdict** exists at the profile default `ultra`:
+  `PASS` on `pypa/sampleproject` with two samples, five proven low findings,
+  and no blocking finding; `low` and `none` runs are kept beside it with their
+  own digests, not merged into it.
 - The CI entry (`council ci`) was exercised on the same external change:
   `council doctor` exited 0, the verdict JSON went to stdout, and the exit code
   was the verdict (2, `INCOMPLETE`).
 
 ## What this does not prove
 
-The quality of the model's review at `ultra`: that level still does not return
-on this prompt. The `PASS` is from `low` — a real reasoning level, labelled with
-its own digest — not from the profile default; `ultra` remains unmeasured, not
-assumed equivalent. A single `low` sample was clean while the third of three
-found two real issues, so the three-sample run is the one to trust.
+The provider's reliability: a request can stall with no tokens and no finish,
+and then the same prompt at the same level answers in 69–84 s. That is why the
+verdict is `INCOMPLETE` when a sample does not answer, and why the sample
+timeout exists. These runs do not establish a stall rate, and they do not show
+that `ultra` is more or less reliable than `low` or `none`.

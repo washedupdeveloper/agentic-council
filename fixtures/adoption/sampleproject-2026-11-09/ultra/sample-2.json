@@ -1,0 +1,53 @@
+{
+  "index": 2,
+  "attempts": 1,
+  "error": null,
+  "raw": "",
+  "findings": [
+    {
+      "dimension": "readability",
+      "severity": "low",
+      "file": "pyproject.toml",
+      "line": 12,
+      "claim": "The commit reformats most of pyproject.toml (comment spacing, collapsed arrays), burying the four real changes under style noise.",
+      "proof": {
+        "kind": "diff",
+        "params": {
+          "path": "pyproject.toml",
+          "line": 12,
+          "mode": "added"
+        }
+      }
+    },
+    {
+      "dimension": "readability",
+      "severity": "low",
+      "file": "pyproject.toml",
+      "line": 75,
+      "claim": "authors collapses to one line at 75 but the sibling maintainers list at 80 stays exploded with trailing comma, leaving parallel fields styled differently.",
+      "proof": {
+        "kind": "present",
+        "params": {
+          "path": "pyproject.toml",
+          "line": 75,
+          "text": "authors = [{ name = \"A. Random Developer\", email = \"author@example.com\" }]"
+        }
+      }
+    },
+    {
+      "dimension": "architecture",
+      "severity": "low",
+      "file": ".gitignore",
+      "line": 15,
+      "claim": "Adds .council/, a local review-tool artifact dir, to a public sample project's ignore file; unrelated to the Python 3.9-3.13 support change.",
+      "proof": {
+        "kind": "diff",
+        "params": {
+          "path": ".gitignore",
+          "line": 15,
+          "mode": "added"
+        }
+      }
+    }
+  ]
+}

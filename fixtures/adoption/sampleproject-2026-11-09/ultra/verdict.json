@@ -1,0 +1,93 @@
+{
+  "run": "adopt-ultra",
+  "base": "8603eaf898a2db2c89c36ad6b302f2994700ad6a",
+  "head": "621e4974ca25ce531773def586ba3ed8e736b3fc",
+  "worktree": true,
+  "diff_sha256": "d2022de47bf2cd5350dc5d7135977b1615a9ae70ba2f2ad654ab5dc2cc1e5429",
+  "digest": "f624bb509229c8b5",
+  "prompt": "/home/nixolotl/projects/review-council-v2/src/council/prompts/reviewer.md",
+  "prompt_bytes": 7954,
+  "prompt_limit": 32768,
+  "prompt_acknowledged": false,
+  "sliced": false,
+  "time_budget": 900,
+  "units": [],
+  "state_dir_ignored": true,
+  "profile": "council-generalist",
+  "reasoning": "ultra",
+  "samples_requested": "auto",
+  "samples_run": 2,
+  "agreement": true,
+  "samples": [
+    {
+      "index": 1,
+      "ok": true,
+      "attempts": 1,
+      "error": null,
+      "findings": 3
+    },
+    {
+      "index": 2,
+      "ok": true,
+      "attempts": 1,
+      "error": null,
+      "findings": 3
+    }
+  ],
+  "skipped": [],
+  "context_digest": "a65e6af84544bbd9",
+  "context_depth": 0,
+  "context": [],
+  "unresolved": [],
+  "references": [],
+  "verdict": "pass",
+  "exit_code": 0,
+  "reason": "no proven blocking findings (5 proven non-blocking finding(s))",
+  "findings": [
+    {
+      "id": "F-01",
+      "dimension": "readability",
+      "severity": "low",
+      "state": "proven",
+      "location": "pyproject.toml:12",
+      "claim": "The commit reformats most of pyproject.toml (comment spacing, collapsed arrays), burying the four real changes under style noise.",
+      "detail": "pyproject.toml:12 is added by this change"
+    },
+    {
+      "id": "F-02",
+      "dimension": "readability",
+      "severity": "low",
+      "state": "proven",
+      "location": "pyproject.toml:75",
+      "claim": "Reformat leaves adjacent author lists in two styles: authors collapsed to one line with no trailing comma, maintainers kept multi-line with one.",
+      "detail": "pyproject.toml:75 is added by this change"
+    },
+    {
+      "id": "F-03",
+      "dimension": "architecture",
+      "severity": "low",
+      "state": "proven",
+      "location": ".gitignore:15",
+      "claim": "Adds .council/, a local review-tool artifact dir, to a public sample project's ignore file; unrelated to the Python 3.9-3.13 support change.",
+      "detail": ".gitignore:15 is added by this change"
+    },
+    {
+      "id": "F-04",
+      "dimension": "architecture",
+      "severity": "low",
+      "state": "proven",
+      "location": "pyproject.toml:12",
+      "claim": "The new TOML and import style is not enforced by any configured formatter, so the next hand edit reverts it and the churn repeats.",
+      "detail": "/\\[tool\\.(ruff|isort|black|pyproject-fmt)/ appears in no file"
+    },
+    {
+      "id": "F-05",
+      "dimension": "architecture",
+      "severity": "low",
+      "state": "proven",
+      "location": "pyproject.toml:36",
+      "claim": "Cosmetic TOML reformat ships in the same diff as the breaking 3.8 drop and 3.0.0 to 4.0.0 bump, so release content cannot be isolated.",
+      "detail": "pyproject.toml:36 is added by this change"
+    }
+  ]
+}
