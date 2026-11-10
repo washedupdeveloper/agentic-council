@@ -142,12 +142,14 @@ is recorded as `reviewer_sandbox` in `verdict.json`. The Nix package puts bwrap
 on the wrapper's PATH, so a Nix/NixOS install gets this by default; a bare wheel
 without bubblewrap records `false` rather than pretending.
 
-`--ephemeral` puts the run directory in a private temporary tree and removes it
-after the verdict; `--keep DIR` copies the run there first. The verdict is
+Runs are **ephemeral by default**: the run directory lives in a private
+temporary tree and is removed after the verdict. `--keep DIR` copies the run
+there first; `--no-ephemeral` writes `.council/runs` instead. The verdict is
 printed — and a requested SARIF log is written — before the tree is removed. A
 failed run removes its temporary tree too; if `--keep` cannot copy, the evidence
 is left in place and its path is printed. Proof writes already run in an overlay
-sandbox, so they never touch the repository.
+sandbox, so they never touch the repository. For hosts without bwrap, see
+[`docs/PORTABILITY.md`](docs/PORTABILITY.md): the container is the boundary.
 
 ## Flags
 
@@ -172,7 +174,7 @@ Every flag the tool accepts, what it changes, and why it exists. `council <comma
 | `--sarif PATH` | off | also write proven findings as a SARIF 2.1.0 log | code scanning wants a log; `verdict.json` stays the complete evidence |
 | `--plan` | off | print units, prompt bytes, depth and skipped files; no reviewer, no run | see the cost and the slicing before spending a model call |
 | `--sandbox` / `--no-sandbox` | on when `bwrap` exists | run the reviewer in a bwrap sandbox: read-only root, private `/tmp`, overlay `$HOME` | writes vanish with the process; `--sandbox` fails rather than run unsandboxed |
-| `--ephemeral` | off | keep run state in a private temp tree and remove it after the verdict | zero-footprint mode: the verdict is the product, not the leftovers |
+| `--ephemeral` / `--no-ephemeral` | on | keep run state in a private temp tree and remove it after the verdict; `--no-ephemeral` writes `.council/runs` | zero-footprint by default: the verdict is the product, not the leftovers |
 | `--keep DIR` | off | copy the run directory to DIR before an ephemeral removal | keep evidence deliberately, not by accident |
 | `--report` | off | exit 0 whatever the verdict | advice in a hook that must not block |
 | `--json` | off | print `verdict.json` | the machine-readable form, byte-identical to the artefact |

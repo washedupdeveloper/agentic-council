@@ -89,10 +89,11 @@ def _add_review_arguments(parser: argparse.ArgumentParser, *, advice: bool,
                         help="kill a stream with no event for N seconds (default: 120)")
     parser.add_argument("--sandbox", action=argparse.BooleanOptionalAction, default=None,
                         help="run the reviewer in a bwrap sandbox (default: on when bwrap is available)")
-    parser.add_argument("--ephemeral", action="store_true",
-                        help="keep run state in a temp directory and remove it after the verdict")
+    parser.add_argument("--ephemeral", action=argparse.BooleanOptionalAction, default=True,
+                        help="keep run state in a temp tree and remove it (default); "
+                             "--no-ephemeral writes .council/runs")
     parser.add_argument("--keep", type=Path, default=None, metavar="DIR",
-                        help="with --ephemeral, copy the run directory here before removing it")
+                        help="copy the run directory here before the ephemeral tree is removed")
     parser.add_argument("--prompt", type=Path, default=None,
                         help="reviewer prompt to use instead of the one shipped with council")
     parser.add_argument("--sarif", type=Path, default=None, metavar="PATH",

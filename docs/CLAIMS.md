@@ -114,3 +114,6 @@ registry, so it cannot describe a claim that has no check.
 | `an-ephemeral-run-uses-only-its-state-directory` | An ephemeral run writes its verdict only to its state directory, not to the repository. | `python3 -m pytest tests/test_run.py::test_an_ephemeral_run_writes_only_to_its_state_directory -q` |
 | `an-ephemeral-run-is-removed-after-the-verdict` | An ephemeral run's temporary tree is removed after the verdict. | `python3 -m pytest tests/test_cli.py::test_ephemeral_removes_the_run_after_the_verdict -q` |
 | `keep-copies-the-run-before-removal` | --keep copies the run directory before the ephemeral tree is removed. | `python3 -m pytest tests/test_cli.py::test_keep_copies_the_run_before_removing_it -q` |
+| `a-review-is-ephemeral-by-default` | A review writes its run to a private temporary tree and removes it by default. | `python3 -m pytest tests/test_cli.py::test_review_is_ephemeral_by_default -q` |
+| `no-ephemeral-keeps-state-in-the-repository` | --no-ephemeral leaves the run state in the repository. | `python3 -m pytest tests/test_cli.py::test_no_ephemeral_keeps_state_in_the_repository -q` |
+| `the-sandbox-wrapper-leaves-no-writes` | tools/sandbox.sh leaves no writes to HOME or /tmp on the host. | `python3 -m pytest tests/test_sandbox_script.py -q` |

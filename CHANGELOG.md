@@ -61,8 +61,13 @@ recorded in `docs/ADOPTION.md`.
 - The reviewer now runs in a bwrap sandbox by default where bwrap is present:
   read-only root, private `/tmp` and a tmpfs overlay of `$HOME`; the choice is
   recorded as `reviewer_sandbox`. `--no-sandbox` opts out, `--sandbox` requires it.
-- `--ephemeral` keeps the run in a private temporary tree and removes it after
-  the verdict; `--keep DIR` copies the evidence there first.
+- Runs are **ephemeral by default**: the run directory lives in a private
+  temporary tree and is removed after the verdict; `--no-ephemeral` writes
+  `.council/runs`, `--keep DIR` copies the evidence first.
+- `tools/sandbox.sh` runs an arbitrary command with the same boundary; it
+  refuses with exit 3 when bwrap is absent.
+- `Dockerfile` and `docs/PORTABILITY.md` state the non-NixOS path: a container
+  (`--rm --read-only --tmpfs /tmp`) is the boundary where bwrap is unavailable.
 - `council doctor`: measures `git`, the reviewer binary, `bwrap` and whether the
   profile answers a probe; `--json` for CI.
 

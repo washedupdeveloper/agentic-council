@@ -553,3 +553,18 @@ check = "python3 -m pytest tests/test_cli.py::test_ephemeral_removes_the_run_aft
 id = "keep-copies-the-run-before-removal"
 text = "--keep copies the run directory before the ephemeral tree is removed."
 check = "python3 -m pytest tests/test_cli.py::test_keep_copies_the_run_before_removing_it -q"
+
+[[claim]]
+id = "a-review-is-ephemeral-by-default"
+text = "A review writes its run to a private temporary tree and removes it by default."
+check = "python3 -m pytest tests/test_cli.py::test_review_is_ephemeral_by_default -q"
+
+[[claim]]
+id = "no-ephemeral-keeps-state-in-the-repository"
+text = "--no-ephemeral leaves the run state in the repository."
+check = "python3 -m pytest tests/test_cli.py::test_no_ephemeral_keeps_state_in_the_repository -q"
+
+[[claim]]
+id = "the-sandbox-wrapper-leaves-no-writes"
+text = "tools/sandbox.sh leaves no writes to HOME or /tmp on the host."
+check = "python3 -m pytest tests/test_sandbox_script.py -q"

@@ -299,6 +299,37 @@ def test_ephemeral_removes_the_run_after_the_verdict(
     assert not root.exists()
 
 
+def test_review_is_ephemeral_by_default(
+        tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    root = tmp_path / "default-eph"
+    monkeypatch.setattr(cli.tempfile, "mkdtemp", lambda prefix: str(root))
+
+    def fake_review(request: object, runner: object) -> Report:
+        run = request.state_dir  # type: ignore[attr-defined]
+        assert run is not None
+        run.mkdir(parents=True)
+        (run / "verdict.json").write_text("{}", encoding="utf-8")
+        return Report(run, "a" * 40, "b" * 40, "d" * 16,
+                      Result(Verdict.PASS, "ok", ()), ())
+
+    monkeypatch.setattr(cli, "review", fake_review)
+    assert cli.main(["review", "--run-id", "d"]) == 0
+    assert not root.exists()
+
+
+def test_no_ephemeral_keeps_state_in_the_repository(
+        monkeypatch: pytest.MonkeyPatch) -> None:
+    seen: dict[str, object] = {}
+
+    def fake_review(request: object, runner: object) -> Report:
+        seen["state"] = request.state_dir  # type: ignore[attr-defined]
+        return report(Verdict.PASS)
+
+    monkeypatch.setattr(cli, "review", fake_review)
+    assert cli.main(["review", "--no-ephemeral"]) == 0
+    assert seen["state"] is None
+
+
 def test_keep_copies_the_run_before_removing_it(
         tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     root = tmp_path / "ephemeral"
