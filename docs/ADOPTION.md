@@ -66,6 +66,14 @@ council review --base HEAD~1 --context-depth 0 \
   --run-id adopt-ultra
 ```
 
+and the same review over the guarded stream (the CLI default):
+
+```sh
+council review --base HEAD~1 --samples 1 --context-depth 0 \
+  --reasoning ultra --stream --idle-timeout 120 --sample-timeout 300 \
+  --run-id adopt-ultra-stream
+```
+
 ## Results
 
 | run | entry | reviewer | verdict | exit | evidence |
@@ -77,9 +85,10 @@ council review --base HEAD~1 --context-depth 0 \
 | `adopt-low` | `review` | `council-generalist --reasoning low` | `PASS` | 0 | 1 sample, 61 s, clean; digest `7344e056e4d4cf5f` |
 | `adopt-low-3` | `review` | `council-generalist --reasoning low` | `PASS` | 0 | 3 samples, 600 s: samples 1–2 clean, sample 3 reported two low readability findings, both **proven**, neither blocking; digest `7344e056e4d4cf5f` |
 | `adopt-ultra` | `review` | `council-generalist --reasoning ultra` | `PASS` | 0 | 2 samples, 239 s, 5 proven low findings (readability/architecture), none blocking; digest `f624bb509229c8b5` |
+| `adopt-ultra-stream` | `review` | `ultra`, `--stream --idle-timeout 120` | `PASS` | 0 | 1 sample, 2 attempts, 230 s, one proven low readability finding; verdict records `transport: stream`, `idle_timeout: 120`; digest `f624bb509229c8b5` |
 
-All seven run directories are preserved under
-`fixtures/adoption/sampleproject-2026-11-09/{provider,stub,ci,substantive,low,low-3,ultra}/`
+All eight run directories are preserved under
+`fixtures/adoption/sampleproject-2026-11-09/{provider,stub,ci,substantive,low,low-3,ultra,ultra-stream}/`
 (`verdict.json` and the sample files).
 
 ## Why the first runs stalled, and what it was not

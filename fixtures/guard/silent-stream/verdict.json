@@ -1,0 +1,42 @@
+{
+  "run": "guard-demo",
+  "base": "0ed36daff7638f566878421715575115d8352a70",
+  "head": "0ed36daff7638f566878421715575115d8352a70",
+  "worktree": true,
+  "diff_sha256": "86765cb97a3839bf63a1a7d1c6b5c6651d5a355e30c008e807f686b1b6adcc28",
+  "digest": "0b90ce8002cbc1bd",
+  "prompt": "/home/nixolotl/projects/review-council-v2/src/council/prompts/reviewer.md",
+  "prompt_bytes": 2071,
+  "prompt_limit": 32768,
+  "prompt_acknowledged": false,
+  "sliced": false,
+  "time_budget": 0,
+  "units": [],
+  "state_dir_ignored": false,
+  "profile": "council-generalist",
+  "reasoning": "profile-default",
+  "transport": "stream",
+  "idle_timeout": 2,
+  "samples_requested": 1,
+  "samples_run": 1,
+  "agreement": null,
+  "samples": [
+    {
+      "index": 1,
+      "ok": false,
+      "attempts": 2,
+      "error": "the reviewer could not run: /tmp/.silent-reviewer.sh stream went silent for 2s",
+      "findings": 0
+    }
+  ],
+  "skipped": [],
+  "context_digest": "ade46da821abce9c",
+  "context_depth": 3,
+  "context": [],
+  "unresolved": [],
+  "references": [],
+  "verdict": "incomplete",
+  "exit_code": 2,
+  "reason": "sample(s) 1 returned nothing usable: the review is missing evidence",
+  "findings": []
+}

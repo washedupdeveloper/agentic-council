@@ -1,0 +1,52 @@
+{
+  "run": "adopt-ultra-stream",
+  "base": "8603eaf898a2db2c89c36ad6b302f2994700ad6a",
+  "head": "621e4974ca25ce531773def586ba3ed8e736b3fc",
+  "worktree": true,
+  "diff_sha256": "d2022de47bf2cd5350dc5d7135977b1615a9ae70ba2f2ad654ab5dc2cc1e5429",
+  "digest": "f624bb509229c8b5",
+  "prompt": "/home/nixolotl/projects/review-council-v2/src/council/prompts/reviewer.md",
+  "prompt_bytes": 7954,
+  "prompt_limit": 32768,
+  "prompt_acknowledged": false,
+  "sliced": false,
+  "time_budget": 600,
+  "units": [],
+  "state_dir_ignored": true,
+  "profile": "council-generalist",
+  "reasoning": "ultra",
+  "transport": "stream",
+  "idle_timeout": 120,
+  "samples_requested": 1,
+  "samples_run": 1,
+  "agreement": null,
+  "samples": [
+    {
+      "index": 1,
+      "ok": true,
+      "attempts": 2,
+      "error": null,
+      "findings": 1
+    }
+  ],
+  "skipped": [],
+  "context_digest": "a65e6af84544bbd9",
+  "context_depth": 0,
+  "context": [],
+  "unresolved": [],
+  "references": [],
+  "verdict": "pass",
+  "exit_code": 0,
+  "reason": "no proven blocking findings (1 proven non-blocking finding(s))",
+  "findings": [
+    {
+      "id": "F-01",
+      "dimension": "readability",
+      "severity": "low",
+      "state": "proven",
+      "location": "pyproject.toml:12",
+      "claim": "Formatting-only rewrites of pyproject.toml ride alongside the 3.8 drop and 4.0.0 bump, burying the breaking change in whitespace churn.",
+      "detail": "pyproject.toml:12 is added by this change"
+    }
+  ]
+}

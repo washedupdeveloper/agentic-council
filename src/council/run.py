@@ -78,6 +78,8 @@ class ReviewRequest:
     context_depth: int = 3
     time_budget: int = 0
     reasoning: str | None = None
+    stream: bool = False
+    idle_timeout: int = 120
 
 
 @dataclass(frozen=True, slots=True)
@@ -297,6 +299,8 @@ def _write_verdict(run_dir: Path, request: ReviewRequest, base: str, head: str,
         "state_dir_ignored": ignored,
         "profile": request.profile,
         "reasoning": request.reasoning or "profile-default",
+        "transport": "stream" if request.stream else "plain",
+        "idle_timeout": request.idle_timeout,
         "samples_requested": request.samples if request.samples is not None else "auto",
         "samples_run": samples_run,
         "agreement": agreement,

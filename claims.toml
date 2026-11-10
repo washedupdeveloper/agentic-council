@@ -443,3 +443,28 @@ check = "python3 -m pytest tests/test_runner.py -q"
 id = "the-reasoning-level-is-part-of-the-instrument"
 text = "A run records its reasoning level, and two levels produce different instrument digests."
 check = "python3 -m pytest tests/test_run.py::test_the_reasoning_level_is_recorded_and_changes_the_instrument -q"
+
+[[claim]]
+id = "a-stream-returns-its-answer-or-fails"
+text = "A stream returns its result text, falls back to its text events, and treats a missing answer or a non-zero result as an error."
+check = "python3 -m pytest tests/test_runner.py -q"
+
+[[claim]]
+id = "a-silent-stream-is-killed-at-the-idle-timeout"
+text = "A stream with no event for the idle timeout is killed and reported as silence."
+check = "python3 -m pytest tests/test_runner.py::test_a_silent_stream_is_killed_at_the_idle_timeout -q"
+
+[[claim]]
+id = "streaming-is-the-default-and-is-recorded"
+text = "Streaming is the CLI default, --no-stream turns it off, and the verdict records transport and idle timeout."
+check = "python3 -m pytest tests/test_cli.py::test_streaming_is_on_by_default_and_can_be_turned_off tests/test_run.py::test_the_transport_and_idle_timeout_are_recorded -q"
+
+[[claim]]
+id = "a-child-holding-the-stream-is-killed"
+text = "Killing a silent reviewer kills the process group, so a child that inherited the pipe cannot hold the reader open."
+check = "python3 -m pytest tests/test_runner.py::test_a_stream_whose_child_holds_the_pipe_is_still_killed -q"
+
+[[claim]]
+id = "a-retry-keeps-the-failed-attempt"
+text = "A sample that succeeds on retry still records the failure that caused the retry."
+check = "python3 -m pytest tests/test_sample.py::test_a_retry_keeps_the_first_failure -q"

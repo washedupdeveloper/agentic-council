@@ -1,0 +1,11 @@
+{
+  "index": 1,
+  "attempts": 2,
+  "error": "the reviewer could not run: /tmp/.silent-reviewer.sh stream went silent for 2s",
+  "failures": [
+    "the reviewer could not run: /tmp/.silent-reviewer.sh stream went silent for 2s",
+    "the reviewer could not run: /tmp/.silent-reviewer.sh stream went silent for 2s"
+  ],
+  "raw": "",
+  "findings": []
+}

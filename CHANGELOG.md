@@ -44,6 +44,10 @@ recorded in `docs/ADOPTION.md`.
   units it did not reach are recorded as unreviewed, so the run cannot be PASS.
 - `--reasoning LEVEL`: overrides the profile's reasoning effort for the review;
   the level is recorded in `verdict.json` and hashed into the instrument digest.
+- `--stream` (default) / `--no-stream`: read the reviewer as JSON events;
+  `--idle-timeout N` (default 120 s) kills a stream that goes silent, and a
+  silent or answerless sample fails rather than passing.
+- Samples record every failed attempt in `failures`, not only the final error.
 - `council doctor`: measures `git`, the reviewer binary, `bwrap` and whether the
   profile answers a probe; `--json` for CI.
 

@@ -13,7 +13,7 @@ from . import doctor as diagnostics
 from .config import ConfigError
 from .repo import ReviewError, init as init_repo
 from .run import DEFAULT_PROFILE, PROMPT_LIMIT, PromptTooLarge, Report, ReviewRequest, review
-from .runner import hermes_runner
+from .runner import DEFAULT_IDLE_TIMEOUT, hermes_runner
 from .verdict import Verdict
 
 EXIT_ERROR = 3
@@ -73,6 +73,11 @@ def _add_review_arguments(parser: argparse.ArgumentParser, *, advice: bool) -> N
                         choices=("none", "minimal", "low", "medium", "high",
                                  "xhigh", "max", "ultra"),
                         help="reasoning effort for this review (default: the profile's setting)")
+    parser.add_argument("--stream", action=argparse.BooleanOptionalAction, default=True,
+                        help="read the reviewer as JSON events and kill a silent stream (default: on)")
+    parser.add_argument("--idle-timeout", type=_positive, default=DEFAULT_IDLE_TIMEOUT,
+                        metavar="SECONDS",
+                        help="kill a stream with no event for N seconds (default: 120)")
     parser.add_argument("--prompt", type=Path, default=None,
                         help="reviewer prompt to use instead of the one shipped with council")
     parser.add_argument("--run-id", default=None,
@@ -189,7 +194,8 @@ def _review(args: argparse.Namespace) -> Report:
     """
     allow = args.allow_large_prompt
     runner = hermes_runner(args.profile, binary=args.reviewer,
-                           timeout=args.sample_timeout, reasoning=args.reasoning)
+                           timeout=args.sample_timeout, reasoning=args.reasoning,
+                           stream=args.stream, idle_timeout=args.idle_timeout)
     while True:
         request = ReviewRequest(repo=args.repo, base=args.base, samples=args.samples,
                                 profile=args.profile, prompt=args.prompt,
@@ -198,7 +204,9 @@ def _review(args: argparse.Namespace) -> Report:
                                 max_prompt_bytes=args.max_prompt_bytes,
                                 context_depth=args.context_depth,
                                 time_budget=args.time_budget,
-                                reasoning=args.reasoning)
+                                reasoning=args.reasoning,
+                                stream=args.stream,
+                                idle_timeout=args.idle_timeout)
         try:
             return review(request, runner)
         except PromptTooLarge as exc:

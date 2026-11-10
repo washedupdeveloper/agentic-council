@@ -32,6 +32,14 @@ inputs:
     description: Reasoning effort (empty means the profile's setting)
     required: false
     default: "none"
+  stream:
+    description: Read the reviewer as JSON events; false for hosts without stream-json
+    required: false
+    default: "true"
+  idle-timeout:
+    description: Kill a stream with no event for N seconds
+    required: false
+    default: "120"
   python:
     description: Interpreter used to create the private environment
     required: false
@@ -58,6 +66,8 @@ runs:
       env:
         BASE: ${{ inputs.base }}
         REASONING: ${{ inputs.reasoning }}
+        STREAM: ${{ inputs.stream }}
+        IDLE: ${{ inputs.idle-timeout }}
       run: |
         set -uo pipefail
         args=(ci
@@ -67,4 +77,6 @@ runs:
           --context-depth "${{ inputs.context-depth }}")
         if [ -n "$BASE" ]; then args+=(--base "$BASE"); fi
         if [ -n "$REASONING" ]; then args+=(--reasoning "$REASONING"); fi
+        if [ "$STREAM" = "true" ]; then args+=(--stream); else args+=(--no-stream); fi
+        if [ -n "$IDLE" ]; then args+=(--idle-timeout "$IDLE"); fi
         council "${args[@]}"

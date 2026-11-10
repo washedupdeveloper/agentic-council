@@ -1,0 +1,23 @@
+{
+  "index": 1,
+  "attempts": 2,
+  "error": null,
+  "raw": "",
+  "findings": [
+    {
+      "dimension": "readability",
+      "severity": "low",
+      "file": "pyproject.toml",
+      "line": 12,
+      "claim": "Formatting-only rewrites of pyproject.toml ride alongside the 3.8 drop and 4.0.0 bump, burying the breaking change in whitespace churn.",
+      "proof": {
+        "kind": "diff",
+        "params": {
+          "path": "pyproject.toml",
+          "line": 12,
+          "mode": "added"
+        }
+      }
+    }
+  ]
+}

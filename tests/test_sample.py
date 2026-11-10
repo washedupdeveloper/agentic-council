@@ -69,6 +69,28 @@ def test_a_failed_sample_keeps_the_raw_answer(tmp_path: Path) -> None:
     assert payload["raw"] == "not json at all"
 
 
+def test_a_retry_keeps_the_first_failure() -> None:
+    replies = iter([OSError("stream went silent for 120s"), VALID])
+
+    def runner(_: str) -> str:
+        reply = next(replies)
+        if isinstance(reply, OSError):
+            raise reply
+        return reply
+
+    result = run_sample("prompt", runner)
+    assert result.ok
+    assert result.attempts == 2
+    assert result.error is None
+    assert result.failures == ("the reviewer could not run: stream went silent for 120s",)
+
+
+def test_a_written_sample_carries_every_failure(tmp_path: Path) -> None:
+    result = run_sample("prompt", lambda _: BROKEN)
+    payload = json.loads(write_sample(tmp_path, result).read_text(encoding="utf-8"))
+    assert len(payload["failures"]) == 2
+
+
 def test_a_written_sample_carries_its_error(tmp_path: Path) -> None:
     path = write_sample(tmp_path, run_sample("prompt", lambda _: BROKEN, attempts=1))
     payload = json.loads(path.read_text(encoding="utf-8"))

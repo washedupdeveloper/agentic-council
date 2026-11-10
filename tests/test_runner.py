@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 import pytest
@@ -35,6 +36,76 @@ def test_no_reasoning_flag_when_the_profile_decides(tmp_path: Path) -> None:
     binary = script(tmp_path, 'printf "%s" "$*"')
     output = hermes_runner("p", binary=str(binary), timeout=10)("hello")
     assert "--reasoning" not in output
+
+
+def py_script(tmp_path: Path, body: str, code: int = 0) -> Path:
+    path = tmp_path / "hermes"
+    path.write_text(
+        f"#!{sys.executable}\nimport json, sys, time\n{body}\nraise SystemExit({code})\n",
+        encoding="utf-8", newline="\n")
+    path.chmod(0o755)
+    return path
+
+
+def test_a_stream_returns_the_result_text(tmp_path: Path) -> None:
+    binary = py_script(tmp_path, '''
+print(json.dumps({"type": "text", "text": "{\\"sections\\": "}))
+print(json.dumps({"type": "text", "text": "{}}"}))
+print(json.dumps({"type": "result", "exit_code": 0, "text": "{\\"sections\\": {}}"}))
+''')
+    answer = hermes_runner("p", binary=str(binary), timeout=10, stream=True,
+                           idle_timeout=5)("q")
+    assert answer == '{"sections": {}}'
+
+
+def test_a_stream_without_a_result_returns_its_text(tmp_path: Path) -> None:
+    binary = py_script(tmp_path, '''
+print(json.dumps({"type": "text", "text": "one "}))
+print(json.dumps({"type": "text", "text": "two"}))
+''')
+    answer = hermes_runner("p", binary=str(binary), timeout=10, stream=True,
+                           idle_timeout=5)("q")
+    assert answer == "one two"
+
+
+def test_a_silent_stream_is_killed_at_the_idle_timeout(tmp_path: Path) -> None:
+    binary = py_script(tmp_path, '''
+print(json.dumps({"type": "system", "subtype": "init"}))
+sys.stdout.flush()
+time.sleep(10)
+''')
+    with pytest.raises(OSError, match="silent for 1s"):
+        hermes_runner("p", binary=str(binary), timeout=30, stream=True,
+                      idle_timeout=1)("q")
+
+
+def test_a_stream_whose_child_holds_the_pipe_is_still_killed(tmp_path: Path) -> None:
+    """A wrapper's sleep inherits stdout; killing only the wrapper leaves it open."""
+    path = tmp_path / "hermes"
+    path.write_text("#!/bin/sh\nprintf '%s\\n' '{\"type\":\"system\"}'\nsleep 10\n",
+                    encoding="utf-8", newline="\n")
+    path.chmod(0o755)
+    with pytest.raises(OSError, match="silent for 1s"):
+        hermes_runner("p", binary=str(path), timeout=30, stream=True,
+                      idle_timeout=1)("q")
+
+
+def test_a_stream_that_ends_without_an_answer_is_an_error(tmp_path: Path) -> None:
+    binary = py_script(tmp_path, '''
+print(json.dumps({"type": "system", "subtype": "init"}))
+''')
+    with pytest.raises(OSError, match="without an answer"):
+        hermes_runner("p", binary=str(binary), timeout=10, stream=True,
+                      idle_timeout=5)("q")
+
+
+def test_a_stream_result_with_a_nonzero_exit_is_an_error(tmp_path: Path) -> None:
+    binary = py_script(tmp_path, '''
+print(json.dumps({"type": "result", "exit_code": 3, "text": ""}))
+''')
+    with pytest.raises(OSError, match="exited 3"):
+        hermes_runner("p", binary=str(binary), timeout=10, stream=True,
+                      idle_timeout=5)("q")
 
 
 def test_the_answer_is_returned_unchanged(tmp_path: Path) -> None:

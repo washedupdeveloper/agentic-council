@@ -23,6 +23,7 @@ class SampleResult:
     attempts: int
     error: str | None
     raw: str = ""
+    failures: tuple[str, ...] = ()
 
     @property
     def ok(self) -> bool:
@@ -37,18 +38,22 @@ def run_sample(prompt: str, runner: Runner, *, index: int = 1,
 
     last = "no attempt was made"
     last_text = ""
+    failures: list[str] = []
     for attempt in range(1, attempts + 1):
         try:
             text = runner(prompt)
         except OSError as exc:
             last = f"the reviewer could not run: {exc}"
+            failures.append(last)
             continue
         last_text = text
         try:
-            return SampleResult(index, parse_reviewer_output(text), attempt, None)
+            return SampleResult(index, parse_reviewer_output(text), attempt, None,
+                                failures=tuple(failures))
         except SchemaError as exc:
             last = str(exc)
-    return SampleResult(index, None, attempts, last, last_text[-4000:])
+            failures.append(last)
+    return SampleResult(index, None, attempts, last, last_text[-4000:], tuple(failures))
 
 
 def write_sample(run_dir: Path, result: SampleResult) -> Path:
@@ -60,6 +65,7 @@ def write_sample(run_dir: Path, result: SampleResult) -> Path:
         "index": result.index,
         "attempts": result.attempts,
         "error": result.error,
+        "failures": list(result.failures),
         "raw": result.raw,
         "findings": [
             {

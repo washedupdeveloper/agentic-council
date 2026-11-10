@@ -70,6 +70,8 @@ Every flag the tool accepts, what it changes, and why it exists. `council <comma
 | `--sample-timeout N` | `900` | give up on one sample after N seconds | a model that never answers must fail in bounded time, not hold the run |
 | `--time-budget N` | none | stop starting units after N seconds; the unit in flight finishes | a large sliced review must end by a deadline even when the instrument is slow |
 | `--reasoning LEVEL` | the profile's | reasoning effort for this review: `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max`, `ultra` | the profile's level may be the wrong cost for a given run; whatever is used is recorded and hashed into the instrument |
+| `--stream` / `--no-stream` | stream | read the reviewer's JSON event stream | a non-streaming call cannot tell “thinking” from “gone”; a stream can be watched |
+| `--idle-timeout N` | `120` | kill a stream with no event for N seconds | silence must cost the idle timeout, not the sample timeout |
 | `--prompt PATH` | the shipped prompt | a different instrument | experiments must not edit the prompt the gate uses |
 | `--report` | off | exit 0 whatever the verdict | advice in a hook that must not block |
 | `--json` | off | print `verdict.json` | the machine-readable form, byte-identical to the artefact |
@@ -289,8 +291,14 @@ findings; earlier attempts at the same level did not answer in 90 s. Usage shows
 one API call, ~4.5k reasoning tokens at `ultra` and ~5.2k at `none`, and
 `finish_reason=stop` when it answers: the failures were provider stalls, not
 reasoning overruns. `--reasoning` still names the instrument in `verdict.json`
-and in the digest, but it is not a reliability lever; `--sample-timeout 300` and
-the single retry are what keep a stall from becoming a false pass.
+and in the digest, but it is not a reliability lever.
+
+The transport is the guard: `--stream` (the default) reads the answer as JSON
+events and `--idle-timeout` (default 120 s) kills a request that goes silent, so
+a stalled provider costs two minutes, not the whole sample timeout. `--no-stream`
+exists for a host whose Hermes has no `stream-json`. A silent or answerless
+sample is still a failed sample, and a run with one is `INCOMPLETE`, never a
+pass.
 
 ## What is not here
 

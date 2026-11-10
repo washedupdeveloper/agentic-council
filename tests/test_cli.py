@@ -210,6 +210,23 @@ def test_the_reasoning_level_reaches_the_runner(monkeypatch: pytest.MonkeyPatch)
     assert seen["reasoning"] == "none"
 
 
+def test_streaming_is_on_by_default_and_can_be_turned_off(
+        monkeypatch: pytest.MonkeyPatch) -> None:
+    seen: list[dict[str, Any]] = []
+
+    def fake_runner(profile: str, **kwargs: Any) -> Any:
+        seen.append(kwargs)
+        return lambda prompt: "{}"
+
+    monkeypatch.setattr(cli, "hermes_runner", fake_runner)
+    stub(monkeypatch, report(Verdict.PASS))
+    assert cli.main(["review", "--run-id", "one"]) == 0
+    assert cli.main(["review", "--no-stream", "--run-id", "two"]) == 0
+    assert seen[0]["stream"] is True
+    assert seen[0]["idle_timeout"] == 120
+    assert seen[1]["stream"] is False
+
+
 def test_init_adds_the_state_directory(tmp_path: Path) -> None:
     subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
     assert cli.main(["init", "-C", str(tmp_path)]) == 0

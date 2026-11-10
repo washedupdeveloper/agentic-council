@@ -513,6 +513,16 @@ def test_the_reasoning_level_is_recorded_and_changes_the_instrument(
     assert quiet.digest != plain.digest
 
 
+def test_the_transport_and_idle_timeout_are_recorded(tmp_path: Path) -> None:
+    repo, _ = make_repo(tmp_path)
+    report = review(ReviewRequest(repo=repo, samples=1, run_id="streamed",
+                                  stream=True, idle_timeout=77),
+                    lambda _: body())
+    payload = json.loads((report.run_dir / "verdict.json").read_text(encoding="utf-8"))
+    assert payload["transport"] == "stream"
+    assert payload["idle_timeout"] == 77
+
+
 def test_a_missing_unit_is_named_even_when_a_finding_is_unsettled(
         tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     repo, prompt = make_two_changes(tmp_path)
