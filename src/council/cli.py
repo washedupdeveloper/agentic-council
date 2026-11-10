@@ -9,11 +9,13 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import NoReturn, Sequence
 
+from . import __version__
 from . import doctor as diagnostics
 from .config import ConfigError
 from .repo import ReviewError, init as init_repo
 from .run import DEFAULT_PROFILE, PROMPT_LIMIT, PromptTooLarge, Report, ReviewRequest, review
 from .runner import DEFAULT_IDLE_TIMEOUT, hermes_runner
+from .sarif import render as render_sarif
 from .verdict import Verdict
 
 EXIT_ERROR = 3
@@ -80,6 +82,8 @@ def _add_review_arguments(parser: argparse.ArgumentParser, *, advice: bool) -> N
                         help="kill a stream with no event for N seconds (default: 120)")
     parser.add_argument("--prompt", type=Path, default=None,
                         help="reviewer prompt to use instead of the one shipped with council")
+    parser.add_argument("--sarif", type=Path, default=None, metavar="PATH",
+                        help="also write proven findings as a SARIF 2.1.0 log")
     parser.add_argument("--run-id", default=None,
                         help="name this run instead of using a timestamp (refused if it exists)")
     parser.add_argument("--context-url", action="append", default=[], metavar="URL",
@@ -101,6 +105,8 @@ def _add_review_arguments(parser: argparse.ArgumentParser, *, advice: bool) -> N
 
 def build_parser() -> argparse.ArgumentParser:
     parser = _Parser(prog="council", description="A review is a claim until a check settles it.")
+    parser.add_argument("--version", action="version",
+                        version=f"%(prog)s {__version__}")
     sub = parser.add_subparsers(dest="command", required=True)
 
     run = sub.add_parser("review", help="review a change; exits 0/1/2")
@@ -280,6 +286,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         print((report.run_dir / "verdict.json").read_text(encoding="utf-8"), end="")
     else:
         _print_report(report)
+
+    if args.sarif is not None:
+        try:
+            args.sarif.write_text(
+                json.dumps(render_sarif(report.result), indent=2) + "\n",
+                encoding="utf-8", newline="\n")
+        except OSError as exc:
+            print(f"council: cannot write SARIF to {args.sarif}: {exc}", file=sys.stderr)
+            return EXIT_ERROR
 
     if report.verdict is Verdict.INCOMPLETE:
         stance = "advice only (--report): not blocking here" if args.report \

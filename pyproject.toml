@@ -20,7 +20,7 @@ council-verify = "council.claims:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-council = ["prompts/*.md"]
+council = ["prompts/*.md", "py.typed"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

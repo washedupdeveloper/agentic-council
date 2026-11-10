@@ -25,6 +25,7 @@ on:
 
 permissions:
   contents: read
+  security-events: write
 
 jobs:
   review:
@@ -47,3 +48,10 @@ jobs:
           samples: ${{ inputs.samples }}
           time-budget: ${{ inputs.time-budget }}
           reasoning: ${{ inputs.reasoning }}
+
+      - name: Upload SARIF
+        if: always()
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: council.sarif

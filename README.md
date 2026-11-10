@@ -35,6 +35,7 @@ a trend; it cannot change it.
 council review                # gate: 0 pass, 1 fail, 2 incomplete, 3 could not start
 council ci                    # the same gate for CI: verdict.json on stdout
 council doctor                # can this machine run a review? measure, don't assume
+council --version             # what is installed
 council review --report       # advice only: always exits 0
 python3 -m pytest             # the suite
 ./bin/council-verify          # every claim this project makes, executed
@@ -53,6 +54,61 @@ cannot list a claim that has no check behind it.
 JSON and always exits with it. It deliberately does not accept `--report` — a
 gate that can be told to exit 0 is not a gate.
 
+## Quickstart
+
+### The wheel — no nix on the host
+
+```sh
+nix build .#wheel                 # produces council-2.0.0-py3-none-any.whl
+python -m pip install council-2.0.0-py3-none-any.whl
+cd path/to/repo
+council doctor                    # is this machine able to review?
+council review --base origin/main --samples 3
+```
+
+The wheel is pure Python (3.11+), no dependencies. `command` proofs need
+`bwrap`; without it they are `UNRUNNABLE` and a run that needs one is
+`INCOMPLETE`, never a pass. The flake is how the project builds its artifacts;
+a user who installs the wheel never needs it.
+
+### The image — tool and sandbox together
+
+```sh
+nix build .#image
+docker load < result
+docker run --rm council:2.0.0 --help
+```
+
+The image carries the tool and `bwrap`, not Hermes. Mount the repository, put a
+`hermes` binary and its profile on the container's PATH, and it reviews like the
+wheel does; the image is the artifact where the sandbox travels with the tool.
+
+### The GitHub Action
+
+The composite action installs the wheel into a private environment, runs
+`council doctor`, then `council ci`, and writes `council.sarif`. It needs a
+runner that has Hermes; it never installs one. The workflow in
+`.github/workflows/council.yml` is the working example, including the
+`upload-sarif` step that puts proven findings in code scanning.
+
+## Configuration
+
+A repository may narrow what proofs are allowed to do in `council.toml` at its
+root:
+
+```toml
+[proofs]
+allow = ["rg", "grep", "git", "jq", "test", "stat", "python3", "nix"]
+timeout = 120
+sandbox = true
+```
+
+The caller's policy is a ceiling: a repository can remove a tool, lower the
+timeout or require the sandbox, never add a tool, raise the timeout or turn the
+sandbox off. Unknown keys are refused with exit 3, so a typo cannot silently
+restore a default. `command` proofs run in an overlay sandbox; `sandbox = false`
+is refused when the caller requires it.
+
 ## Flags
 
 Every flag the tool accepts, what it changes, and why it exists. `council <command>
@@ -70,9 +126,10 @@ Every flag the tool accepts, what it changes, and why it exists. `council <comma
 | `--sample-timeout N` | `900` | give up on one sample after N seconds | a model that never answers must fail in bounded time, not hold the run |
 | `--time-budget N` | none | stop starting units after N seconds; the unit in flight finishes | a large sliced review must end by a deadline even when the instrument is slow |
 | `--reasoning LEVEL` | the profile's | reasoning effort for this review: `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max`, `ultra` | the profile's level may be the wrong cost for a given run; whatever is used is recorded and hashed into the instrument |
-| `--stream` / `--no-stream` | stream | read the reviewer's JSON event stream | a non-streaming call cannot tell “thinking” from “gone”; a stream can be watched |
+| `--stream` / `--no-stream` | stream | read the reviewer's JSON event stream | a non-streaming call cannot tell “thinking” from “gone”; a stream can be watched; a plain-output stub needs `--no-stream` |
 | `--idle-timeout N` | `120` | kill a stream with no event for N seconds | silence must cost the idle timeout, not the sample timeout |
 | `--prompt PATH` | the shipped prompt | a different instrument | experiments must not edit the prompt the gate uses |
+| `--sarif PATH` | off | also write proven findings as a SARIF 2.1.0 log | code scanning wants a log; `verdict.json` stays the complete evidence |
 | `--report` | off | exit 0 whatever the verdict | advice in a hook that must not block |
 | `--json` | off | print `verdict.json` | the machine-readable form, byte-identical to the artefact |
 | `--run-id ID` | timestamp | name the run; refused if it exists | two runs are comparable only when they can be named |

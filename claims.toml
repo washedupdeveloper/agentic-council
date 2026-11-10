@@ -468,3 +468,28 @@ check = "python3 -m pytest tests/test_runner.py::test_a_stream_whose_child_holds
 id = "a-retry-keeps-the-failed-attempt"
 text = "A sample that succeeds on retry still records the failure that caused the retry."
 check = "python3 -m pytest tests/test_sample.py::test_a_retry_keeps_the_first_failure -q"
+
+[[claim]]
+id = "the-command-line-reports-its-version"
+text = "council --version prints the installed version and exits 0."
+check = "python3 -m pytest tests/test_cli.py::test_the_version_is_reported -q"
+
+[[claim]]
+id = "the-wheel-ships-its-typed-marker"
+text = "The installed package carries py.typed, so its annotations are visible to type checkers."
+check = "python3 -m pytest tests/test_packaging.py::test_the_package_ships_a_typed_marker -q"
+
+[[claim]]
+id = "proven-findings-become-sarif-results"
+text = "A proven finding appears in SARIF with its rule, level, file and line, and the severity maps to a SARIF level."
+check = "python3 -m pytest tests/test_sarif.py -q"
+
+[[claim]]
+id = "only-proven-findings-are-sarif-alerts"
+text = "Refuted, unsettled and unrunnable findings never appear as SARIF results."
+check = "python3 -m pytest tests/test_sarif.py::test_unproven_findings_are_not_alerts -q"
+
+[[claim]]
+id = "the-repository-configuration-is-documented"
+text = "The README documents council.toml, its [proofs] table, and the three keys."
+check = "python3 -m pytest tests/test_docs.py::test_the_repository_configuration_is_documented -q"

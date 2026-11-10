@@ -40,6 +40,10 @@ inputs:
     description: Kill a stream with no event for N seconds
     required: false
     default: "120"
+  sarif:
+    description: Where to write the SARIF log (empty disables it)
+    required: false
+    default: "council.sarif"
   python:
     description: Interpreter used to create the private environment
     required: false
@@ -68,6 +72,7 @@ runs:
         REASONING: ${{ inputs.reasoning }}
         STREAM: ${{ inputs.stream }}
         IDLE: ${{ inputs.idle-timeout }}
+        SARIF: ${{ inputs.sarif }}
       run: |
         set -uo pipefail
         args=(ci
@@ -79,4 +84,5 @@ runs:
         if [ -n "$REASONING" ]; then args+=(--reasoning "$REASONING"); fi
         if [ "$STREAM" = "true" ]; then args+=(--stream); else args+=(--no-stream); fi
         if [ -n "$IDLE" ]; then args+=(--idle-timeout "$IDLE"); fi
+        if [ -n "$SARIF" ]; then args+=(--sarif "$SARIF"); fi
         council "${args[@]}"

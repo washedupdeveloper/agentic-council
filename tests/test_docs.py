@@ -37,3 +37,11 @@ def test_every_command_is_documented() -> None:
     )
     missing = [name for name in subcommands.choices if f"council {name}" not in text]
     assert not missing, f"undocumented command(s): {', '.join(missing)}"
+
+
+def test_the_repository_configuration_is_documented() -> None:
+    """A security-relevant knob that exists only in code is a trap."""
+    text = README.read_text(encoding="utf-8")
+    assert "## Configuration" in text
+    assert "council.toml" in text
+    assert "[proofs]" in text

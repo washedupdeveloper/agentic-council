@@ -26,6 +26,12 @@ def test_the_reviewer_prompt_ships_with_the_package() -> None:
     assert "sections" in prompt.read_text(encoding="utf-8")
 
 
+def test_the_package_ships_a_typed_marker() -> None:
+    import council
+
+    assert (Path(council.__file__).resolve().parent / "py.typed").is_file()
+
+
 def test_both_console_scripts_are_declared() -> None:
     assert project()["scripts"] == {
         "council": "council.cli:main",

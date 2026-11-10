@@ -129,7 +129,7 @@
             python -m pip wheel --no-deps --no-build-isolation --wheel-dir dist .
             python -m pip install --no-index --target dist/site dist/*.whl
             PYTHONPATH=dist/site python -m council --help > /dev/null
-            PYTHONPATH=dist/site python -c "import council; assert council.__version__ == '${version}'"
+            PYTHONPATH=dist/site python -c "import council, pathlib; assert council.__version__ == '${version}'; assert (pathlib.Path(council.__file__).parent / 'py.typed').is_file()"
           '';
         });
 

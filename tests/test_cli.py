@@ -227,6 +227,26 @@ def test_streaming_is_on_by_default_and_can_be_turned_off(
     assert seen[1]["stream"] is False
 
 
+def test_the_version_is_reported(capsys: pytest.CaptureFixture[str]) -> None:
+    import council
+
+    with pytest.raises(SystemExit) as stopped:
+        cli.main(["--version"])
+    assert stopped.value.code == 0
+    assert council.__version__ in capsys.readouterr().out
+
+
+def test_sarif_is_written_when_asked(tmp_path: Path,
+                                     monkeypatch: pytest.MonkeyPatch) -> None:
+    finding = Finding("F-01", "readability", "low", State.PROVEN, "a.py:2",
+                      "A claim.", "A detail.")
+    stub(monkeypatch, report(Verdict.PASS, findings=(finding,)))
+    path = tmp_path / "council.sarif"
+    assert cli.main(["review", "--sarif", str(path), "--run-id", "sarif"]) == 0
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    assert payload["runs"][0]["results"][0]["ruleId"] == "readability"
+
+
 def test_init_adds_the_state_directory(tmp_path: Path) -> None:
     subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
     assert cli.main(["init", "-C", str(tmp_path)]) == 0

@@ -48,6 +48,12 @@ recorded in `docs/ADOPTION.md`.
   `--idle-timeout N` (default 120 s) kills a stream that goes silent, and a
   silent or answerless sample fails rather than passing.
 - Samples record every failed attempt in `failures`, not only the final error.
+- `--version` prints the installed version; the wheel now ships `py.typed`, so
+  consumers' type checkers use the package's annotations.
+- `--sarif PATH` writes proven findings as SARIF 2.1.0 for code scanning;
+  `verdict.json` remains the complete evidence.
+- README gains a Quickstart (wheel, image, action) and a Configuration section
+  for `council.toml` (`[proofs] allow`, `timeout`, `sandbox`).
 - `council doctor`: measures `git`, the reviewer binary, `bwrap` and whether the
   profile answers a probe; `--json` for CI.
 
