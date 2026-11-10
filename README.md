@@ -284,10 +284,11 @@ a missing answer for a pass.
 
 The profile on this host sets `reasoning_effort: ultra`. The 7,954-byte external
 prompt answered in 21 s at `--reasoning none`, and `none` caught a planted AWS
-key as `critical` in 11 s, while `low` did not return within 150 s. When a host
-stalls, set `--reasoning none` or `minimal`; the level is recorded in
-`verdict.json` and is part of the instrument digest, because the same prompt at
-two levels is not the same review.
+key as `critical` in 11 s. `low` needed 206 s with a 300 s sample timeout; a
+three-sample `low` run reached `PASS` in 600 s with two proven low findings.
+When a host stalls, raise `--sample-timeout` for `low`, or use `none` for the
+fast path; the level is recorded in `verdict.json` and is part of the instrument
+digest, because the same prompt at two levels is not the same review.
 
 ## What is not here
 

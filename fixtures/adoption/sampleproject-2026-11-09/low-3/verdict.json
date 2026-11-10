@@ -1,0 +1,73 @@
+{
+  "run": "adopt-low-3",
+  "base": "8603eaf898a2db2c89c36ad6b302f2994700ad6a",
+  "head": "621e4974ca25ce531773def586ba3ed8e736b3fc",
+  "worktree": true,
+  "diff_sha256": "d2022de47bf2cd5350dc5d7135977b1615a9ae70ba2f2ad654ab5dc2cc1e5429",
+  "digest": "7344e056e4d4cf5f",
+  "prompt": "/home/nixolotl/projects/review-council-v2/src/council/prompts/reviewer.md",
+  "prompt_bytes": 7954,
+  "prompt_limit": 32768,
+  "prompt_acknowledged": false,
+  "sliced": false,
+  "time_budget": 900,
+  "units": [],
+  "state_dir_ignored": true,
+  "profile": "council-generalist",
+  "reasoning": "low",
+  "samples_requested": 3,
+  "samples_run": 3,
+  "agreement": null,
+  "samples": [
+    {
+      "index": 1,
+      "ok": true,
+      "attempts": 1,
+      "error": null,
+      "findings": 0
+    },
+    {
+      "index": 2,
+      "ok": true,
+      "attempts": 1,
+      "error": null,
+      "findings": 0
+    },
+    {
+      "index": 3,
+      "ok": true,
+      "attempts": 2,
+      "error": null,
+      "findings": 2
+    }
+  ],
+  "skipped": [],
+  "context_digest": "a65e6af84544bbd9",
+  "context_depth": 0,
+  "context": [],
+  "unresolved": [],
+  "references": [],
+  "verdict": "pass",
+  "exit_code": 0,
+  "reason": "no proven blocking findings (2 proven non-blocking finding(s))",
+  "findings": [
+    {
+      "id": "F-01",
+      "dimension": "readability",
+      "severity": "low",
+      "state": "proven",
+      "location": ".gitignore:15",
+      "claim": ".council/ ignore rule is added with no link to the Python 3.9/4.0.0 change; unexplained scope creep in a release diff.",
+      "detail": ".gitignore:15 is added by this change"
+    },
+    {
+      "id": "F-02",
+      "dimension": "readability",
+      "severity": "low",
+      "state": "proven",
+      "location": "pyproject.toml:62",
+      "claim": "Whitespace-only reformat of the license table rides along with the 3.9 floor and 4.0.0 bump, splitting a release diff into cosmetic and functional hunks.",
+      "detail": "pyproject.toml:62 says 'license = { file = \"LICENSE.txt\" }'"
+    }
+  ]
+}

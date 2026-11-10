@@ -1,0 +1,38 @@
+{
+  "index": 3,
+  "attempts": 2,
+  "error": null,
+  "raw": "",
+  "findings": [
+    {
+      "dimension": "readability",
+      "severity": "low",
+      "file": "pyproject.toml",
+      "line": 62,
+      "claim": "Whitespace-only reformat of the license table rides along with the 3.9 floor and 4.0.0 bump, splitting a release diff into cosmetic and functional hunks.",
+      "proof": {
+        "kind": "present",
+        "params": {
+          "path": "pyproject.toml",
+          "line": 62,
+          "text": "license = { file = \"LICENSE.txt\" }"
+        }
+      }
+    },
+    {
+      "dimension": "readability",
+      "severity": "low",
+      "file": ".gitignore",
+      "line": 15,
+      "claim": ".council/ ignore rule is added with no link to the Python 3.9/4.0.0 change; unexplained scope creep in a release diff.",
+      "proof": {
+        "kind": "diff",
+        "params": {
+          "path": ".gitignore",
+          "line": 15,
+          "mode": "added"
+        }
+      }
+    }
+  ]
+}
