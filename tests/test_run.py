@@ -13,7 +13,7 @@ import pytest
 from council.prompt import instrument_digest
 from council.repo import init
 from council.run import (DEFAULT_PROFILE, PromptTooLarge, ReviewError, ReviewRequest,
-                         default_prompt, review)
+                         default_prompt, plan, review)
 from council.schema import DIMENSIONS
 from council.verdict import Verdict
 
@@ -511,6 +511,26 @@ def test_the_reasoning_level_is_recorded_and_changes_the_instrument(
     payload = json.loads((quiet.run_dir / "verdict.json").read_text(encoding="utf-8"))
     assert payload["reasoning"] == "none"
     assert quiet.digest != plain.digest
+
+
+def test_a_plan_is_one_prompt_when_it_fits(tmp_path: Path) -> None:
+    repo, _ = make_repo(tmp_path)
+    prompt = tmp_path / "prompt.md"
+    prompt.write_text(PROMPT, encoding="utf-8")
+    planned = plan(ReviewRequest(repo=repo, base="HEAD", prompt=prompt))
+    assert planned.sliced is False
+    assert planned.units == ()
+    assert planned.prompt_bytes > 0
+    assert not (repo / ".council").exists()
+
+
+def test_a_plan_names_the_units_and_writes_nothing(tmp_path: Path) -> None:
+    repo, prompt = make_two_changes(tmp_path)
+    planned = plan(ReviewRequest(repo=repo, base="HEAD", prompt=prompt,
+                                 max_prompt_bytes=200))
+    assert planned.sliced is True
+    assert [unit.id for unit in planned.units] == ["unit-001", "unit-002"]
+    assert not (repo / ".council").exists()
 
 
 def test_the_transport_and_idle_timeout_are_recorded(tmp_path: Path) -> None:

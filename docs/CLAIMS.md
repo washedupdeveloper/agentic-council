@@ -102,3 +102,9 @@ registry, so it cannot describe a claim that has no check.
 | `proven-findings-become-sarif-results` | A proven finding appears in SARIF with its rule, level, file and line, and the severity maps to a SARIF level. | `python3 -m pytest tests/test_sarif.py -q` |
 | `only-proven-findings-are-sarif-alerts` | Refuted, unsettled and unrunnable findings never appear as SARIF results. | `python3 -m pytest tests/test_sarif.py::test_unproven_findings_are_not_alerts -q` |
 | `the-repository-configuration-is-documented` | The README documents council.toml, its [proofs] table, and the three keys. | `python3 -m pytest tests/test_docs.py::test_the_repository_configuration_is_documented -q` |
+| `a-pull-request-is-read-from-gh` | A pull request number is resolved through gh into both SHAs and its identity. | `python3 -m pytest tests/test_pr.py::test_resolve_reads_the_pull_request -q` |
+| `a-pull-request-must-be-checked-out-at-its-head` | A checkout at a commit other than the PR head is refused with the gh checkout command. | `python3 -m pytest tests/test_pr.py::test_a_checkout_at_another_commit_is_refused -q` |
+| `a-pull-request-refuses-a-dirty-worktree` | A dirty worktree is refused: a PR review is the commit, not local edits. | `python3 -m pytest tests/test_pr.py::test_a_dirty_worktree_is_refused -q` |
+| `a-pull-request-takes-its-base-from-github` | The PR command uses GitHub's base and records the pull request in the request. | `python3 -m pytest tests/test_cli.py::test_pr_takes_its_base_from_github_and_records_it -q` |
+| `a-plan-writes-no-run-directory` | A plan names its units and creates no run directory. | `python3 -m pytest tests/test_run.py::test_a_plan_names_the_units_and_writes_nothing -q` |
+| `the-cli-prints-a-plan` | council review --plan prints the plan and exits 0. | `python3 -m pytest tests/test_cli.py::test_plan_prints_and_writes_nothing -q` |

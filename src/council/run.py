@@ -18,6 +18,7 @@ from .context import Context, build as build_context
 from .findings import OPEN_STATES, Finding, State, blocks
 from .merge import merge
 from .paths import run_dir as run_path
+from .pr import PullRequest
 from .prompt import instrument_digest, render
 from .proofs import ProofContext
 from .reference import FetchError, Reference, fetch
@@ -80,6 +81,7 @@ class ReviewRequest:
     reasoning: str | None = None
     stream: bool = False
     idle_timeout: int = 120
+    pull_request: PullRequest | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -131,6 +133,40 @@ class Fitted:
     context: Context
     depth: int
     bytes: int
+
+
+@dataclass(frozen=True, slots=True)
+class Prepared:
+    """Everything a review and a plan share: the change, the instrument, the prompt."""
+
+    root: Path
+    base: str
+    head: str
+    patch: str
+    skipped: tuple[Skipped, ...]
+    references: tuple[Reference, ...]
+    prompt_file: Path
+    template: str
+    digest: str
+    prompt: str
+    prompt_bytes: int
+    sliced: bool
+    full_context: Context
+    diff_sha256: str
+
+
+@dataclass(frozen=True, slots=True)
+class Plan:
+    """What a review would do, without asking anyone or writing a run."""
+
+    base: str
+    head: str
+    prompt_bytes: int
+    prompt_limit: int
+    sliced: bool
+    units: tuple[Unit, ...]
+    skipped: tuple[Skipped, ...]
+    depth: int
 
 
 def _prompt_for(template: str, base: str, patch: str, root: Path, depth: int,
@@ -301,6 +337,13 @@ def _write_verdict(run_dir: Path, request: ReviewRequest, base: str, head: str,
         "reasoning": request.reasoning or "profile-default",
         "transport": "stream" if request.stream else "plain",
         "idle_timeout": request.idle_timeout,
+        "pull_request": None if request.pull_request is None else {
+            "number": request.pull_request.number,
+            "url": request.pull_request.url,
+            "title": request.pull_request.title,
+            "base": request.pull_request.base,
+            "head": request.pull_request.head,
+        },
         "samples_requested": request.samples if request.samples is not None else "auto",
         "samples_run": samples_run,
         "agreement": agreement,
@@ -334,18 +377,8 @@ def _write_verdict(run_dir: Path, request: ReviewRequest, base: str, head: str,
         json.dumps(payload, indent=2) + "\n", encoding="utf-8", newline="\n")
 
 
-def review(request: ReviewRequest, runner: Runner) -> Report:
-    """Run one review and write every artefact under `.council/runs/<id>/`.
-
-    A prompt over `request.max_prompt_bytes` is not sent. The call refuses with
-    `PromptTooLarge` before the reviewer is asked and before any run directory
-    exists; the caller either narrows the change, raises the budget, or sets
-    `allow_large_prompt`. The decision belongs to a person (or to an explicit
-    flag), never to the tool guessing.
-    """
-    if request.samples is not None and request.samples < 1:
-        raise ReviewError("samples must be at least 1")
-
+def _prepare(request: ReviewRequest) -> Prepared:
+    """Resolve the change and build the prompt, with no side effect on disk."""
     root = repo_root(request.repo)
     base = resolve_base(root, request.base)
     head = output(root, "rev-parse", "HEAD").strip()
@@ -364,6 +397,60 @@ def review(request: ReviewRequest, runner: Runner) -> Report:
     digest = instrument_digest(template, profile=request.profile,
                                reasoning=request.reasoning)
 
+    full_context = build_context(patch, _reader(root), python_files(root),
+                                 max_depth=request.context_depth - 1)
+    prompt_context = full_context.text
+    if references:
+        prompt_context = f"{prompt_context}\n\n{_reference_text(references)}"
+    prompt = render(template, base=base, diff=patch, context=prompt_context)
+    prompt_bytes = len(prompt.encode("utf-8"))
+    sliced = prompt_bytes > request.max_prompt_bytes and not request.allow_large_prompt
+    return Prepared(root, base, head, patch, change.skipped, references, prompt_file,
+                    template, digest, prompt, prompt_bytes, sliced, full_context,
+                    diff_sha256)
+
+
+def plan(request: ReviewRequest) -> Plan:
+    """The units, prompt sizes and skipped files a review would use. No model call."""
+    prepared = _prepare(request)
+    units: tuple[Unit, ...] = ()
+    if prepared.sliced:
+        units = tuple(_build_units(prepared.template, prepared.base, prepared.patch,
+                                   prepared.root, request, prepared.references))
+    return Plan(prepared.base, prepared.head, prepared.prompt_bytes,
+                request.max_prompt_bytes, prepared.sliced, units,
+                prepared.skipped, request.context_depth)
+
+
+def review(request: ReviewRequest, runner: Runner) -> Report:
+    """Run one review and write every artefact under `.council/runs/<id>/`.
+
+    A prompt over `request.max_prompt_bytes` is not sent. The call refuses with
+    `PromptTooLarge` before the reviewer is asked and before any run directory
+    exists; the caller either narrows the change, raises the budget, or sets
+    `allow_large_prompt`. The decision belongs to a person (or to an explicit
+    flag), never to the tool guessing.
+    """
+    if request.samples is not None and request.samples < 1:
+        raise ReviewError("samples must be at least 1")
+
+    prepared = _prepare(request)
+    root = prepared.root
+    base = prepared.base
+    head = prepared.head
+    patch = prepared.patch
+    diff_sha256 = prepared.diff_sha256
+    references = prepared.references
+    prompt_file = prepared.prompt_file
+    template = prepared.template
+    digest = prepared.digest
+    limit = request.max_prompt_bytes
+    acknowledged = request.allow_large_prompt
+    full_context = prepared.full_context
+    prompt = prepared.prompt
+    prompt_bytes = prepared.prompt_bytes
+    sliced = prepared.sliced
+
     run_id = (request.run_id if request.run_id is not None
               else datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S"))
     if not run_id.strip():
@@ -374,17 +461,6 @@ def review(request: ReviewRequest, runner: Runner) -> Report:
         raise ReviewError(str(exc)) from exc
     if directory.is_symlink() or directory.exists():
         raise ReviewError(f"run {run_id!r} already exists at {directory}")
-
-    limit = request.max_prompt_bytes
-    acknowledged = request.allow_large_prompt
-    full_context = build_context(patch, _reader(root), python_files(root),
-                                 max_depth=request.context_depth - 1)
-    prompt_context = full_context.text
-    if references:
-        prompt_context = f"{prompt_context}\n\n{_reference_text(references)}"
-    prompt = render(template, base=base, diff=patch, context=prompt_context)
-    prompt_bytes = len(prompt.encode("utf-8"))
-    sliced = prompt_bytes > limit and not acknowledged
 
     config = load_config(root / CONFIG_NAME)
     proofs = ProofContext(repo=root, allow=config.allow, diff=patch,
@@ -475,7 +551,7 @@ def review(request: ReviewRequest, runner: Runner) -> Report:
     ignored = state_dir_ignored(root)
     _write_verdict(directory, request, base, head, digest, prompt_file, ignored,
                    samples, result, worktree=True, diff_sha256=diff_sha256,
-                   skipped=change.skipped, context=reported_context,
+                   skipped=prepared.skipped, context=reported_context,
                    references=references,
                    samples_run=samples_run, agreement=agreement,
                    prompt_bytes=prompt_bytes, prompt_limit=limit,
@@ -483,4 +559,4 @@ def review(request: ReviewRequest, runner: Runner) -> Report:
                    sliced=sliced, time_budget=request.time_budget,
                    units=units_payload)
     return Report(directory, base, head, digest, result, samples, prompt_file, ignored,
-                  change.skipped, diff_sha256, reported_context.digest)
+                  prepared.skipped, diff_sha256, reported_context.digest)

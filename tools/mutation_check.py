@@ -93,7 +93,7 @@ MUTATIONS: tuple[Mutation, ...] = (
              "run.py", "failed_samples=[sample.index for sample in samples if not sample.ok])",
              "failed_samples=[]),"),
     Mutation("slicing-disabled",
-             "run.py", "sliced = prompt_bytes > limit and not acknowledged",
+             "run.py", "sliced = prompt_bytes > request.max_prompt_bytes and not request.allow_large_prompt",
              "sliced = False"),
     Mutation("a-missing-prompt-is-not-refused",
              "run.py", "if not prompt_file.exists():", "if False:"),

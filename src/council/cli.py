@@ -12,8 +12,10 @@ from typing import NoReturn, Sequence
 from . import __version__
 from . import doctor as diagnostics
 from .config import ConfigError
+from .pr import PullRequest, resolve as resolve_pr, verify_checkout
 from .repo import ReviewError, init as init_repo
-from .run import DEFAULT_PROFILE, PROMPT_LIMIT, PromptTooLarge, Report, ReviewRequest, review
+from .run import (DEFAULT_PROFILE, PROMPT_LIMIT, Plan, PromptTooLarge, Report,
+                  ReviewRequest, plan, review)
 from .runner import DEFAULT_IDLE_TIMEOUT, hermes_runner
 from .sarif import render as render_sarif
 from .verdict import Verdict
@@ -52,7 +54,8 @@ class _Parser(argparse.ArgumentParser):
         self.exit(EXIT_ERROR, f"council: {message}\n")
 
 
-def _add_review_arguments(parser: argparse.ArgumentParser, *, advice: bool) -> None:
+def _add_review_arguments(parser: argparse.ArgumentParser, *, advice: bool,
+                          base: bool = True) -> None:
     """The review surface, shared by `review` and `ci`.
 
     `ci` is the gate without the advice switches: it always prints the verdict
@@ -61,7 +64,8 @@ def _add_review_arguments(parser: argparse.ArgumentParser, *, advice: bool) -> N
     """
     parser.add_argument("-C", "--repo", type=Path, default=Path("."),
                         help="repository to review (default: the current directory)")
-    parser.add_argument("--base", help="revision to diff against (default: origin/HEAD, then HEAD~1)")
+    if base:
+        parser.add_argument("--base", help="revision to diff against (default: origin/HEAD, then HEAD~1)")
     parser.add_argument("--samples", type=_samples, default=None,
                         help="samples: N, or auto (default: 1 clean, 2 to confirm, 3 to break a tie); per unit when sliced")
     parser.add_argument("--profile", default=DEFAULT_PROFILE, help="Hermes profile to ask")
@@ -98,6 +102,8 @@ def _add_review_arguments(parser: argparse.ArgumentParser, *, advice: bool) -> N
     if advice:
         parser.add_argument("--autonomous", action="store_true",
                             help="never ask: refuse an oversized prompt, exit 3")
+        parser.add_argument("--plan", action="store_true",
+                            help="show units and prompt sizes; call no reviewer and write no run")
         parser.add_argument("--report", action="store_true",
                             help="advice only: exit 0 whatever the verdict")
         parser.add_argument("--json", action="store_true", help="print the run's verdict.json")
@@ -115,6 +121,10 @@ def build_parser() -> argparse.ArgumentParser:
     ci = sub.add_parser("ci", help="the gate for CI: prints verdict.json, exits 0/1/2")
     _add_review_arguments(ci, advice=False)
     ci.set_defaults(report=False, json=True)
+
+    pr = sub.add_parser("pr", help="review a GitHub pull request by number")
+    pr.add_argument("number", type=int, help="pull request number")
+    _add_review_arguments(pr, advice=True, base=False)
 
     init = sub.add_parser("init", help="add .council/ to the repository's .gitignore")
     init.add_argument("-C", "--repo", type=Path, default=Path("."))
@@ -139,7 +149,7 @@ council: why there is a limit
 """
 
 
-def _oversize_decision(exc: PromptTooLarge) -> tuple[str, int | str | None]:
+def _oversize_decision(exc: PromptTooLarge, *, allow_base: bool = True) -> tuple[str, int | str | None]:
     """Ask a person what to do. Empty input or EOF cancels: silence is not consent."""
     while True:
         print(f"council: the prompt for this change is {exc.size:,} bytes; "
@@ -170,6 +180,10 @@ def _oversize_decision(exc: PromptTooLarge) -> tuple[str, int | str | None]:
                 continue
             return ("budget", number)
         if command == "base":
+            if not allow_base:
+                print("council: the PR base is fixed by GitHub; choose context, budget or allow",
+                      file=sys.stderr)
+                continue
             if not rest:
                 print("council: base needs a revision", file=sys.stderr)
                 continue
@@ -192,6 +206,31 @@ def _oversize_decision(exc: PromptTooLarge) -> tuple[str, int | str | None]:
         print(f"council: {command!r} is not one of the choices", file=sys.stderr)
 
 
+def _request(args: argparse.Namespace, *, allow: bool | None = None) -> ReviewRequest:
+    """The request the CLI's parsed arguments describe."""
+    return ReviewRequest(
+        repo=args.repo, base=args.base, samples=args.samples,
+        profile=args.profile, prompt=args.prompt, run_id=args.run_id,
+        context_urls=tuple(args.context_url),
+        allow_large_prompt=args.allow_large_prompt if allow is None else allow,
+        max_prompt_bytes=args.max_prompt_bytes,
+        context_depth=args.context_depth,
+        time_budget=args.time_budget,
+        reasoning=args.reasoning,
+        stream=args.stream,
+        idle_timeout=args.idle_timeout,
+        pull_request=getattr(args, "pull_request", None),
+    )
+
+
+def _bind_pr(args: argparse.Namespace) -> None:
+    """Resolve the PR and make its base the review's base. Never checks out."""
+    pr: PullRequest = resolve_pr(args.number, args.repo)
+    verify_checkout(pr, args.repo)
+    args.base = pr.base
+    args.pull_request = pr
+
+
 def _review(args: argparse.Namespace) -> Report:
     """Review, and let a person decide when the prompt is over the limit.
 
@@ -203,16 +242,7 @@ def _review(args: argparse.Namespace) -> Report:
                            timeout=args.sample_timeout, reasoning=args.reasoning,
                            stream=args.stream, idle_timeout=args.idle_timeout)
     while True:
-        request = ReviewRequest(repo=args.repo, base=args.base, samples=args.samples,
-                                profile=args.profile, prompt=args.prompt,
-                                run_id=args.run_id, context_urls=tuple(args.context_url),
-                                allow_large_prompt=allow,
-                                max_prompt_bytes=args.max_prompt_bytes,
-                                context_depth=args.context_depth,
-                                time_budget=args.time_budget,
-                                reasoning=args.reasoning,
-                                stream=args.stream,
-                                idle_timeout=args.idle_timeout)
+        request = _request(args, allow=allow)
         try:
             return review(request, runner)
         except PromptTooLarge as exc:
@@ -222,7 +252,7 @@ def _review(args: argparse.Namespace) -> Report:
                            and sys.stdin.isatty())
             if not interactive:
                 raise
-            decision, value = _oversize_decision(exc)
+            decision, value = _oversize_decision(exc, allow_base=args.command != "pr")
             if decision == "allow":
                 allow = True
             elif decision == "budget" and isinstance(value, int):
@@ -243,6 +273,43 @@ def _print_report(report: Report) -> None:
         print(f"        {finding.state.value} — {finding.detail}")
     print(f"  reason: {report.result.reason}")
     print(f"  run:    {report.run_dir}")
+
+
+def _print_plan(planned: Plan) -> None:
+    print(f"PLAN  base {planned.base[:8]} → head {planned.head[:8]}")
+    stance = "sliced" if planned.sliced else "one prompt"
+    print(f"  prompt {planned.prompt_bytes:,} bytes; limit {planned.prompt_limit:,}; {stance}")
+    if not planned.sliced:
+        print(f"  whole change  {planned.prompt_bytes:,} bytes  context depth {planned.depth}")
+    for unit in planned.units:
+        files = ", ".join(unit.files)
+        print(f"  {unit.id}  {files}  {unit.bytes:,} bytes  depth {unit.depth}")
+    if planned.skipped:
+        listed = ", ".join(f"{item.path} ({item.reason})" for item in planned.skipped[:5])
+        more = f", +{len(planned.skipped) - 5} more" if len(planned.skipped) > 5 else ""
+        print(f"  skipped: {len(planned.skipped)} file(s): {listed}{more}")
+
+
+def _plan_payload(planned: Plan) -> dict[str, object]:
+    return {
+        "base": planned.base,
+        "head": planned.head,
+        "prompt_bytes": planned.prompt_bytes,
+        "prompt_limit": planned.prompt_limit,
+        "sliced": planned.sliced,
+        "units": [
+            {
+                "id": unit.id,
+                "files": list(unit.files),
+                "ranges": [{"file": file, "start": start, "end": end}
+                           for file, start, end in unit.ranges],
+                "prompt_bytes": unit.bytes,
+                "context_depth": unit.depth,
+            }
+            for unit in planned.units
+        ],
+        "skipped": [{"path": item.path, "reason": item.reason} for item in planned.skipped],
+    }
 
 
 def _doctor(args: argparse.Namespace) -> int:
@@ -272,6 +339,25 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(f"council: {exc}", file=sys.stderr)
             return EXIT_ERROR
         print("added .council/ to .gitignore" if added else ".council/ is already ignored")
+        return 0
+
+    if args.command == "pr":
+        try:
+            _bind_pr(args)
+        except ReviewError as exc:
+            print(f"council: {exc}", file=sys.stderr)
+            return EXIT_ERROR
+
+    if getattr(args, "plan", False):
+        try:
+            planned = plan(_request(args))
+        except (ReviewError, ConfigError) as exc:
+            print(f"council: {exc}", file=sys.stderr)
+            return EXIT_ERROR
+        if args.json:
+            print(json.dumps(_plan_payload(planned), indent=2))
+        else:
+            _print_plan(planned)
         return 0
 
     # Only an interactive `review` asks. `ci` is the autonomous entry point and

@@ -52,8 +52,12 @@ recorded in `docs/ADOPTION.md`.
   consumers' type checkers use the package's annotations.
 - `--sarif PATH` writes proven findings as SARIF 2.1.0 for code scanning;
   `verdict.json` remains the complete evidence.
-- README gains a Quickstart (wheel, image, action) and a Configuration section
-  for `council.toml` (`[proofs] allow`, `timeout`, `sandbox`).
+- `council pr NUMBER`: resolve a GitHub pull request with `gh`, verify the
+  checkout is its head commit with a clean worktree, and review it; the verdict
+  records the PR's URL and SHAs. The base is GitHub's and `--base` is refused.
+- `--plan` on `review` and `pr`: print units, file ranges, prompt bytes, context
+  depth and skipped files without calling the reviewer or writing a run.
+- README gains the `council pr` entry and the plan documentation.
 - `council doctor`: measures `git`, the reviewer binary, `bwrap` and whether the
   profile answers a probe; `--json` for CI.
 

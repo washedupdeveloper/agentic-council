@@ -247,6 +247,41 @@ def test_sarif_is_written_when_asked(tmp_path: Path,
     assert payload["runs"][0]["results"][0]["ruleId"] == "readability"
 
 
+def test_plan_prints_and_writes_nothing(monkeypatch: pytest.MonkeyPatch,
+                                        capsys: pytest.CaptureFixture[str]) -> None:
+    planned = cli.Plan("a" * 40, "b" * 40, 1234, 32768, False, (), (), 3)
+    monkeypatch.setattr(cli, "plan", lambda request: planned)
+    assert cli.main(["review", "--plan", "--base", "HEAD"]) == 0
+    out = capsys.readouterr().out
+    assert "PLAN" in out
+    assert "1,234" in out
+
+
+def test_pr_takes_its_base_from_github_and_records_it(
+        monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    pull = cli.PullRequest(7, "https://example/7", "A change", "a" * 40, "b" * 40,
+                           "main", "topic")
+    monkeypatch.setattr(cli, "resolve_pr", lambda number, repo: pull)
+    monkeypatch.setattr(cli, "verify_checkout", lambda pr, repo: None)
+    seen: dict[str, object] = {}
+
+    def fake_review(request: object, runner: object) -> Report:
+        seen["request"] = request
+        return report(Verdict.PASS)
+
+    monkeypatch.setattr(cli, "review", fake_review)
+    assert cli.main(["pr", "7", "-C", str(tmp_path), "--run-id", "pr"]) == 0
+    request = seen["request"]
+    assert getattr(request, "base") == "a" * 40
+    assert getattr(request, "pull_request") == pull
+
+
+def test_pr_does_not_accept_a_base() -> None:
+    with pytest.raises(SystemExit) as stopped:
+        cli.main(["pr", "7", "--base", "main"])
+    assert stopped.value.code == 3
+
+
 def test_init_adds_the_state_directory(tmp_path: Path) -> None:
     subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
     assert cli.main(["init", "-C", str(tmp_path)]) == 0

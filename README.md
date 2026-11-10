@@ -33,6 +33,8 @@ a trend; it cannot change it.
 
 ```sh
 council review                # gate: 0 pass, 1 fail, 2 incomplete, 3 could not start
+council review --plan         # units, prompt sizes and skipped files; no model call
+council pr 123                # review a GitHub pull request (needs gh and its head checked out)
 council ci                    # the same gate for CI: verdict.json on stdout
 council doctor                # can this machine run a review? measure, don't assume
 council --version             # what is installed
@@ -53,6 +55,26 @@ cannot list a claim that has no check behind it.
 `council ci` is `council review` for a pipeline: it always prints the verdict as
 JSON and always exits with it. It deliberately does not accept `--report` — a
 gate that can be told to exit 0 is not a gate.
+
+### `council pr`
+
+`council pr 123` asks the GitHub CLI for the pull request's base and head SHAs,
+checks that the current checkout **is** that head commit with a clean worktree,
+and then reviews `base..HEAD` exactly as `council review` would. It never checks
+a branch out and never reviews local edits: a PR review is a review of a commit.
+
+It needs `gh` on `PATH` and an authenticated GitHub CLI. If the checkout is at a
+different commit, it says so and asks for `gh pr checkout 123`; if the worktree
+is dirty, it refuses. `--plan`, `--sarif`, `--json`, `--report` and the review
+flags all work; `--base` is not accepted because GitHub owns the base.
+`verdict.json` records the PR's number, URL, title and both SHAs.
+
+`council review --plan` (and `council pr N --plan`) resolves the change, builds
+the context and prompt, and prints the units it would review — file ranges,
+prompt bytes per unit, context depth and skipped files — **without calling the
+reviewer and without writing a run directory**. `--json` gives the same as
+objects. It is how a user sees why a change will be sliced or refused before
+spending a model call.
 
 ## Quickstart
 
@@ -130,6 +152,7 @@ Every flag the tool accepts, what it changes, and why it exists. `council <comma
 | `--idle-timeout N` | `120` | kill a stream with no event for N seconds | silence must cost the idle timeout, not the sample timeout |
 | `--prompt PATH` | the shipped prompt | a different instrument | experiments must not edit the prompt the gate uses |
 | `--sarif PATH` | off | also write proven findings as a SARIF 2.1.0 log | code scanning wants a log; `verdict.json` stays the complete evidence |
+| `--plan` | off | print units, prompt bytes, depth and skipped files; no reviewer, no run | see the cost and the slicing before spending a model call |
 | `--report` | off | exit 0 whatever the verdict | advice in a hook that must not block |
 | `--json` | off | print `verdict.json` | the machine-readable form, byte-identical to the artefact |
 | `--run-id ID` | timestamp | name the run; refused if it exists | two runs are comparable only when they can be named |
