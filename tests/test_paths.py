@@ -24,7 +24,8 @@ def test_a_run_id_cannot_escape(tmp_path: Path, run_id: str) -> None:
 
 
 @pytest.mark.parametrize("run_id", ["a\nb", "a\0b", "a:b", "a?b", "a*b", "a|b",
-                                    "a<b", "a>b", 'a"b', "x" * 129])
+                                    "a<b", "a>b", 'a"b', "x" * 129,
+                                    "\u200b", "\u202e", "\u2028"])
 def test_a_run_id_must_be_a_portable_segment(tmp_path: Path, run_id: str) -> None:
     with pytest.raises(ValueError, match="run id"):
         run_dir(tmp_path, run_id)

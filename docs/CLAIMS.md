@@ -127,3 +127,13 @@ registry, so it cannot describe a claim that has no check.
 | `human-output-has-no-terminal-controls` | Human output replaces control characters from model output. | `python3 -m pytest tests/test_cli.py::test_the_human_report_does_not_emit_terminal_controls -q` |
 | `a-file-url-that-is-not-a-file-is-refused` | A file URL that is not a regular file is refused. | `python3 -m pytest tests/test_reference.py::test_a_file_url_that_is_a_directory_is_refused -q` |
 | `a-proof-that-crashes-is-unrunnable` | A proof that raises is UNRUNNABLE, not a crashed run. | `python3 -m pytest tests/test_proofs.py::test_a_proof_that_crashes_is_unrunnable -q` |
+| `a-run-directory-is-claimed-exclusively` | A second run cannot claim an existing run directory. | `python3 -m pytest tests/test_run.py::test_a_claimed_run_directory_is_exclusive -q` |
+| `a-missing-reviewer-leaves-no-run-directory` | A start failure before evidence removes the empty run directory. | `python3 -m pytest tests/test_run.py::test_a_missing_reviewer_leaves_no_run_directory -q` |
+| `keep-refuses-an-existing-target` | --keep refuses to merge into an existing run directory. | `python3 -m pytest tests/test_cli.py::test_keep_refuses_an_existing_target -q` |
+| `a-non-utf8-answer-is-a-failed-sample` | A reviewer answer that is not UTF-8 is replaced, not a crash. | `python3 -m pytest tests/test_runner.py::test_a_non_utf8_answer_is_replaced_not_a_crash -q` |
+| `json-pointer-rejects-a-negative-index` | A JSON Pointer array index cannot be negative. | `python3 -m pytest tests/test_proofs.py::test_json_pointer_rejects_a_negative_index -q` |
+| `json-pointer-rejects-a-leading-zero` | A JSON Pointer array index cannot have a leading zero. | `python3 -m pytest tests/test_proofs.py::test_json_pointer_rejects_a_leading_zero -q` |
+| `a-failed-sample-is-named-in-a-fail-reason` | A failed sample is named in the reason even when the verdict is FAIL. | `python3 -m pytest tests/test_adjudicate.py::test_a_missing_sample_does_not_soften_a_real_failure -q` |
+| `a-stream-result-with-empty-text-falls-back` | An empty stream result falls back to the text events. | `python3 -m pytest tests/test_runner.py::test_a_stream_result_with_empty_text_falls_back_to_text_events -q` |
+| `run-id-rejects-format-characters` | A run id rejects bidi, zero-width and line-separator characters. | `python3 -m pytest tests/test_paths.py::test_a_run_id_must_be_a_portable_segment -q` |
+| `a-present-proof-refuses-a-fifo` | A present proof refuses a FIFO without opening it. | `python3 -m pytest tests/test_proofs.py::test_present_refuses_a_fifo_without_opening_it -q` |

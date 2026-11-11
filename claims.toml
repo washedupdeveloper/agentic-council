@@ -618,3 +618,53 @@ check = "python3 -m pytest tests/test_reference.py::test_a_file_url_that_is_a_di
 id = "a-proof-that-crashes-is-unrunnable"
 text = "A proof that raises is UNRUNNABLE, not a crashed run."
 check = "python3 -m pytest tests/test_proofs.py::test_a_proof_that_crashes_is_unrunnable -q"
+
+[[claim]]
+id = "a-run-directory-is-claimed-exclusively"
+text = "A second run cannot claim an existing run directory."
+check = "python3 -m pytest tests/test_run.py::test_a_claimed_run_directory_is_exclusive -q"
+
+[[claim]]
+id = "a-missing-reviewer-leaves-no-run-directory"
+text = "A start failure before evidence removes the empty run directory."
+check = "python3 -m pytest tests/test_run.py::test_a_missing_reviewer_leaves_no_run_directory -q"
+
+[[claim]]
+id = "keep-refuses-an-existing-target"
+text = "--keep refuses to merge into an existing run directory."
+check = "python3 -m pytest tests/test_cli.py::test_keep_refuses_an_existing_target -q"
+
+[[claim]]
+id = "a-non-utf8-answer-is-a-failed-sample"
+text = "A reviewer answer that is not UTF-8 is replaced, not a crash."
+check = "python3 -m pytest tests/test_runner.py::test_a_non_utf8_answer_is_replaced_not_a_crash -q"
+
+[[claim]]
+id = "json-pointer-rejects-a-negative-index"
+text = "A JSON Pointer array index cannot be negative."
+check = "python3 -m pytest tests/test_proofs.py::test_json_pointer_rejects_a_negative_index -q"
+
+[[claim]]
+id = "json-pointer-rejects-a-leading-zero"
+text = "A JSON Pointer array index cannot have a leading zero."
+check = "python3 -m pytest tests/test_proofs.py::test_json_pointer_rejects_a_leading_zero -q"
+
+[[claim]]
+id = "a-failed-sample-is-named-in-a-fail-reason"
+text = "A failed sample is named in the reason even when the verdict is FAIL."
+check = "python3 -m pytest tests/test_adjudicate.py::test_a_missing_sample_does_not_soften_a_real_failure -q"
+
+[[claim]]
+id = "a-stream-result-with-empty-text-falls-back"
+text = "An empty stream result falls back to the text events."
+check = "python3 -m pytest tests/test_runner.py::test_a_stream_result_with_empty_text_falls_back_to_text_events -q"
+
+[[claim]]
+id = "run-id-rejects-format-characters"
+text = "A run id rejects bidi, zero-width and line-separator characters."
+check = "python3 -m pytest tests/test_paths.py::test_a_run_id_must_be_a_portable_segment -q"
+
+[[claim]]
+id = "a-present-proof-refuses-a-fifo"
+text = "A present proof refuses a FIFO without opening it."
+check = "python3 -m pytest tests/test_proofs.py::test_present_refuses_a_fifo_without_opening_it -q"

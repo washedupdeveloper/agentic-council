@@ -396,7 +396,7 @@ def _finish_ephemeral(args: argparse.Namespace, report: Report | None) -> None:
                 print(f"council: --keep {_safe(target)} is inside the run directory; "
                       f"evidence left at {_safe(report.run_dir)}", file=sys.stderr)
                 return
-            shutil.copytree(report.run_dir, target, dirs_exist_ok=True)
+            shutil.copytree(report.run_dir, target)
             print(f"council: kept {_safe(target)}", file=sys.stderr)
         except (OSError, ValueError) as exc:
             print(f"council: could not keep {_safe(target)}: {_safe(exc)}; "

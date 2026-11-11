@@ -109,6 +109,29 @@ print(json.dumps({"type": "result", "exit_code": 3, "text": ""}))
                       idle_timeout=5)("q")
 
 
+def test_a_non_utf8_answer_is_replaced_not_a_crash(tmp_path: Path) -> None:
+    binary = py_script(tmp_path, 'import sys; sys.stdout.buffer.write(b"\\xff")')
+    answer = hermes_runner("p", binary=str(binary), timeout=10)("q")
+    assert "\ufffd" in answer
+
+
+def test_a_non_utf8_stream_line_is_ignored_not_a_crash(tmp_path: Path) -> None:
+    binary = py_script(tmp_path, 'import sys; sys.stdout.buffer.write(b"\\xff\\n")')
+    with pytest.raises(OSError, match="without an answer"):
+        hermes_runner("p", binary=str(binary), timeout=10, stream=True,
+                      idle_timeout=5)("q")
+
+
+def test_a_stream_result_with_empty_text_falls_back_to_text_events(tmp_path: Path) -> None:
+    binary = py_script(tmp_path, '''
+print(json.dumps({"type": "text", "text": "ok"}))
+print(json.dumps({"type": "result", "exit_code": 0, "text": ""}))
+''')
+    answer = hermes_runner("p", binary=str(binary), timeout=10, stream=True,
+                           idle_timeout=5)("q")
+    assert answer == "ok"
+
+
 def test_a_sandboxed_reviewer_cannot_write_to_the_host(tmp_path: Path) -> None:
     if shutil.which("bwrap") is None:
         pytest.skip("bwrap is not available")

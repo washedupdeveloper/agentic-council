@@ -318,6 +318,25 @@ def _write_sample(directory: Path, sample: SampleResult) -> None:
         raise ReviewError(f"cannot write a sample under {directory}: {exc}") from exc
 
 
+def _claim(directory: Path, run_id: str) -> None:
+    """Create the run directory exclusively: a second run cannot share it."""
+    try:
+        directory.mkdir(parents=True, exist_ok=False)
+    except FileExistsError as exc:
+        raise ReviewError(f"run {run_id!r} already exists at {directory}") from exc
+    except OSError as exc:
+        raise ReviewError(f"cannot create the run directory {directory}: {exc}") from exc
+
+
+def _discard_empty(directory: Path) -> None:
+    """Remove the claim if the run failed before writing any evidence."""
+    try:
+        if directory.is_dir() and not any(directory.iterdir()):
+            directory.rmdir()
+    except OSError:
+        pass
+
+
 def _write_verdict(run_dir: Path, request: ReviewRequest, base: str, head: str,
                    digest: str, prompt: Path, ignored: bool,
                    samples: tuple[SampleResult, ...], result: Result, *,
@@ -523,104 +542,107 @@ def review(request: ReviewRequest, runner: Runner) -> Report:
             raise
         except (OSError, ValueError) as exc:
             raise ReviewError(f"cannot use the state directory {directory}: {exc}") from exc
-    elif directory.is_symlink() or directory.exists():
-        raise ReviewError(f"run {run_id!r} already exists at {directory}")
 
     config = load_config(root / CONFIG_NAME)
     proofs = ProofContext(repo=root, allow=config.allow, diff=patch,
                           timeout=config.timeout, sandbox=config.sandbox)
+    units = _build_units(template, base, patch, root, request, references) if sliced else []
+    _claim(directory, run_id)
     units_payload: list[dict[str, object]] = []
 
-    if not sliced:
-        samples, samples_run, agreement = _samples(prompt, runner, request.samples)
-        for sample in samples:
-            _write_sample(directory, sample)
-        merged = merge([sample.output.findings if sample.output is not None else ()
-                        for sample in samples])
-        adjudication = adjudicate(
-            merged, proofs,
-            failed_samples=[sample.index for sample in samples if not sample.ok])
-        result = verdict(adjudication)
-        reported_context = full_context
-    else:
-        units = _build_units(template, base, patch, root, request, references)
-        runs: list[tuple[Unit, tuple[SampleResult, ...], int, bool | None, bool]] = []
-        raw: list[RawFinding] = []
-        skipped_by_budget: set[str] = set()
-        started = time.monotonic()
-        for unit in units:
-            if request.time_budget and time.monotonic() - started >= request.time_budget:
-                # The budget stops starting units; the one in flight was allowed
-                # to finish. A unit never asked is unreviewed, not clean.
-                skipped_by_budget.add(unit.id)
-                runs.append((unit, (), 0, None, False))
-                continue
-            unit_samples, unit_run, unit_agreement = _samples(
-                unit.prompt, runner, request.samples)
-            for sample in unit_samples:
-                _write_sample(directory / "units" / unit.id, sample)
-            ok = all(sample.ok for sample in unit_samples)
-            runs.append((unit, unit_samples, unit_run, unit_agreement, ok))
-            for sample in unit_samples:
-                if sample.output is not None:
-                    raw.extend(sample.output.findings)
-        merged = merge([raw])
-        adjudication = adjudicate(merged, proofs)
-        result = verdict(adjudication)
-        unreviewed = [unit.id for unit, _, _, _, ok in runs if not ok]
-        if unreviewed:
-            silent = [unit_id for unit_id in unreviewed if unit_id not in skipped_by_budget]
-            late = [unit_id for unit_id in unreviewed if unit_id in skipped_by_budget]
-            reasons = []
-            if silent:
-                reasons.append(f"unit(s) {', '.join(silent)} returned nothing usable")
-            if late:
-                reasons.append(f"unit(s) {', '.join(late)} were not reviewed within "
-                               f"the {request.time_budget}s time budget")
-            note = "; ".join(reasons)
-            if result.verdict is Verdict.PASS:
-                result = Result(
-                    Verdict.INCOMPLETE,
-                    note + ": the review is missing evidence",
-                    result.findings,
-                )
-            else:
-                # FAIL and INCOMPLETE both outrank a missing unit, but the reason
-                # must still say what was never looked at.
-                result = Result(result.verdict, f"{result.reason}; {note}", result.findings)
-        for unit, unit_samples, unit_run, unit_agreement, ok in runs:
-            mine = [finding for finding in result.findings if _belongs(finding, unit)]
-            units_payload.append({
-                "id": unit.id,
-                "files": list(unit.files),
-                "ranges": [{"file": file, "start": start, "end": end}
-                           for file, start, end in unit.ranges],
-                "diff_sha256": hashlib.sha256(unit.patch.encode("utf-8")).hexdigest(),
-                "context_digest": unit.context_digest,
-                "context_depth": unit.depth,
-                "prompt_bytes": unit.bytes,
-                "samples_run": unit_run,
-                "agreement": unit_agreement,
-                "ok": ok,
-                "error": ("time budget exhausted"
-                          if unit.id in skipped_by_budget else None),
-                "findings": len(mine),
-                "verdict": _unit_verdict(mine, ok),
-            })
-        samples = ()
-        samples_run = sum(run[2] for run in runs)
-        agreement = None
-        reported_context = Context((), (), "", "")
+    try:
+        if not sliced:
+            samples, samples_run, agreement = _samples(prompt, runner, request.samples)
+            for sample in samples:
+                _write_sample(directory, sample)
+            merged = merge([sample.output.findings if sample.output is not None else ()
+                            for sample in samples])
+            adjudication = adjudicate(
+                merged, proofs,
+                failed_samples=[sample.index for sample in samples if not sample.ok])
+            result = verdict(adjudication)
+            reported_context = full_context
+        else:
+            runs: list[tuple[Unit, tuple[SampleResult, ...], int, bool | None, bool]] = []
+            raw: list[RawFinding] = []
+            skipped_by_budget: set[str] = set()
+            started = time.monotonic()
+            for unit in units:
+                if request.time_budget and time.monotonic() - started >= request.time_budget:
+                    # The budget stops starting units; the one in flight was allowed
+                    # to finish. A unit never asked is unreviewed, not clean.
+                    skipped_by_budget.add(unit.id)
+                    runs.append((unit, (), 0, None, False))
+                    continue
+                unit_samples, unit_run, unit_agreement = _samples(
+                    unit.prompt, runner, request.samples)
+                for sample in unit_samples:
+                    _write_sample(directory / "units" / unit.id, sample)
+                ok = all(sample.ok for sample in unit_samples)
+                runs.append((unit, unit_samples, unit_run, unit_agreement, ok))
+                for sample in unit_samples:
+                    if sample.output is not None:
+                        raw.extend(sample.output.findings)
+            merged = merge([raw])
+            adjudication = adjudicate(merged, proofs)
+            result = verdict(adjudication)
+            unreviewed = [unit.id for unit, _, _, _, ok in runs if not ok]
+            if unreviewed:
+                silent = [unit_id for unit_id in unreviewed if unit_id not in skipped_by_budget]
+                late = [unit_id for unit_id in unreviewed if unit_id in skipped_by_budget]
+                reasons = []
+                if silent:
+                    reasons.append(f"unit(s) {', '.join(silent)} returned nothing usable")
+                if late:
+                    reasons.append(f"unit(s) {', '.join(late)} were not reviewed within "
+                                   f"the {request.time_budget}s time budget")
+                note = "; ".join(reasons)
+                if result.verdict is Verdict.PASS:
+                    result = Result(
+                        Verdict.INCOMPLETE,
+                        note + ": the review is missing evidence",
+                        result.findings,
+                    )
+                else:
+                    # FAIL and INCOMPLETE both outrank a missing unit, but the reason
+                    # must still say what was never looked at.
+                    result = Result(result.verdict, f"{result.reason}; {note}", result.findings)
+            for unit, unit_samples, unit_run, unit_agreement, ok in runs:
+                mine = [finding for finding in result.findings if _belongs(finding, unit)]
+                units_payload.append({
+                    "id": unit.id,
+                    "files": list(unit.files),
+                    "ranges": [{"file": file, "start": start, "end": end}
+                               for file, start, end in unit.ranges],
+                    "diff_sha256": hashlib.sha256(unit.patch.encode("utf-8")).hexdigest(),
+                    "context_digest": unit.context_digest,
+                    "context_depth": unit.depth,
+                    "prompt_bytes": unit.bytes,
+                    "samples_run": unit_run,
+                    "agreement": unit_agreement,
+                    "ok": ok,
+                    "error": ("time budget exhausted"
+                              if unit.id in skipped_by_budget else None),
+                    "findings": len(mine),
+                    "verdict": _unit_verdict(mine, ok),
+                })
+            samples = ()
+            samples_run = sum(run[2] for run in runs)
+            agreement = None
+            reported_context = Context((), (), "", "")
 
-    ignored = True if request.state_dir is not None else state_dir_ignored(root)
-    _write_verdict(directory, request, base, head, digest, prompt_file, ignored,
-                   samples, result, worktree=True, diff_sha256=diff_sha256,
-                   skipped=prepared.skipped, context=reported_context,
-                   references=references,
-                   samples_run=samples_run, agreement=agreement,
-                   prompt_bytes=prompt_bytes, prompt_limit=limit,
-                   prompt_acknowledged=acknowledged,
-                   sliced=sliced, time_budget=request.time_budget,
-                   units=units_payload)
+        ignored = True if request.state_dir is not None else state_dir_ignored(root)
+        _write_verdict(directory, request, base, head, digest, prompt_file, ignored,
+                       samples, result, worktree=True, diff_sha256=diff_sha256,
+                       skipped=prepared.skipped, context=reported_context,
+                       references=references,
+                       samples_run=samples_run, agreement=agreement,
+                       prompt_bytes=prompt_bytes, prompt_limit=limit,
+                       prompt_acknowledged=acknowledged,
+                       sliced=sliced, time_budget=request.time_budget,
+                       units=units_payload)
+    except BaseException:
+        _discard_empty(directory)
+        raise
     return Report(directory, base, head, digest, result, samples, prompt_file, ignored,
                   prepared.skipped, diff_sha256, reported_context.digest)

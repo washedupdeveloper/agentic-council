@@ -52,11 +52,17 @@ def verdict(adjudication: Adjudication) -> Result:
     honest answer is `INCOMPLETE`, never `PASS`.
     """
     result = judge(adjudication.findings)
-    if adjudication.failed_samples and result.verdict is Verdict.PASS:
+    if adjudication.failed_samples:
         listed = ", ".join(str(index) for index in adjudication.failed_samples)
+        if result.verdict is Verdict.PASS:
+            return Result(
+                Verdict.INCOMPLETE,
+                f"sample(s) {listed} returned nothing usable: the review is missing evidence",
+                adjudication.findings,
+            )
         return Result(
-            Verdict.INCOMPLETE,
-            f"sample(s) {listed} returned nothing usable: the review is missing evidence",
+            result.verdict,
+            f"{result.reason}; sample(s) {listed} returned nothing usable",
             adjudication.findings,
         )
     return result

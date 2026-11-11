@@ -69,6 +69,12 @@ def _path_param(ctx: ProofContext, params: Mapping[str, Any], key: str = "path")
     target = (root / raw).resolve()
     if not target.is_relative_to(root):
         raise _BadParams(f"params.{key}: {raw!r} leaves the repository")
+    try:
+        regular = target.is_file()
+    except OSError as exc:
+        raise _BadParams(f"params.{key}: {raw!r} cannot be read: {exc}") from exc
+    if not regular:
+        raise _BadParams(f"params.{key}: {raw!r} is not a regular file")
     return target
 
 
@@ -190,6 +196,8 @@ def _pointer(document: Any, pointer: str) -> Any:
     for raw in pointer[1:].split("/"):
         part = raw.replace("~1", "/").replace("~0", "~")
         if isinstance(current, list):
+            if re.fullmatch(r"(0|[1-9][0-9]*)", part) is None:
+                raise KeyError(part)
             current = current[int(part)]
         elif isinstance(current, dict):
             current = current[part]

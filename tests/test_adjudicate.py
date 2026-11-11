@@ -96,7 +96,9 @@ def test_a_missing_sample_makes_an_otherwise_clean_run_incomplete(tmp_path: Path
 
 def test_a_missing_sample_does_not_soften_a_real_failure(tmp_path: Path) -> None:
     adj = adjudicate([merged()], ctx(repo_with(tmp_path)), failed_samples=[2])
-    assert verdict(adj).verdict is Verdict.FAIL
+    result = verdict(adj)
+    assert result.verdict is Verdict.FAIL
+    assert "sample(s) 2" in result.reason
 
 
 def test_a_clean_run_with_no_findings_passes(tmp_path: Path) -> None:

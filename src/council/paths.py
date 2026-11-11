@@ -3,6 +3,7 @@ gitignored, one path segment per id."""
 
 from __future__ import annotations
 
+import unicodedata
 from pathlib import Path
 
 #: The directory name inside the repository. Gitignored by `council init`; a
@@ -23,10 +24,8 @@ def validate_run_id(run_id: str) -> str:
         raise ValueError(f"invalid run id {run_id!r}: expected one path segment")
     if any(ch in _FORBIDDEN for ch in run_id):
         raise ValueError(f"invalid run id {run_id!r}: expected one path segment")
-    if any(ord(ch) < 32 or ord(ch) == 127 for ch in run_id):
-        raise ValueError(f"invalid run id {run_id!r}: control characters are not allowed")
-    if any(0xD800 <= ord(ch) <= 0xDFFF for ch in run_id):
-        raise ValueError(f"invalid run id {run_id!r}: not valid UTF-8")
+    if any(unicodedata.category(ch) in {"Cc", "Cf", "Cs", "Zl", "Zp"} for ch in run_id):
+        raise ValueError(f"invalid run id {run_id!r}: control or format characters are not allowed")
     if len(run_id) > MAX_RUN_ID:
         raise ValueError(f"invalid run id: longer than {MAX_RUN_ID} characters")
     return run_id

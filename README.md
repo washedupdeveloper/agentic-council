@@ -302,7 +302,9 @@ The rebuild's acceptance criteria, every amendment to them, and the command that
 decides each one: `docs/M11.md`. The time budget and the doctor checks are
 decided in [`docs/M13.md`](docs/M13.md); release and adoption in
 [`docs/M14.md`](docs/M14.md), with the external run written up in
-[`docs/ADOPTION.md`](docs/ADOPTION.md).
+[`docs/ADOPTION.md`](docs/ADOPTION.md). Every explicit and implicit state
+machine, its invariants, transitions and residual races lives in
+[`docs/STATE-MACHINES.md`](docs/STATE-MACHINES.md).
 
 ## Evidence
 

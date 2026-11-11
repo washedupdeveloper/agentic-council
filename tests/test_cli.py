@@ -454,6 +454,29 @@ def test_keep_inside_the_run_directory_is_refused(
     shutil.rmtree(root)
 
 
+def test_keep_refuses_an_existing_target(
+        tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    root = tmp_path / "ephemeral"
+    run = tmp_path / "run"
+    keep = tmp_path / "kept"
+    keep.mkdir()
+    (keep / "run").mkdir()
+    monkeypatch.setattr(cli.tempfile, "mkdtemp", lambda prefix: str(root))
+
+    def fake_review(request: object, runner: object) -> Report:
+        root.mkdir(parents=True, exist_ok=True)
+        run.mkdir()
+        (run / "verdict.json").write_text("{}", encoding="utf-8")
+        return Report(run, "a" * 40, "b" * 40, "d" * 16,
+                      Result(Verdict.PASS, "ok", ()), ())
+
+    monkeypatch.setattr(cli, "review", fake_review)
+    assert cli.main(["review", "--keep", str(keep), "--run-id", "run"]) == 0
+    assert root.exists()
+    assert not (keep / "run" / "verdict.json").exists()
+    shutil.rmtree(root)
+
+
 def test_keep_copies_the_run_before_removing_it(
         tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     root = tmp_path / "ephemeral"

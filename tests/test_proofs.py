@@ -7,6 +7,7 @@ where the claim holds and once where it does not.
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
 from pathlib import Path
@@ -118,6 +119,15 @@ def test_present_cannot_read_a_missing_file(tmp_path: Path) -> None:
     assert outcome.state is State.UNRUNNABLE
 
 
+@pytest.mark.skipif(not hasattr(os, "mkfifo"), reason="FIFOs are POSIX-only")
+def test_present_refuses_a_fifo_without_opening_it(tmp_path: Path) -> None:
+    os.mkfifo(tmp_path / "pipe")
+    outcome = run_proof("present", {"path": "pipe", "line": 1, "text": "x"},
+                        ctx(tmp_path))
+    assert outcome.state is State.UNRUNNABLE
+    assert "regular file" in outcome.detail
+
+
 def test_present_cannot_read_past_the_end(tmp_path: Path) -> None:
     write(tmp_path, "a.py", "one\n")
     outcome = run_proof("present", {"path": "a.py", "line": 9, "text": "x"}, ctx(tmp_path))
@@ -223,6 +233,20 @@ def test_json_does_not_let_true_pass_for_one(tmp_path: Path) -> None:
 def test_json_cannot_resolve_a_missing_pointer(tmp_path: Path) -> None:
     write(tmp_path, "d.json", json.dumps({"a": 1}))
     outcome = run_proof("json", {"path": "d.json", "pointer": "/b", "equals": 1}, ctx(tmp_path))
+    assert outcome.state is State.UNRUNNABLE
+
+
+def test_json_pointer_rejects_a_negative_index(tmp_path: Path) -> None:
+    write(tmp_path, "d.json", json.dumps({"a": [1, 2]}))
+    outcome = run_proof("json", {"path": "d.json", "pointer": "/a/-1", "equals": 2},
+                        ctx(tmp_path))
+    assert outcome.state is State.UNRUNNABLE
+
+
+def test_json_pointer_rejects_a_leading_zero(tmp_path: Path) -> None:
+    write(tmp_path, "d.json", json.dumps({"a": [1, 2]}))
+    outcome = run_proof("json", {"path": "d.json", "pointer": "/a/01", "equals": 2},
+                        ctx(tmp_path))
     assert outcome.state is State.UNRUNNABLE
 
 

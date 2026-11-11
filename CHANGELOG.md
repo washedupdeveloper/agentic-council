@@ -77,6 +77,19 @@ recorded in `docs/ADOPTION.md`.
 - Untracked symlinks are named and skipped, never followed; proof parameters
   cannot crash a run; non-UTF-8 diff bytes are replaced once so the prompt is
   valid; human output strips terminal control characters.
+- A run directory is claimed with `mkdir(exist_ok=False)` before evidence is
+  written, so concurrent `--no-ephemeral` runs cannot share it. A start failure
+  before evidence removes the empty claim.
+- `--keep` refuses an existing target instead of merging into it; a copy
+  failure leaves the source evidence and names both paths.
+- A reviewer answer that is not UTF-8 is replaced rather than crashing the
+  decoder; a stream `result` with empty text falls back to text events.
+- JSON Pointer array indexes reject `-1` and leading zeros; a FIFO cannot be
+  opened as a `present`/`json` proof file.
+- Failed samples are named in the reason even on `FAIL`; auto-sampling returns
+  `agreement: null` when any sample is missing.
+- `docs/STATE-MACHINES.md` maps every explicit and implicit state machine, its
+  invariants, transitions, confirmed issues and residual races.
 - `council doctor`: measures `git`, the reviewer binary, `bwrap` and whether the
   profile answers a probe; `--json` for CI.
 

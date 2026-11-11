@@ -87,7 +87,7 @@ def _read_stream(argv: list[str], timeout: int, idle_timeout: int) -> str:
     with tempfile.TemporaryFile(mode="w+", encoding="utf-8") as errors:
         try:
             proc = subprocess.Popen(argv, stdout=subprocess.PIPE, stderr=errors,
-                                    text=True, bufsize=1,
+                                    text=True, errors="replace", bufsize=1,
                                     start_new_session=os.name == "posix")
         except (FileNotFoundError, PermissionError, NotADirectoryError, ValueError) as exc:
             raise ReviewerMissing(f"{argv[0]!r} is not installed or not executable") from exc
@@ -156,7 +156,7 @@ def _read_stream(argv: list[str], timeout: int, idle_timeout: int) -> str:
             raise OSError(f"{argv[0]} exited {exit_code}{detail}")
         if proc.returncode not in (0, None):
             raise OSError(f"{argv[0]} exited {proc.returncode}{detail}")
-        answer = final if final is not None else "".join(text)
+        answer = final if final is not None and final.strip() else "".join(text)
         if not answer.strip():
             raise OSError(f"{argv[0]} stream ended without an answer{detail}")
         return answer
@@ -190,7 +190,7 @@ def hermes_runner(profile: str, *, timeout: int = DEFAULT_TIMEOUT,
                 return _read_stream(argv, timeout, idle_timeout)
             try:
                 proc = subprocess.run(argv, capture_output=True, text=True,
-                                      timeout=timeout, check=False)
+                                      errors="replace", timeout=timeout, check=False)
             except (FileNotFoundError, PermissionError, NotADirectoryError, ValueError) as exc:
                 raise ReviewerMissing(f"{binary!r} is not installed or not executable") from exc
             except subprocess.TimeoutExpired as exc:
