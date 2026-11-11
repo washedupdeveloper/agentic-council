@@ -23,6 +23,26 @@ def test_a_run_id_cannot_escape(tmp_path: Path, run_id: str) -> None:
         run_dir(tmp_path, run_id)
 
 
+@pytest.mark.parametrize("run_id", ["a\nb", "a\0b", "a:b", "a?b", "a*b", "a|b",
+                                    "a<b", "a>b", 'a"b', "x" * 129])
+def test_a_run_id_must_be_a_portable_segment(tmp_path: Path, run_id: str) -> None:
+    with pytest.raises(ValueError, match="run id"):
+        run_dir(tmp_path, run_id)
+
+
+def test_a_state_file_is_refused(tmp_path: Path) -> None:
+    (tmp_path / ".council").write_text("not a directory", encoding="utf-8")
+    with pytest.raises(ValueError, match="not a directory"):
+        run_dir(tmp_path, "r1")
+
+
+def test_a_runs_file_is_refused(tmp_path: Path) -> None:
+    (tmp_path / ".council").mkdir()
+    (tmp_path / ".council" / "runs").write_text("not a directory", encoding="utf-8")
+    with pytest.raises(ValueError, match="not a directory"):
+        run_dir(tmp_path, "r1")
+
+
 def test_a_symlinked_state_directory_is_refused(tmp_path: Path) -> None:
     """A pre-existing `.council -> elsewhere` must not move the writes out."""
     elsewhere = tmp_path / "elsewhere"

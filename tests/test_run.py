@@ -526,6 +526,87 @@ def test_an_ephemeral_run_writes_only_to_its_state_directory(tmp_path: Path) -> 
     assert payload["ephemeral"] is True
 
 
+def test_an_empty_change_is_refused(tmp_path: Path) -> None:
+    repo, _ = make_repo(tmp_path)
+    git(repo, "add", "-A")
+    git(repo, "commit", "-qm", "everything")
+    with pytest.raises(ReviewError, match="change is empty"):
+        review(ReviewRequest(repo=repo, base="HEAD", run_id="empty"), lambda _: body())
+
+
+def test_an_unknown_base_is_refused(tmp_path: Path) -> None:
+    repo, _ = make_repo(tmp_path)
+    with pytest.raises(ReviewError, match="--base"):
+        review(ReviewRequest(repo=repo, base="does-not-exist", run_id="bad-base"),
+               lambda _: body())
+
+
+def test_a_tracked_file_with_invalid_utf8_is_reviewable(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    git(repo, "init", "-q")
+    git(repo, "config", "user.email", "test@example.invalid")
+    git(repo, "config", "user.name", "test")
+    (repo / "raw.bin").write_bytes(b"\xff\n")
+    git(repo, "add", "-A")
+    git(repo, "commit", "-qm", "base")
+    (repo / "raw.bin").write_bytes(b"\xff\xfe\n")
+    seen: list[str] = []
+
+    def runner(prompt: str) -> str:
+        seen.append(prompt)
+        return body()
+
+    report = review(ReviewRequest(repo=repo, base="HEAD", samples=1, run_id="raw"),
+                    runner)
+    assert report.verdict is Verdict.PASS
+    assert "\ufffd" in seen[0]
+
+
+def test_a_prompt_directory_is_refused(tmp_path: Path) -> None:
+    repo, _ = make_repo(tmp_path)
+    prompt = tmp_path / "prompt.md"
+    prompt.mkdir()
+    with pytest.raises(ReviewError, match="no reviewer prompt"):
+        review(ReviewRequest(repo=repo, run_id="prompt-dir", prompt=prompt), lambda _: body())
+
+
+def test_a_non_utf8_prompt_is_refused(tmp_path: Path) -> None:
+    repo, _ = make_repo(tmp_path)
+    prompt = tmp_path / "prompt.md"
+    prompt.write_bytes(b"\xff\xfe")
+    with pytest.raises(ReviewError, match="cannot read the reviewer prompt"):
+        review(ReviewRequest(repo=repo, run_id="prompt-bytes", prompt=prompt), lambda _: body())
+
+
+def test_a_prompt_without_placeholders_is_refused(tmp_path: Path) -> None:
+    repo, _ = make_repo(tmp_path)
+    prompt = tmp_path / "prompt.md"
+    prompt.write_text("Review this, please.\n", encoding="utf-8")
+    with pytest.raises(ReviewError, match="not usable"):
+        review(ReviewRequest(repo=repo, run_id="prompt-bare", prompt=prompt), lambda _: body())
+
+
+def test_a_state_directory_symlink_is_refused(tmp_path: Path) -> None:
+    repo, _ = make_repo(tmp_path)
+    target = tmp_path / "target"
+    target.mkdir()
+    state = tmp_path / "state"
+    state.symlink_to(target)
+    with pytest.raises(ReviewError, match="symlink"):
+        review(ReviewRequest(repo=repo, run_id="state-link", state_dir=state),
+               lambda _: body())
+
+
+def test_a_state_directory_file_is_refused(tmp_path: Path) -> None:
+    repo, _ = make_repo(tmp_path)
+    state = tmp_path / "state"
+    state.write_text("not a directory", encoding="utf-8")
+    with pytest.raises(ReviewError, match="not a directory"):
+        review(ReviewRequest(repo=repo, run_id="state-file", state_dir=state),
+               lambda _: body())
+
+
 def test_a_plan_is_one_prompt_when_it_fits(tmp_path: Path) -> None:
     repo, _ = make_repo(tmp_path)
     prompt = tmp_path / "prompt.md"
@@ -554,6 +635,23 @@ def test_the_transport_and_idle_timeout_are_recorded(tmp_path: Path) -> None:
     payload = json.loads((report.run_dir / "verdict.json").read_text(encoding="utf-8"))
     assert payload["transport"] == "stream"
     assert payload["idle_timeout"] == 77
+
+
+def test_a_failed_sample_does_not_count_as_agreement(tmp_path: Path) -> None:
+    repo, _ = make_repo(tmp_path)
+    calls = {"n": 0}
+
+    def runner(prompt: str) -> str:
+        calls["n"] += 1
+        if calls["n"] == 1:
+            return body({"security": [secret()]})
+        raise OSError("stalled")
+
+    report = review(ReviewRequest(repo=repo, samples=None, run_id="agreement"), runner)
+    payload = json.loads((report.run_dir / "verdict.json").read_text(encoding="utf-8"))
+    assert payload["agreement"] is None
+    assert payload["samples_run"] == 3
+    assert any(not sample["ok"] for sample in payload["samples"])
 
 
 def test_a_missing_unit_is_named_even_when_a_finding_is_unsettled(

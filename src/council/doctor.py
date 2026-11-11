@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import os
 import shutil
 import time
+import unicodedata
 from dataclasses import dataclass
+from pathlib import Path
 
 from .sample import Runner
 
@@ -23,7 +26,13 @@ class Check:
     detail: str
 
     def line(self) -> str:
-        return f"{self.status:<4}  {self.name:<8}  {self.detail}"
+        return f"{self.status:<4}  {self.name:<8}  {_safe(self.detail)}"
+
+
+def _safe(text: object) -> str:
+    """One printable line: a profile name or an error must not drive the terminal."""
+    return "".join(ch if unicodedata.category(ch) not in {"Cc", "Cf", "Cs", "Zl", "Zp"}
+                   else " " for ch in str(text))
 
 
 def check_git() -> Check:
@@ -32,7 +41,14 @@ def check_git() -> Check:
 
 
 def check_reviewer(binary: str) -> Check:
-    path = shutil.which(binary)
+    try:
+        path = shutil.which(binary)
+        if path is None:
+            candidate = Path(binary)
+            if candidate.is_file() and os.access(candidate, os.X_OK):
+                path = str(candidate)
+    except (OSError, ValueError) as exc:
+        return Check("reviewer", FAIL, f"{binary}: {exc}")
     if path:
         return Check("reviewer", OK, path)
     return Check("reviewer", FAIL, f"{binary} is not on PATH")
@@ -49,10 +65,12 @@ def check_profile(profile: str, runner: Runner, probe_timeout: int) -> Check:
     """Ask the profile a question it must answer quickly."""
     started = time.monotonic()
     try:
-        runner(PROBE)
+        answer = runner(PROBE)
     except Exception as exc:  # noqa: BLE001 - every failure is the finding here
         return Check("profile", FAIL, f"{profile}: {type(exc).__name__}: {exc}")
     seconds = time.monotonic() - started
+    if not isinstance(answer, str) or not answer.strip():
+        return Check("profile", FAIL, f"{profile}: the probe returned nothing")
     return Check("profile", OK,
                  f"{profile} answered in {seconds:.1f}s (probe limit {probe_timeout}s)")
 

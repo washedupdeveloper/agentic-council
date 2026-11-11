@@ -88,8 +88,8 @@ MUTATIONS: tuple[Mutation, ...] = (
     Mutation("a-usage-error-reuses-the-incomplete-code",
              "cli.py", "EXIT_ERROR = 3", "EXIT_ERROR = 2"),
     Mutation("a-run-may-overwrite-an-old-one",
-             "run.py", "if request.state_dir is None and (directory.is_symlink() or directory.exists()):",
-             "if False:"),
+             "run.py", "elif directory.is_symlink() or directory.exists():",
+             "elif False:"),
     Mutation("failed-samples-are-forgotten",
              "run.py", "failed_samples=[sample.index for sample in samples if not sample.ok])",
              "failed_samples=[]),"),
@@ -97,7 +97,7 @@ MUTATIONS: tuple[Mutation, ...] = (
              "run.py", "sliced = prompt_bytes > request.max_prompt_bytes and not request.allow_large_prompt",
              "sliced = False"),
     Mutation("a-missing-prompt-is-not-refused",
-             "run.py", "if not prompt_file.exists():", "if False:"),
+             "run.py", "if not prompt_file.is_file():", "if False:"),
 )
 
 

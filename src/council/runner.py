@@ -19,7 +19,8 @@ import time
 from pathlib import Path
 from typing import TextIO
 
-from .sample import Runner
+from .repo import ReviewError
+from .sample import ReviewerMissing, Runner
 
 DEFAULT_BINARY = "hermes"
 DEFAULT_TIMEOUT = 900
@@ -45,7 +46,14 @@ def _sandbox_argv(argv: list[str], prompt_dir: Path) -> list[str]:
     if bwrap is None:
         raise OSError("bwrap is required for the reviewer sandbox but is not on PATH")
     binary = shutil.which(argv[0]) or argv[0]
-    home = str(Path.home())
+    if shutil.which(argv[0]) is None and not Path(argv[0]).is_file():
+        raise ReviewerMissing(f"{argv[0]!r} is not installed or not on PATH")
+    if not os.access(binary, os.X_OK):
+        raise ReviewerMissing(f"{argv[0]!r} is not executable")
+    try:
+        home = str(Path.home())
+    except RuntimeError as exc:
+        raise ReviewError("HOME is not set: the reviewer sandbox needs a home to overlay") from exc
     return [
         bwrap, "--die-with-parent", "--unshare-pid",
         "--ro-bind", "/", "/",
@@ -81,8 +89,8 @@ def _read_stream(argv: list[str], timeout: int, idle_timeout: int) -> str:
             proc = subprocess.Popen(argv, stdout=subprocess.PIPE, stderr=errors,
                                     text=True, bufsize=1,
                                     start_new_session=os.name == "posix")
-        except FileNotFoundError as exc:
-            raise OSError(f"{argv[0]!r} is not installed or not on PATH") from exc
+        except (FileNotFoundError, PermissionError, NotADirectoryError, ValueError) as exc:
+            raise ReviewerMissing(f"{argv[0]!r} is not installed or not executable") from exc
         if proc.stdout is None:  # pragma: no cover - PIPE guarantees it
             raise OSError("the reviewer process has no stdout")
         deadline = time.monotonic() + timeout
@@ -183,8 +191,8 @@ def hermes_runner(profile: str, *, timeout: int = DEFAULT_TIMEOUT,
             try:
                 proc = subprocess.run(argv, capture_output=True, text=True,
                                       timeout=timeout, check=False)
-            except FileNotFoundError as exc:
-                raise OSError(f"{binary!r} is not installed or not on PATH") from exc
+            except (FileNotFoundError, PermissionError, NotADirectoryError, ValueError) as exc:
+                raise ReviewerMissing(f"{binary!r} is not installed or not executable") from exc
             except subprocess.TimeoutExpired as exc:
                 raise OSError(f"{binary} did not answer within {timeout}s") from exc
         if proc.returncode != 0:

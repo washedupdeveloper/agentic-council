@@ -36,8 +36,12 @@ def resolve(number: int, repo: Path, *, gh: str = "gh") -> PullRequest:
     binary = shutil.which(gh)
     if binary is None:
         raise ReviewError("`gh` is not installed or not on PATH: `council pr` needs the GitHub CLI")
-    proc = subprocess.run([binary, "pr", "view", str(number), "--json", FIELDS],
-                          cwd=repo, capture_output=True, text=True, check=False)
+    try:
+        proc = subprocess.run([binary, "pr", "view", str(number), "--json", FIELDS],
+                              cwd=repo, capture_output=True, text=True, check=False,
+                              timeout=30)
+    except (OSError, subprocess.SubprocessError, ValueError, UnicodeDecodeError) as exc:
+        raise ReviewError(f"gh pr view {number} could not run: {exc}") from exc
     if proc.returncode != 0:
         detail = proc.stderr.strip() or proc.stdout.strip() or f"exit {proc.returncode}"
         raise ReviewError(f"gh pr view {number} failed: {detail}")

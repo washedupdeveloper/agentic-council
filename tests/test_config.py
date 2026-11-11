@@ -88,3 +88,34 @@ def test_a_non_boolean_sandbox_is_refused(tmp_path: Path) -> None:
 def test_a_non_positive_timeout_is_refused(tmp_path: Path) -> None:
     with pytest.raises(ConfigError, match="positive"):
         load(write(tmp_path, "[proofs]\ntimeout = 0\n"))
+
+
+def test_a_boolean_timeout_is_refused(tmp_path: Path) -> None:
+    with pytest.raises(ConfigError, match="positive"):
+        load(write(tmp_path, "[proofs]\ntimeout = true\n"))
+
+
+def test_malformed_toml_is_a_config_error(tmp_path: Path) -> None:
+    with pytest.raises(ConfigError, match="not valid TOML"):
+        load(write(tmp_path, "[proofs\nallow = []\n"))
+
+
+def test_a_directory_is_a_config_error(tmp_path: Path) -> None:
+    path = tmp_path / "council.toml"
+    path.mkdir()
+    with pytest.raises(ConfigError, match="regular file"):
+        load(path)
+
+
+def test_a_non_utf8_config_is_a_config_error(tmp_path: Path) -> None:
+    path = tmp_path / "council.toml"
+    path.write_bytes(b"\xff\xfe")
+    with pytest.raises(ConfigError, match="UTF-8"):
+        load(path)
+
+
+def test_a_broken_symlink_is_a_config_error(tmp_path: Path) -> None:
+    path = tmp_path / "council.toml"
+    path.symlink_to(tmp_path / "missing.toml")
+    with pytest.raises(ConfigError, match="broken symlink"):
+        load(path)

@@ -20,6 +20,30 @@ else any blocking finding open     -> INCOMPLETE  exit 2
 else                               -> PASS        exit 0
 ```
 
+A **start failure** is exit 3, never 2: 2 means the review ran and is missing
+evidence. A start failure writes no run and sends no prompt.
+
+## Errors and exit codes
+
+The CLI refuses before spending a model call when the request cannot be valid:
+
+- a run id that is not one portable path segment (separators, `..`, control
+  characters, Windows-reserved characters, or more than 128 characters);
+- an empty `--repo`, `--prompt`, `--sarif` or `--keep` path;
+- a prompt that is missing, a directory, a FIFO, or not UTF-8;
+- a `--sarif` or `--keep` path whose parent is missing, or that is a symlink,
+  a directory where a file is needed, or a file where a directory is needed;
+- an empty `--base`, `--profile` or `--context-url`;
+- a `--plan` combined with `--sarif`, `--keep` or `--report` (a plan writes no
+  run, so those flags would be silently ignored);
+- a change with no reviewable text, an unknown base revision, a malformed
+  `council.toml`, or a missing reviewer binary.
+
+A missing reviewer is a start failure (exit 3), not an `INCOMPLETE` review, and
+it is not retried. A file in the change that is a symlink is named and skipped;
+it is never followed. Human output replaces control characters from model output
+so a finding cannot drive the terminal.
+
 `blocking` means severity `high` or `critical` — **or any severity in `security`
 or `correctness`**. The model may rank a defect; it may not decide that a proven
 security or correctness defect is mergeable. The boundary is tested in both

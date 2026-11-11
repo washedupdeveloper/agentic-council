@@ -5,7 +5,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from council.sample import run_sample, write_sample
+import pytest
+
+from council.sample import ReviewerMissing, run_sample, write_sample
 from council.schema import DIMENSIONS
 
 VALID = json.dumps({"sections": {name: [] for name in DIMENSIONS}})
@@ -46,6 +48,18 @@ def test_a_runner_that_cannot_start_is_a_failure_not_a_crash() -> None:
     result = run_sample("prompt", runner)
     assert not result.ok
     assert result.error is not None and "could not run" in result.error
+
+
+def test_a_missing_reviewer_is_not_retried() -> None:
+    calls: list[str] = []
+
+    def runner(prompt: str) -> str:
+        calls.append(prompt)
+        raise ReviewerMissing("hermes is not installed")
+
+    with pytest.raises(ReviewerMissing):
+        run_sample("prompt", runner)
+    assert calls == ["prompt"]
 
 
 def test_attempts_can_be_one() -> None:

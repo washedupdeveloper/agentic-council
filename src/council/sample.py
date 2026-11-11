@@ -8,12 +8,17 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
+from .repo import ReviewError
 from .schema import ReviewerOutput, SchemaError, parse_reviewer_output
 
 #: prompt -> the model's raw text. Raising `OSError` means the reviewer could not run.
 Runner = Callable[[str], str]
 
 ATTEMPTS = 2
+
+
+class ReviewerMissing(ReviewError, OSError):
+    """The reviewer binary is not there; retrying cannot help."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -42,6 +47,8 @@ def run_sample(prompt: str, runner: Runner, *, index: int = 1,
     for attempt in range(1, attempts + 1):
         try:
             text = runner(prompt)
+        except ReviewerMissing:
+            raise
         except OSError as exc:
             last = f"the reviewer could not run: {exc}"
             failures.append(last)

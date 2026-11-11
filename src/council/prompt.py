@@ -47,6 +47,6 @@ def instrument_digest(template: str, *, profile: str,
     digest = hashlib.sha256()
     for part in ("council-prompt-v2", contract, template, profile,
                  reasoning or "profile-default", *dimensions):
-        digest.update(part.encode("utf-8"))
+        digest.update(part.encode("utf-8", "surrogatepass"))
         digest.update(b"\x00")
     return digest.hexdigest()[:16]

@@ -95,3 +95,32 @@ def test_a_clean_checkout_at_the_head_is_accepted(monkeypatch: pytest.MonkeyPatc
     monkeypatch.setattr(pr_module, "output",
                         lambda repo, *args: HEAD if args[0] == "rev-parse" else "")
     verify_checkout(pull(), tmp_path)
+
+
+def test_a_gh_that_cannot_run_is_a_review_error(monkeypatch: pytest.MonkeyPatch,
+                                                tmp_path: Path) -> None:
+    monkeypatch.setattr(pr_module.shutil, "which", lambda name: "/usr/bin/gh")
+    monkeypatch.setattr(pr_module.subprocess, "run",
+                        lambda *a, **k: (_ for _ in ()).throw(OSError("no such cwd")))
+    with pytest.raises(ReviewError, match="could not run"):
+        resolve(7, tmp_path)
+
+
+def test_a_gh_timeout_is_a_review_error(monkeypatch: pytest.MonkeyPatch,
+                                        tmp_path: Path) -> None:
+    monkeypatch.setattr(pr_module.shutil, "which", lambda name: "/usr/bin/gh")
+
+    def timeout(*args: object, **kwargs: object) -> object:
+        raise pr_module.subprocess.TimeoutExpired(["gh"], 30)
+
+    monkeypatch.setattr(pr_module.subprocess, "run", timeout)
+    with pytest.raises(ReviewError, match="could not run"):
+        resolve(7, tmp_path)
+
+
+def test_a_non_positive_pull_request_is_refused(monkeypatch: pytest.MonkeyPatch,
+                                                tmp_path: Path) -> None:
+    monkeypatch.setattr(pr_module.shutil, "which", lambda name: "/usr/bin/gh")
+    for number in (0, -1):
+        with pytest.raises(ReviewError, match="positive integer"):
+            resolve(number, tmp_path)

@@ -68,6 +68,11 @@ def test_a_zero_line_is_refused() -> None:
         parse_reviewer_output(payload(security=[finding(line=0)]))
 
 
+def test_a_boolean_line_is_refused() -> None:
+    with pytest.raises(SchemaError, match="got bool"):
+        parse_reviewer_output(payload(security=[finding(line=True)]))
+
+
 def test_a_leading_dot_slash_is_refused() -> None:
     with pytest.raises(SchemaError, match="must not start"):
         parse_reviewer_output(payload(security=[finding(file="./a.py")]))

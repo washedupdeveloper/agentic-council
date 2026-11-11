@@ -7,6 +7,7 @@ when git itself failed. One argument list, one timeout, one place to fix quoting
 
 from __future__ import annotations
 
+import stat
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -42,10 +43,13 @@ def git(repo: Path, *args: str, timeout: int = GIT_TIMEOUT) -> subprocess.Comple
     `surrogateescape` keeps a path that is not valid UTF-8 readable instead of
     raising while a diff is being built.
     """
-    return subprocess.run(
-        ["git", *args], cwd=repo, capture_output=True, text=True,
-        errors="surrogateescape", timeout=timeout,
-    )
+    try:
+        return subprocess.run(
+            ["git", *args], cwd=repo, capture_output=True, text=True,
+            errors="surrogateescape", timeout=timeout,
+        )
+    except (OSError, subprocess.SubprocessError, ValueError) as exc:
+        raise ReviewError(f"git {' '.join(args)} could not run: {exc}") from exc
 
 
 def output(repo: Path, *args: str, timeout: int = GIT_TIMEOUT) -> str:
@@ -69,6 +73,17 @@ def untracked_diff(root: Path) -> tuple[str, tuple[Skipped, ...]]:
     skipped: list[Skipped] = []
     for rel in proc.stdout.split("\0"):
         if not rel or rel.startswith(".council/"):
+            continue
+        try:
+            info = (root / rel).lstat()
+        except OSError:
+            skipped.append(Skipped(rel, "unreadable"))
+            continue
+        if stat.S_ISLNK(info.st_mode):
+            skipped.append(Skipped(rel, "symlink"))
+            continue
+        if not stat.S_ISREG(info.st_mode):
+            skipped.append(Skipped(rel, "not a regular file"))
             continue
         try:
             data = (root / rel).read_bytes()
@@ -125,10 +140,20 @@ def init(repo: Path) -> bool:
     """Add `.council/` to the repository's `.gitignore`. True if it was added."""
     top = root(repo)
     path = top / ".gitignore"
-    existing = path.read_text(encoding="utf-8") if path.exists() else ""
-    if any(line.strip().rstrip("/") == ".council" for line in existing.splitlines()):
-        return False
-    prefix = "" if not existing or existing.endswith("\n") else "\n"
-    with path.open("a", encoding="utf-8", newline="\n") as handle:
-        handle.write(f"{prefix}{IGNORE_LINE}\n")
+    try:
+        if path.is_symlink():
+            raise ReviewError(f"{path} is a symlink: refusing to write outside the checkout")
+        if path.exists() and not path.is_file():
+            raise ReviewError(f"{path} is not a regular file")
+        existing = path.read_text(encoding="utf-8") if path.exists() else ""
+        if any(line.strip().lstrip("/").rstrip("/") == ".council"
+               for line in existing.splitlines()):
+            return False
+        prefix = "" if not existing or existing.endswith("\n") else "\n"
+        with path.open("a", encoding="utf-8", newline="\n") as handle:
+            handle.write(f"{prefix}{IGNORE_LINE}\n")
+    except ReviewError:
+        raise
+    except (OSError, UnicodeDecodeError) as exc:
+        raise ReviewError(f"cannot update {path}: {exc}") from exc
     return True

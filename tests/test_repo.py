@@ -56,3 +56,37 @@ def test_an_untracked_file_over_the_limit_is_named(tmp_path: Path) -> None:
     patch, skipped = untracked_diff(tmp_path)
     assert patch == ""
     assert skipped == (Skipped("big.txt", "too large"),)
+
+
+def test_an_untracked_symlink_is_named_not_followed(tmp_path: Path) -> None:
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    outside = tmp_path.parent / "outside-secret.txt"
+    outside.write_text("SECRET\n", encoding="utf-8")
+    (tmp_path / "link.txt").symlink_to(outside)
+    patch, skipped = untracked_diff(tmp_path)
+    assert skipped == (Skipped("link.txt", "symlink"),)
+    assert "SECRET" not in patch
+
+
+def test_init_refuses_a_symlinked_gitignore(tmp_path: Path) -> None:
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    outside = tmp_path.parent / "outside-ignore"
+    outside.write_text("keep\n", encoding="utf-8")
+    (tmp_path / ".gitignore").symlink_to(outside)
+    with pytest.raises(ReviewError, match="symlink"):
+        init(tmp_path)
+    assert outside.read_text(encoding="utf-8") == "keep\n"
+
+
+def test_init_refuses_a_directory_gitignore(tmp_path: Path) -> None:
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    (tmp_path / ".gitignore").mkdir()
+    with pytest.raises(ReviewError, match="not a regular file"):
+        init(tmp_path)
+
+
+def test_init_refuses_a_non_utf8_gitignore(tmp_path: Path) -> None:
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    (tmp_path / ".gitignore").write_bytes(b"\xff\xfe")
+    with pytest.raises(ReviewError, match="cannot update"):
+        init(tmp_path)

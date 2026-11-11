@@ -68,6 +68,15 @@ recorded in `docs/ADOPTION.md`.
   refuses with exit 3 when bwrap is absent.
 - `Dockerfile` and `docs/PORTABILITY.md` state the non-NixOS path: a container
   (`--rm --read-only --tmpfs /tmp`) is the boundary where bwrap is unavailable.
+- The CLI now refuses invalid input before a model call: non-portable run ids,
+  empty paths, missing output parents, symlinks/FIFOs where a file is expected,
+  unreadable or non-UTF-8 prompts, empty changes, unknown bases, malformed
+  `council.toml`, and `--plan` combined with `--sarif`/`--keep`/`--report`.
+- A missing reviewer is a start failure (exit 3), not an `INCOMPLETE` review,
+  and is not retried. `--time-budget 0` is accepted; negative values are not.
+- Untracked symlinks are named and skipped, never followed; proof parameters
+  cannot crash a run; non-UTF-8 diff bytes are replaced once so the prompt is
+  valid; human output strips terminal control characters.
 - `council doctor`: measures `git`, the reviewer binary, `bwrap` and whether the
   profile answers a probe; `--json` for CI.
 

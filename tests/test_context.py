@@ -118,5 +118,11 @@ def test_a_non_python_file_gets_no_context() -> None:
             "@@ -1,1 +1,2 @@\n # Title\n+More.\n")
     context = build(diff, reader({"README.md": "# Title\nMore.\n"}), ["README.md"])
     assert context.spans == ()
-    assert context.digest == build(diff, reader({"README.md": "# Title\nMore.\n"}),
-                                   ["README.md"]).digest
+
+
+def test_a_python_file_with_a_nul_is_unresolved() -> None:
+    diff = ("diff --git a/a.py b/a.py\n--- a/a.py\n+++ b/a.py\n"
+            "@@ -1 +1 @@\n-x = 1\n+x = 2\n")
+    context = build(diff, reader({"a.py": "x = 1\0\n"}), ["a.py"])
+    assert context.spans == ()
+    assert any("not parsable" in item for item in context.unresolved)

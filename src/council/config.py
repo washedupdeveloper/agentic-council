@@ -47,9 +47,20 @@ class Config:
 
 def load(path: Path, policy: Policy = DEFAULT_POLICY) -> Config:
     """Load `council.toml`; a missing file means the policy, an unknown key is an error."""
-    if not path.exists():
-        return Config(allow=policy.allow, timeout=policy.timeout, sandbox=policy.sandbox)
-    raw = tomllib.loads(path.read_text(encoding="utf-8"))
+    try:
+        if path.is_symlink() and not path.exists():
+            raise ConfigError(f"{path} is a broken symlink")
+        if not path.exists():
+            return Config(allow=policy.allow, timeout=policy.timeout, sandbox=policy.sandbox)
+        if not path.is_file():
+            raise ConfigError(f"{path} is not a regular file")
+        raw = tomllib.loads(path.read_text(encoding="utf-8"))
+    except OSError as exc:
+        raise ConfigError(f"cannot read {path}: {exc}") from exc
+    except UnicodeDecodeError as exc:
+        raise ConfigError(f"{path} is not UTF-8 text") from exc
+    except tomllib.TOMLDecodeError as exc:
+        raise ConfigError(f"{path.name} is not valid TOML: {exc}") from exc
 
     unknown = set(raw) - {"proofs"}
     if unknown:
@@ -77,7 +88,7 @@ def load(path: Path, policy: Policy = DEFAULT_POLICY) -> Config:
         allow = requested
 
     timeout = proofs.get("timeout", policy.timeout)
-    if not isinstance(timeout, int) or timeout < 1:
+    if isinstance(timeout, bool) or not isinstance(timeout, int) or timeout < 1:
         raise ConfigError("[proofs].timeout must be a positive integer")
     timeout = min(timeout, policy.timeout)
 

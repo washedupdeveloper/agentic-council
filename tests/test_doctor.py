@@ -43,6 +43,21 @@ def test_a_profile_that_answers_is_ok(monkeypatch: pytest.MonkeyPatch) -> None:
     assert "answered in" in profile.detail
 
 
+def test_a_profile_that_returns_nothing_is_a_failure(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(doctor.shutil, "which",
+                        which({"git": "/g", "hermes": "/h", "bwrap": "/b"}))
+    checks = doctor.run("p", runner=lambda prompt: "   ", probe_timeout=60)
+    profile = next(check for check in checks if check.name == "profile")
+    assert profile.status == "fail"
+    assert "returned nothing" in profile.detail
+
+
+def test_a_doctor_line_does_not_emit_terminal_controls() -> None:
+    check = doctor.Check("profile", "fail", "p\x1b[31mred\nline")
+    assert "\x1b" not in check.line()
+    assert "\n" not in check.line()
+
+
 def test_bwrap_missing_is_a_warning_not_a_failure(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(doctor.shutil, "which", which({"git": "/g", "hermes": "/h"}))
     checks = doctor.run("p", runner=lambda prompt: "ok")

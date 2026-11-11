@@ -8,9 +8,12 @@ tool reach anything the host can reach. The caller supplies them with
 from __future__ import annotations
 
 import hashlib
+import http.client
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
+from pathlib import Path
+from urllib.parse import unquote, urlparse
 
 MAX_BYTES = 64_000
 
@@ -27,12 +30,19 @@ class Reference:
 
 
 def fetch(url: str, *, timeout: int = 30, limit: int = MAX_BYTES) -> Reference:
-    request = urllib.request.Request(url, method="GET",
-                                     headers={"User-Agent": "council"})
     try:
+        parsed = urlparse(url)
+        if parsed.scheme == "file":
+            local = Path(unquote(parsed.path))
+            if not local.is_file():
+                raise FetchError(f"{url} is not a regular file")
+        request = urllib.request.Request(url, method="GET",
+                                         headers={"User-Agent": "council"})
         with urllib.request.urlopen(request, timeout=timeout) as response:
             data = response.read(limit + 1)
-    except (urllib.error.URLError, OSError) as exc:
+    except FetchError:
+        raise
+    except (urllib.error.URLError, http.client.HTTPException, OSError, ValueError) as exc:
         raise FetchError(f"{url} could not be fetched: {exc}") from exc
     if len(data) > limit:
         raise FetchError(f"{url} is larger than {limit} bytes; a reference is context, not a corpus")

@@ -27,3 +27,8 @@ def test_a_reference_over_the_limit_is_refused(tmp_path: Path) -> None:
 def test_a_missing_reference_is_an_error_not_an_empty_context(tmp_path: Path) -> None:
     with pytest.raises(FetchError):
         fetch((tmp_path / "missing.txt").as_uri())
+
+
+def test_a_file_url_that_is_a_directory_is_refused(tmp_path: Path) -> None:
+    with pytest.raises(FetchError, match="regular file"):
+        fetch(tmp_path.as_uri())

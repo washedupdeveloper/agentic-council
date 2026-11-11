@@ -135,7 +135,7 @@ def _parse(path: str, read: Reader,
         return None
     try:
         tree = ast.parse(text)
-    except SyntaxError:
+    except (SyntaxError, ValueError):
         cache[path] = None
         return None
     entry = (_functions(tree), tree)

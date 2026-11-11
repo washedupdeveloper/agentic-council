@@ -117,3 +117,13 @@ registry, so it cannot describe a claim that has no check.
 | `a-review-is-ephemeral-by-default` | A review writes its run to a private temporary tree and removes it by default. | `python3 -m pytest tests/test_cli.py::test_review_is_ephemeral_by_default -q` |
 | `no-ephemeral-keeps-state-in-the-repository` | --no-ephemeral leaves the run state in the repository. | `python3 -m pytest tests/test_cli.py::test_no_ephemeral_keeps_state_in_the_repository -q` |
 | `the-sandbox-wrapper-leaves-no-writes` | tools/sandbox.sh leaves no writes to HOME or /tmp on the host. | `python3 -m pytest tests/test_sandbox_script.py -q` |
+| `an-invalid-run-id-is-refused-before-a-run` | A run id that is not one portable path segment is refused before a run. | `python3 -m pytest tests/test_cli.py::test_an_invalid_run_id_is_refused_before_a_run -q` |
+| `a-missing-reviewer-is-not-retried` | A missing reviewer is a start failure, not a retried sample. | `python3 -m pytest tests/test_sample.py::test_a_missing_reviewer_is_not_retried -q` |
+| `an-empty-change-is-refused` | A change with no reviewable text is refused before a model call. | `python3 -m pytest tests/test_run.py::test_an_empty_change_is_refused -q` |
+| `an-unknown-base-is-refused` | An unknown base revision is a start failure, not a fallback. | `python3 -m pytest tests/test_run.py::test_an_unknown_base_is_refused -q` |
+| `a-malformed-config-is-a-config-error` | Malformed TOML is a configuration error, not a traceback. | `python3 -m pytest tests/test_config.py::test_malformed_toml_is_a_config_error -q` |
+| `an-untracked-symlink-is-not-followed` | An untracked symlink is named and skipped, never followed. | `python3 -m pytest tests/test_repo.py::test_an_untracked_symlink_is_named_not_followed -q` |
+| `plan-refuses-sarif-and-keep` | --plan refuses --sarif, --keep and --report instead of ignoring them. | `python3 -m pytest tests/test_cli.py::test_plan_refuses_outputs_it_cannot_write -q` |
+| `human-output-has-no-terminal-controls` | Human output replaces control characters from model output. | `python3 -m pytest tests/test_cli.py::test_the_human_report_does_not_emit_terminal_controls -q` |
+| `a-file-url-that-is-not-a-file-is-refused` | A file URL that is not a regular file is refused. | `python3 -m pytest tests/test_reference.py::test_a_file_url_that_is_a_directory_is_refused -q` |
+| `a-proof-that-crashes-is-unrunnable` | A proof that raises is UNRUNNABLE, not a crashed run. | `python3 -m pytest tests/test_proofs.py::test_a_proof_that_crashes_is_unrunnable -q` |

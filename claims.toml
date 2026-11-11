@@ -568,3 +568,53 @@ check = "python3 -m pytest tests/test_cli.py::test_no_ephemeral_keeps_state_in_t
 id = "the-sandbox-wrapper-leaves-no-writes"
 text = "tools/sandbox.sh leaves no writes to HOME or /tmp on the host."
 check = "python3 -m pytest tests/test_sandbox_script.py -q"
+
+[[claim]]
+id = "an-invalid-run-id-is-refused-before-a-run"
+text = "A run id that is not one portable path segment is refused before a run."
+check = "python3 -m pytest tests/test_cli.py::test_an_invalid_run_id_is_refused_before_a_run -q"
+
+[[claim]]
+id = "a-missing-reviewer-is-not-retried"
+text = "A missing reviewer is a start failure, not a retried sample."
+check = "python3 -m pytest tests/test_sample.py::test_a_missing_reviewer_is_not_retried -q"
+
+[[claim]]
+id = "an-empty-change-is-refused"
+text = "A change with no reviewable text is refused before a model call."
+check = "python3 -m pytest tests/test_run.py::test_an_empty_change_is_refused -q"
+
+[[claim]]
+id = "an-unknown-base-is-refused"
+text = "An unknown base revision is a start failure, not a fallback."
+check = "python3 -m pytest tests/test_run.py::test_an_unknown_base_is_refused -q"
+
+[[claim]]
+id = "a-malformed-config-is-a-config-error"
+text = "Malformed TOML is a configuration error, not a traceback."
+check = "python3 -m pytest tests/test_config.py::test_malformed_toml_is_a_config_error -q"
+
+[[claim]]
+id = "an-untracked-symlink-is-not-followed"
+text = "An untracked symlink is named and skipped, never followed."
+check = "python3 -m pytest tests/test_repo.py::test_an_untracked_symlink_is_named_not_followed -q"
+
+[[claim]]
+id = "plan-refuses-sarif-and-keep"
+text = "--plan refuses --sarif, --keep and --report instead of ignoring them."
+check = "python3 -m pytest tests/test_cli.py::test_plan_refuses_outputs_it_cannot_write -q"
+
+[[claim]]
+id = "human-output-has-no-terminal-controls"
+text = "Human output replaces control characters from model output."
+check = "python3 -m pytest tests/test_cli.py::test_the_human_report_does_not_emit_terminal_controls -q"
+
+[[claim]]
+id = "a-file-url-that-is-not-a-file-is-refused"
+text = "A file URL that is not a regular file is refused."
+check = "python3 -m pytest tests/test_reference.py::test_a_file_url_that_is_a_directory_is_refused -q"
+
+[[claim]]
+id = "a-proof-that-crashes-is-unrunnable"
+text = "A proof that raises is UNRUNNABLE, not a crashed run."
+check = "python3 -m pytest tests/test_proofs.py::test_a_proof_that_crashes_is_unrunnable -q"

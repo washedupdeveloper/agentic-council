@@ -5,10 +5,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from .repo import git
+from .repo import ReviewError, git
 
 
-class BaseError(ValueError):
+class BaseError(ReviewError):
     """No usable base revision, or the one asked for does not exist."""
 
 

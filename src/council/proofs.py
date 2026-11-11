@@ -77,6 +77,8 @@ def _walk(root: Path) -> list[Path]:
     for path in root.rglob("*"):
         if any(part in SKIP_DIRS for part in path.relative_to(root).parts):
             continue
+        if path.is_symlink():
+            continue
         if path.is_file():
             out.append(path)
     return sorted(out)
@@ -92,7 +94,11 @@ def proof_absent(params: Mapping[str, Any], ctx: ProofContext) -> ProofOutcome:
     if not isinstance(exclude, list) or not all(isinstance(x, str) for x in exclude):
         raise _BadParams("params.exclude: expected a list of globs")
 
-    for path in _walk(ctx.repo):
+    try:
+        paths = _walk(ctx.repo)
+    except OSError as exc:
+        return _cannot(f"the repository cannot be walked: {exc}")
+    for path in paths:
         rel = path.relative_to(ctx.repo).as_posix()
         if any(fnmatch.fnmatch(rel, glob) for glob in exclude):
             continue
@@ -150,13 +156,14 @@ def proof_command(params: Mapping[str, Any], ctx: ProofContext) -> ProofOutcome:
 
     try:
         proc = subprocess.run(
-            command, cwd=ctx.repo, capture_output=True, text=True, timeout=ctx.timeout, check=False
+            command, cwd=ctx.repo, capture_output=True, text=True,
+            errors="replace", timeout=ctx.timeout, check=False
         )
     except FileNotFoundError:
         return _cannot(f"{binary!r} is not installed on this host")
     except subprocess.TimeoutExpired:
         return _cannot(f"{' '.join(argv)} did not finish within {ctx.timeout}s")
-    except OSError as exc:
+    except (OSError, ValueError) as exc:
         return _cannot(f"{binary!r} could not be started: {exc}")
 
     if proc.returncode != 0 and (proc.stderr or "").startswith("bwrap:"):
@@ -255,3 +262,5 @@ def run_proof(kind: str, params: Mapping[str, Any], ctx: ProofContext) -> ProofO
         return executor(params, ctx)
     except _BadParams as exc:
         return _cannot(str(exc))
+    except Exception as exc:  # noqa: BLE001 - untrusted params must not crash the run
+        return _cannot(f"the proof crashed: {type(exc).__name__}: {exc}")

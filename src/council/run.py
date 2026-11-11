@@ -17,9 +17,9 @@ from .config import CONFIG_NAME, load as load_config
 from .context import Context, build as build_context
 from .findings import OPEN_STATES, Finding, State, blocks
 from .merge import merge
-from .paths import run_dir as run_path
+from .paths import run_dir as run_path, validate_run_id
 from .pr import PullRequest
-from .prompt import instrument_digest, render
+from .prompt import PromptError, instrument_digest, render
 from .proofs import ProofContext
 from .reference import FetchError, Reference, fetch
 from .repo import (ReviewError, Skipped, diff, output, python_files,
@@ -279,8 +279,11 @@ def _samples(prompt: str, runner: Runner,
                            and _blocking_key(first) == _blocking_key(results[1]))
     if not agreed and len(results) < AUTO_MAX:
         results.append(run_sample(prompt, runner, index=3))
-        keys = [key for key in (_blocking_key(sample) for sample in results) if key is not None]
-        agreed = len(set(keys)) == 1 if keys else None
+        if any(sample.output is None for sample in results):
+            agreed = None
+        else:
+            keys = [_blocking_key(sample) for sample in results]
+            agreed = len(set(keys)) == 1
     return tuple(results), len(results), agreed
 
 
@@ -306,6 +309,13 @@ def _reference_text(references: tuple[Reference, ...]) -> str:
     blocks = ["## Reference (fetched by the caller; context, not evidence)"]
     blocks.extend(f"### {item.url} ({item.sha256})\n{item.text}" for item in references)
     return "\n\n".join(blocks)
+
+
+def _write_sample(directory: Path, sample: SampleResult) -> None:
+    try:
+        write_sample(directory, sample)
+    except (OSError, ValueError) as exc:
+        raise ReviewError(f"cannot write a sample under {directory}: {exc}") from exc
 
 
 def _write_verdict(run_dir: Path, request: ReviewRequest, base: str, head: str,
@@ -376,9 +386,12 @@ def _write_verdict(run_dir: Path, request: ReviewRequest, base: str, head: str,
             for finding in result.findings
         ],
     }
-    run_dir.mkdir(parents=True, exist_ok=True)
-    (run_dir / "verdict.json").write_text(
-        json.dumps(payload, indent=2) + "\n", encoding="utf-8", newline="\n")
+    try:
+        run_dir.mkdir(parents=True, exist_ok=True)
+        (run_dir / "verdict.json").write_text(
+            json.dumps(payload, indent=2) + "\n", encoding="utf-8", newline="\n")
+    except (OSError, ValueError) as exc:
+        raise ReviewError(f"cannot write {run_dir / 'verdict.json'}: {exc}") from exc
 
 
 def _prepare(request: ReviewRequest) -> Prepared:
@@ -387,7 +400,10 @@ def _prepare(request: ReviewRequest) -> Prepared:
     base = resolve_base(root, request.base)
     head = output(root, "rev-parse", "HEAD").strip()
     change = diff(root, base)
-    patch = change.patch
+    # `git` decodes with surrogateescape so a non-UTF-8 path stays readable; a
+    # non-UTF-8 *content* byte becomes a lone surrogate, which cannot be encoded
+    # into the prompt. Replace those bytes once, here, so the prompt is valid.
+    patch = change.patch.encode("utf-8", "surrogateescape").decode("utf-8", "replace")
     diff_sha256 = hashlib.sha256(patch.encode("utf-8")).hexdigest()
     try:
         references = tuple(fetch(url) for url in request.context_urls)
@@ -395,18 +411,35 @@ def _prepare(request: ReviewRequest) -> Prepared:
         raise ReviewError(str(exc)) from exc
 
     prompt_file = request.prompt if request.prompt is not None else default_prompt()
-    if not prompt_file.exists():
-        raise ReviewError(f"no reviewer prompt at {prompt_file}: a review needs an instrument")
-    template = prompt_file.read_text(encoding="utf-8")
+    try:
+        if not prompt_file.is_file():
+            raise ReviewError(f"no reviewer prompt at {prompt_file}: a review needs an instrument")
+        template = prompt_file.read_text(encoding="utf-8")
+    except ReviewError:
+        raise
+    except (OSError, UnicodeDecodeError) as exc:
+        raise ReviewError(f"cannot read the reviewer prompt at {prompt_file}: {exc}") from exc
     digest = instrument_digest(template, profile=request.profile,
                                reasoning=request.reasoning)
+
+    if not patch.strip():
+        if change.skipped:
+            names = ", ".join(item.path for item in change.skipped[:5])
+            more = f", +{len(change.skipped) - 5} more" if len(change.skipped) > 5 else ""
+            raise ReviewError(
+                f"the change has no reviewable text; skipped {len(change.skipped)} "
+                f"file(s): {names}{more}")
+        raise ReviewError("the change is empty: base and head are the same")
 
     full_context = build_context(patch, _reader(root), python_files(root),
                                  max_depth=request.context_depth - 1)
     prompt_context = full_context.text
     if references:
         prompt_context = f"{prompt_context}\n\n{_reference_text(references)}"
-    prompt = render(template, base=base, diff=patch, context=prompt_context)
+    try:
+        prompt = render(template, base=base, diff=patch, context=prompt_context)
+    except PromptError as exc:
+        raise ReviewError(f"the reviewer prompt is not usable: {exc}") from exc
     prompt_bytes = len(prompt.encode("utf-8"))
     sliced = prompt_bytes > request.max_prompt_bytes and not request.allow_large_prompt
     return Prepared(root, base, head, patch, change.skipped, references, prompt_file,
@@ -437,6 +470,26 @@ def review(request: ReviewRequest, runner: Runner) -> Report:
     """
     if request.samples is not None and request.samples < 1:
         raise ReviewError("samples must be at least 1")
+    if request.max_prompt_bytes < 1:
+        raise ReviewError("the prompt limit must be at least 1 byte")
+    if request.context_depth not in (0, 1, 2, 3):
+        raise ReviewError("context depth must be 0, 1, 2 or 3")
+    if request.time_budget < 0:
+        raise ReviewError("the time budget must not be negative")
+    if request.idle_timeout < 1:
+        raise ReviewError("the idle timeout must be at least 1 second")
+    if not request.profile.strip():
+        raise ReviewError("--profile must not be empty")
+    if any(ord(ch) < 32 or 0xD800 <= ord(ch) <= 0xDFFF for ch in request.profile):
+        raise ReviewError("--profile must be printable text")
+    if request.base is not None and not request.base.strip():
+        raise ReviewError("--base must not be empty")
+    try:
+        run_id = validate_run_id(
+            request.run_id if request.run_id is not None
+            else datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S"))
+    except ValueError as exc:
+        raise ReviewError(str(exc)) from exc
 
     prepared = _prepare(request)
     root = prepared.root
@@ -455,16 +508,22 @@ def review(request: ReviewRequest, runner: Runner) -> Report:
     prompt_bytes = prepared.prompt_bytes
     sliced = prepared.sliced
 
-    run_id = (request.run_id if request.run_id is not None
-              else datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S"))
-    if not run_id.strip():
-        raise ReviewError("--run-id must not be empty")
     try:
         directory = (request.state_dir if request.state_dir is not None
                      else run_path(root, run_id))
     except ValueError as exc:
         raise ReviewError(str(exc)) from exc
-    if request.state_dir is None and (directory.is_symlink() or directory.exists()):
+    if request.state_dir is not None:
+        try:
+            if directory.is_symlink():
+                raise ReviewError(f"{directory} is a symlink: a run must not write outside its state directory")
+            if directory.exists() and not directory.is_dir():
+                raise ReviewError(f"{directory} exists and is not a directory")
+        except ReviewError:
+            raise
+        except (OSError, ValueError) as exc:
+            raise ReviewError(f"cannot use the state directory {directory}: {exc}") from exc
+    elif directory.is_symlink() or directory.exists():
         raise ReviewError(f"run {run_id!r} already exists at {directory}")
 
     config = load_config(root / CONFIG_NAME)
@@ -475,7 +534,7 @@ def review(request: ReviewRequest, runner: Runner) -> Report:
     if not sliced:
         samples, samples_run, agreement = _samples(prompt, runner, request.samples)
         for sample in samples:
-            write_sample(directory, sample)
+            _write_sample(directory, sample)
         merged = merge([sample.output.findings if sample.output is not None else ()
                         for sample in samples])
         adjudication = adjudicate(
@@ -499,7 +558,7 @@ def review(request: ReviewRequest, runner: Runner) -> Report:
             unit_samples, unit_run, unit_agreement = _samples(
                 unit.prompt, runner, request.samples)
             for sample in unit_samples:
-                write_sample(directory / "units" / unit.id, sample)
+                _write_sample(directory / "units" / unit.id, sample)
             ok = all(sample.ok for sample in unit_samples)
             runs.append((unit, unit_samples, unit_run, unit_agreement, ok))
             for sample in unit_samples:

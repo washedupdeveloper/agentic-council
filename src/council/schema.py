@@ -83,6 +83,8 @@ def _field(entry: dict[str, Any], key: str, where: str, *, kind: type) -> Any:
     value = entry[key]
     if not isinstance(value, kind):
         raise SchemaError(f"{where}.{key}: expected {kind.__name__}, got {type(value).__name__}")
+    if kind is int and isinstance(value, bool):
+        raise SchemaError(f"{where}.{key}: expected int, got bool")
     if isinstance(value, str) and not value.strip():
         raise SchemaError(f"{where}.{key}: empty")
     return value

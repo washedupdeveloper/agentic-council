@@ -71,6 +71,30 @@ def test_absent_skips_git_and_run_state(tmp_path: Path) -> None:
     assert outcome.state is State.PROVEN
 
 
+def test_absent_does_not_follow_a_symlink_out_of_the_repository(tmp_path: Path) -> None:
+    outside = tmp_path.parent / "outside-secret.txt"
+    outside.write_text("SECRET\n", encoding="utf-8")
+    (tmp_path / "link.txt").symlink_to(outside)
+    outcome = run_proof("absent", {"pattern": "SECRET"}, ctx(tmp_path))
+    assert outcome.state is State.PROVEN
+
+
+def test_a_command_with_a_nul_cannot_run(tmp_path: Path) -> None:
+    outcome = run_proof("command", {"argv": ["true", "\0"]}, ctx(tmp_path))
+    assert outcome.state is State.UNRUNNABLE
+
+
+def test_a_proof_that_crashes_is_unrunnable(
+        tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def boom(params: object, context: object) -> object:
+        raise RuntimeError("boom")
+
+    monkeypatch.setitem(EXECUTORS, "absent", boom)
+    outcome = run_proof("absent", {"pattern": "x"}, ctx(tmp_path))
+    assert outcome.state is State.UNRUNNABLE
+    assert "crashed" in outcome.detail
+
+
 def test_an_invalid_regex_cannot_run(tmp_path: Path) -> None:
     assert run_proof("absent", {"pattern": "("}, ctx(tmp_path)).state is State.UNRUNNABLE
 

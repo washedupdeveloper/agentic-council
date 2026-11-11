@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -132,6 +133,18 @@ def test_the_report_prints_every_finding(monkeypatch: pytest.MonkeyPatch,
     assert "F-01" in out
     assert "a.py:2" in out
     assert "proven" in out
+
+
+def test_the_human_report_does_not_emit_terminal_controls(
+        monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    finding = Finding(id="F-01", dimension="security", severity="critical",
+                      state=State.PROVEN, location="a.py:2",
+                      claim="A\x1b[31mred\nclaim", detail="bad\x07detail")
+    stub(monkeypatch, report(Verdict.FAIL, findings=(finding,)))
+    cli.main(["review"])
+    out = capsys.readouterr().out
+    assert "\x1b" not in out
+    assert "\x07" not in out
 
 
 def test_the_run_id_is_passed_through(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -328,6 +341,117 @@ def test_no_ephemeral_keeps_state_in_the_repository(
     monkeypatch.setattr(cli, "review", fake_review)
     assert cli.main(["review", "--no-ephemeral"]) == 0
     assert seen["state"] is None
+
+
+@pytest.mark.parametrize("run_id", ["", "   ", "../escape", "/tmp/escape", "a/b",
+                                    "a\\b", "a:b", "a?b", "a*b", "a|b", "a<b",
+                                    "a>b", 'a"b', "a\nb", "a\0b", "x" * 129])
+def test_an_invalid_run_id_is_refused_before_a_run(
+        monkeypatch: pytest.MonkeyPatch, run_id: str) -> None:
+    called: list[int] = []
+
+    def fake_review(request: object, runner: object) -> Report:
+        called.append(1)
+        return report(Verdict.PASS)
+
+    monkeypatch.setattr(cli, "review", fake_review)
+    assert cli.main(["review", "--run-id", run_id]) == 3
+    assert called == []
+
+
+def test_time_budget_zero_is_valid(monkeypatch: pytest.MonkeyPatch) -> None:
+    seen: dict[str, int] = {}
+
+    def fake_review(request: object, runner: object) -> Report:
+        seen["budget"] = request.time_budget  # type: ignore[attr-defined]
+        return report(Verdict.PASS)
+
+    monkeypatch.setattr(cli, "review", fake_review)
+    assert cli.main(["review", "--time-budget", "0"]) == 0
+    assert seen["budget"] == 0
+
+
+def test_plan_refuses_outputs_it_cannot_write(tmp_path: Path) -> None:
+    assert cli.main(["review", "--plan", "--sarif", str(tmp_path / "x.sarif")]) == 3
+    assert cli.main(["review", "--plan", "--keep", str(tmp_path)]) == 3
+    assert cli.main(["review", "--plan", "--report"]) == 3
+    assert cli.main(["review", "--plan", "--run-id", "../escape"]) == 3
+
+
+def test_a_sarif_parent_that_does_not_exist_is_refused_before_a_run(
+        tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    called: list[int] = []
+
+    def fake_review(request: object, runner: object) -> Report:
+        called.append(1)
+        return report(Verdict.PASS)
+
+    monkeypatch.setattr(cli, "review", fake_review)
+    path = tmp_path / "missing" / "council.sarif"
+    assert cli.main(["review", "--sarif", str(path)]) == 3
+    assert called == []
+
+
+def test_a_keep_path_that_is_a_file_is_refused_before_a_run(
+        tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    called: list[int] = []
+
+    def fake_review(request: object, runner: object) -> Report:
+        called.append(1)
+        return report(Verdict.PASS)
+
+    monkeypatch.setattr(cli, "review", fake_review)
+    keep = tmp_path / "keep"
+    keep.write_text("not a directory", encoding="utf-8")
+    assert cli.main(["review", "--keep", str(keep)]) == 3
+    assert called == []
+
+
+def test_a_prompt_directory_is_refused_before_a_run(
+        tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    called: list[int] = []
+
+    def fake_review(request: object, runner: object) -> Report:
+        called.append(1)
+        return report(Verdict.PASS)
+
+    monkeypatch.setattr(cli, "review", fake_review)
+    prompt = tmp_path / "prompt.md"
+    prompt.mkdir()
+    assert cli.main(["review", "--prompt", str(prompt)]) == 3
+    assert called == []
+
+
+def test_a_json_read_failure_removes_the_ephemeral_tree(
+        tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    root = tmp_path / "ephemeral"
+    monkeypatch.setattr(cli.tempfile, "mkdtemp", lambda prefix: str(root))
+
+    def fake_review(request: object, runner: object) -> Report:
+        return report(Verdict.PASS, run_dir=tmp_path / "missing")
+
+    monkeypatch.setattr(cli, "review", fake_review)
+    assert cli.main(["review", "--json", "--run-id", "x"]) == 3
+    assert not root.exists()
+
+
+def test_keep_inside_the_run_directory_is_refused(
+        tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    root = tmp_path / "ephemeral"
+    run = tmp_path / "run"
+    monkeypatch.setattr(cli.tempfile, "mkdtemp", lambda prefix: str(root))
+
+    def fake_review(request: object, runner: object) -> Report:
+        root.mkdir(parents=True, exist_ok=True)
+        run.mkdir()
+        (run / "verdict.json").write_text("{}", encoding="utf-8")
+        return Report(run, "a" * 40, "b" * 40, "d" * 16,
+                      Result(Verdict.PASS, "ok", ()), ())
+
+    monkeypatch.setattr(cli, "review", fake_review)
+    assert cli.main(["review", "--keep", str(tmp_path), "--run-id", "x"]) == 0
+    assert root.exists()
+    shutil.rmtree(root)
 
 
 def test_keep_copies_the_run_before_removing_it(
