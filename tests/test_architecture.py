@@ -32,6 +32,8 @@ PURE = (
     "domain.run_id",
     "domain.config",
     "domain.adjudication",
+    "domain.baseline",
+    "domain.proof",
     "domain.sandbox",
 )
 
@@ -40,6 +42,7 @@ ADAPTERS = frozenset({
     "__main__",
     "adjudicate",
     "base",
+    "baseline",
     "claims",
     "cli",
     "config",

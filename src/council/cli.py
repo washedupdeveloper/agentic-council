@@ -10,12 +10,14 @@ import sys
 import tempfile
 import unicodedata
 from dataclasses import asdict
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import NoReturn, Sequence
 
+from . import baseline as baseline_io
 from . import doctor as diagnostics
 from .config import ConfigError
+from .domain.baseline import Baseline
 from .paths import validate_run_id
 from .pr import PullRequest, resolve as resolve_pr, verify_checkout
 from .repo import ReviewError, init as init_repo
@@ -23,7 +25,7 @@ from .run import (DEFAULT_PROFILE, PROMPT_LIMIT, Plan, PromptTooLarge, Report,
                   ReviewRequest, plan, review)
 from .runner import DEFAULT_IDLE_TIMEOUT, hermes_runner
 from .sarif import render as render_sarif
-from .verdict import Verdict
+from .verdict import Result, Verdict
 from .version import current_version
 
 EXIT_ERROR = 3
@@ -125,6 +127,14 @@ def _add_review_arguments(parser: argparse.ArgumentParser, *, advice: bool,
                         help="also write proven findings as a SARIF 2.1.0 log")
     parser.add_argument("--run-id", default=None,
                         help="name this run instead of using a timestamp (refused if it exists)")
+    parser.add_argument("--baseline", type=_path, default=None, metavar="PATH",
+                        help="accepted-risk baseline to apply after the evidence verdict")
+    parser.add_argument("--baseline-from-base", action="store_true",
+                        help="read --baseline from the base revision (default: on for ci/pr)")
+    parser.add_argument("--baseline-strict", action="store_true",
+                        help="fail when a baseline entry is expired or stale")
+    parser.add_argument("--allow-baseline-change", action="store_true",
+                        help="allow the reviewed diff to edit the baseline (maintenance only)")
     parser.add_argument("--context-url", action="append", default=[], metavar="URL",
                         help="fetch this URL as reference context (repeatable; never a proof)")
     parser.add_argument("--context-depth", type=int, choices=(0, 1, 2, 3), default=3,
@@ -155,11 +165,28 @@ def build_parser() -> argparse.ArgumentParser:
 
     ci = sub.add_parser("ci", help="the gate for CI: prints verdict.json, exits 0/1/2")
     _add_review_arguments(ci, advice=False)
-    ci.set_defaults(report=False, json=True)
+    ci.set_defaults(report=False, json=True, baseline_from_base=True)
 
     pr = sub.add_parser("pr", help="review a GitHub pull request by number")
     pr.add_argument("number", type=int, help="pull request number")
     _add_review_arguments(pr, advice=True, base=False)
+    pr.set_defaults(baseline_from_base=True)
+
+    baseline = sub.add_parser("baseline", help="create or prune an accepted-risk baseline")
+    baseline_sub = baseline.add_subparsers(dest="baseline_action", required=True)
+    create = baseline_sub.add_parser("create", help="snapshot proven blocking findings from a run")
+    create.add_argument("--from", dest="from_run", type=_path, required=True, metavar="DIR",
+                        help="kept run directory containing verdict.json")
+    create.add_argument("--out", type=_path, required=True, metavar="PATH")
+    create.add_argument("--owner", required=True, help="person or team accepting the risk")
+    create.add_argument("--reason", required=True, help="why the accepted risk is tolerated")
+    create.add_argument("--days", type=_positive, default=90, metavar="N",
+                        help="days until the accepted risk expires (default: 90)")
+    prune = baseline_sub.add_parser("prune", help="remove entries no longer found in a run")
+    prune.add_argument("--baseline", type=_path, required=True, metavar="PATH")
+    prune.add_argument("--from", dest="from_run", type=_path, required=True, metavar="DIR")
+    prune.add_argument("--write", action="store_true",
+                       help="write the pruned baseline (default: report only)")
 
     init = sub.add_parser("init", help="add .council/ to the repository's .gitignore")
     init.add_argument("-C", "--repo", type=_path, default=Path("."))
@@ -260,6 +287,10 @@ def _request(args: argparse.Namespace, *, allow: bool | None = None) -> ReviewRe
         sandbox=bool(getattr(args, "sandbox", False)),
         state_dir=getattr(args, "state_dir", None),
         pull_request=getattr(args, "pull_request", None),
+        baseline=getattr(args, "baseline", None),
+        baseline_from_base=bool(getattr(args, "baseline_from_base", False)),
+        baseline_strict=bool(getattr(args, "baseline_strict", False)),
+        allow_baseline_change=bool(getattr(args, "allow_baseline_change", False)),
     )
 
 
@@ -322,6 +353,10 @@ def _preflight(args: argparse.Namespace) -> None:
             raise
         except (OSError, ValueError) as exc:
             raise ReviewError(f"cannot read the reviewer prompt at {args.prompt}: {exc}") from exc
+    if args.baseline is not None and args.baseline_from_base and args.baseline.is_absolute():
+        raise ReviewError("--baseline must be repository-relative when read from the base revision")
+    if args.baseline_strict and args.baseline is None:
+        raise ReviewError("--baseline-strict requires --baseline")
     if args.sarif is not None:
         _check_output(args.sarif, "--sarif", directory=False)
     if args.keep is not None:
@@ -417,8 +452,19 @@ def _print_report(report: Report) -> None:
         print(f"  {_safe(finding.id)}  {_safe(finding.severity):<8} {_safe(finding.dimension):<13} "
               f"{_safe(finding.location)}  {_safe(finding.claim)}")
         print(f"        {finding.state.value} — {_safe(finding.detail)}")
-    print(f"  reason: {_safe(report.result.reason)}")
+    print(f"  reason: {_safe(report.reason)}")
+    if report.gate is not None and report.gate.suppressed:
+        print(f"  baseline: {len(report.gate.suppressed)} accepted finding(s)")
     print(f"  run:    {_safe(report.run_dir)}")
+
+
+def _sarif_result(report: Report) -> Result:
+    """SARIF is a report of what still blocks, not the accepted-risk evidence."""
+    if report.gate is None or not report.gate.suppressed:
+        return report.result
+    suppressed = set(report.gate.suppressed)
+    return Result(report.gate.verdict, report.gate.reason,
+                  tuple(item for item in report.findings if item.id not in suppressed))
 
 
 def _print_plan(planned: Plan) -> None:
@@ -459,6 +505,41 @@ def _plan_payload(planned: Plan) -> dict[str, object]:
     }
 
 
+def _baseline(args: argparse.Namespace) -> int:
+    """Create or prune the accepted-risk file. No reviewer is involved."""
+    try:
+        today = datetime.now(timezone.utc).date()
+        if args.baseline_action == "create":
+            expires = today + timedelta(days=args.days)
+            baseline = baseline_io.from_run(
+                args.from_run, owner=args.owner, reason=args.reason,
+                created=today, expires=expires)
+            baseline_io.write(args.out, baseline)
+            print(f"wrote {args.out} ({len(baseline.entries)} entry/entries, "
+                  f"expires {expires.isoformat()})")
+            return 0
+        baseline = baseline_io.load(args.baseline)
+        present = baseline_io.run_fingerprints(args.from_run)
+        stale = tuple(entry for entry in baseline.entries
+                      if entry.fingerprint not in present)
+        if not stale:
+            print(f"{args.baseline}: no stale entries")
+            return 0
+        if args.write:
+            baseline_io.write(args.baseline,
+                              Baseline(tuple(entry for entry in baseline.entries
+                                             if entry.fingerprint in present)))
+        verb = "pruned" if args.write else "would prune"
+        print(f"{args.baseline}: {verb} {len(stale)} stale entry/entries")
+        for entry in stale:
+            print(f"  {entry.fingerprint[:12]}  {_safe(entry.file)}:{entry.line}  "
+                  f"{_safe(entry.claim)}")
+        return 0
+    except ReviewError as exc:
+        print(f"council: {_safe(exc)}", file=sys.stderr)
+        return EXIT_ERROR
+
+
 def _doctor(args: argparse.Namespace) -> int:
     """Report what this machine can do. A fail is exit 1; a warning is not."""
     runner = hermes_runner(args.profile, binary=args.reviewer,
@@ -491,6 +572,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         except ReviewError as exc:
             print(f"council: {_safe(exc)}", file=sys.stderr)
             return EXIT_ERROR
+
+    if args.command == "baseline":
+        return _baseline(args)
 
     if args.command == "doctor":
         return _doctor(args)
@@ -553,7 +637,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.sarif is not None:
         try:
             args.sarif.write_text(
-                json.dumps(render_sarif(report.result, tool_version=current_version()),
+                json.dumps(render_sarif(_sarif_result(report), tool_version=current_version()),
                            indent=2) + "\n",
                 encoding="utf-8", newline="\n")
         except (OSError, ValueError) as exc:

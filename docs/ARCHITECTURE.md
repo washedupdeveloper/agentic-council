@@ -7,8 +7,8 @@ architecture pass after the state-machine milestone.
 
 The concept is sound and the structure is now honest. The review's decisions —
 what a run id is, what a configuration means, what a set of proof outcomes
-settles, and what a sandbox invocation looks like — are pure functions in
-`council.domain` and the pure renderers beside it. The earlier purity claim was
+settles, what an accepted risk means, and what a sandbox invocation looks like —
+are pure functions in `council.domain` and the pure renderers beside it. The earlier purity claim was
 false: `paths` was on the pure list while it called `is_symlink()` and
 `exists()`, and the test only inspected a short list of call names. That test
 could not fail for the defect it existed to prevent. It has been replaced with a
@@ -17,7 +17,7 @@ direction, and fails when an effectful module is not explicitly named as an
 adapter.
 
 The implementation is not fully DDD or fully SOLID. `run.review` is still a
-668-line application module that validates, prepares, samples, adjudicates and
+733-line application module that validates, prepares, samples, adjudicates and
 serialises in one place; `proofs.py` executes checks in the same module that
 defines proof semantics. Those are recorded below as debt, not relabelled as
 architecture.
@@ -36,6 +36,11 @@ architecture.
 | A cheap failure precedes an expensive one | Config, empty-change and prompt checks run before any context fetch; the reviewer is not called. | `test_malformed_config_is_found_before_the_reviewer`, `test_a_missing_prompt_is_found_before_a_context_fetch`, `test_an_empty_change_is_found_before_a_context_fetch`. |
 | A boolean is not a quantity | `bool` is refused for samples, prompt budget, context depth, time budget and idle timeout. | `test_a_boolean_request_number_is_refused`. |
 | A repository config cannot redirect through a link | A symlinked `council.toml` is refused before it is read. | `test_a_symlinked_config_is_refused`. |
+| A baseline cannot suppress missing evidence | Only `PROVEN` blocking findings are suppressible; `UNRUNNABLE` and `UNSETTLED` stay open. | `test_an_unsettled_finding_cannot_be_suppressed`, `test_an_unrunnable_finding_cannot_be_suppressed`. |
+| A baseline is a policy layer, not a verdict rewrite | `evidence_verdict` remains the finding-state result; `verdict` is the gate after matching. | `test_a_matching_proven_finding_is_suppressed_after_the_verdict`; `verdict.json` records both. |
+| A PR cannot edit its own baseline | CI reads the baseline from the base revision and refuses a baseline changed in the diff. | `test_load_at_reads_the_base_revision_not_the_worktree`, `test_a_baseline_cannot_be_edited_by_the_diff_it_judges`. |
+| A baseline expires and a severity escalation is new | Entries carry an expiry; severity is part of the fingerprint. | `test_an_expired_entry_does_not_suppress`, `test_a_severity_escalation_is_not_covered_by_an_old_baseline`. |
+| A baselined finding is not an alert | SARIF receives only the unsuppressed findings; the evidence remains in `verdict.json`. | `test_a_baselined_finding_is_not_a_sarif_alert`. |
 
 ## Dependency rule
 
@@ -48,7 +53,7 @@ council.findings, verdict, merge, schema, prompt, changes, context, sarif
 council.adjudicate, run   application/orchestration; effects through calls
         ^
         | imports
-council.repo, runner, proofs, pr, doctor, config, paths, sample, sandbox, cli,
+council.repo, runner, proofs, pr, doctor, config, baseline, paths, sample, sandbox, cli,
 council.version           effect adapters
 ```
 
@@ -59,7 +64,7 @@ adapter; `tests/test_architecture.py` enforces the direction.
 
 | Principle | What is true | Where it is weaker |
 |---|---|---|
-| **S**ingle responsibility | `config` splits read (`load`) from decision (`parse`); `paths` splits name validation (`domain.run_id`) from the symlink guard; `adjudicate` splits proof execution from `decide`; `sample` splits `payload` from `write_sample`; `sandbox` splits lookup from `command`; `version` is the only metadata reader. | `run.review` still orchestrates preparation, sampling, adjudication, persistence and serialisation. `proofs` still owns both the six executors and their parameter rules. |
+| **S**ingle responsibility | `config` splits read (`load`) from decision (`parse`); `paths` splits name validation (`domain.run_id`) from the symlink guard; `adjudicate` splits proof execution from `decide`; `baseline` splits file/git access from the pure `domain.baseline`; `sample` splits `payload` from `write_sample`; `sandbox` splits lookup from `command`; `version` is the only metadata reader. | `run.review` still orchestrates preparation, sampling, adjudication, baseline gate, persistence and serialisation. `proofs` still owns both the six executors and their parameter rules. |
 | **O**pen/closed | A proof kind is a row in `EXECUTORS` plus the schema's kind set; a new kind does not add a branch to `run`. | A new **review mode** would still touch `run.review`; there is no separate application service per mode. |
 | **L**iskov substitution | `ProofOutcome` is one domain value regardless of executor; `ReviewerMissing` is both a `ReviewError` and an `OSError`, so a start failure is not retried as a sample. | No subclass hierarchy beyond this; the test is behavioural, not inheritance-shaped. |
 | **I**nterface segregation | `Runner` is `Callable[[str], str]`; `Prover` is the narrow proof-executor shape; callers do not receive a repository object with unrelated methods. | The CLI parser object is a large mutable namespace; it is a boundary object, not a domain interface. |
@@ -94,7 +99,7 @@ evidence; `INCOMPLETE` is exit 2 and means the review ran with missing evidence.
 
 ## Residual architecture debt
 
-1. **`run.py` is an application god module (668 lines).** It performs request
+1. **`run.py` is an application god module (733 lines).** It performs request
    validation, git preparation, prompt construction, sampling, adjudication,
    payload construction and persistence. Splitting it is a larger change than
    this pass and would risk the state-machine guarantees; the next safe cut is

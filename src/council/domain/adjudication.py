@@ -12,6 +12,7 @@ from typing import Sequence, cast
 from ..findings import Finding, Severity, State
 from ..merge import MergedFinding
 from ..verdict import Result, Verdict, judge
+from .proof import canonical_proof
 
 
 @dataclass(frozen=True, slots=True)
@@ -59,6 +60,7 @@ def decide(merged: Sequence[MergedFinding],
             location=f"{item.file}:{item.line}",
             claim=item.claims[0] if item.claims else "",
             detail=detail,
+            proof=canonical_proof(item.proofs),
         ))
     return Adjudication(tuple(findings), tuple(sorted(failed_samples)))
 

@@ -533,6 +533,56 @@ afterwards. A lock would close it.
 - A broken symlink silently meant “missing”; now an error. A symlink to an
   existing file is refused too (`test_a_symlinked_config_is_refused`).
 
+## M13 — Baseline and gate
+
+**Owner:** `domain.baseline` decides; `council.baseline` reads/writes;
+`run._prepare` loads the policy before expensive work; `run.review` applies it
+after the evidence verdict.
+
+**States:** `NO_BASELINE`, `LOADED`, `MATCHED`, `EXPIRED`, `STALE`, `GATED`.
+
+**Invariants**
+
+- A baseline entry exists only for a `PROVEN` blocking finding.
+- `UNRUNNABLE`, `UNSETTLED`, a failed sample or an unreviewed unit can never be
+  suppressed.
+- `evidence_verdict` is never rewritten; the gate result is separate.
+- CI reads the baseline from the base revision; a baseline changed in the
+  reviewed diff is a start failure unless explicitly allowed.
+- Entries carry an owner, reason and an expiry not before creation; severity and
+  proof are part of the fingerprint.
+- An incomplete run (failed sample or unreviewed unit) cannot create or prune a
+  baseline; missing evidence is not a waiver.
+- The baseline file is a regular UTF-8 file, not a symlink/FIFO, and at most
+  1,000,000 bytes.
+
+**Transitions**
+
+| from | event | guard | to | side effect |
+|---|---|---|---|---|
+| NO_BASELINE | `--baseline` absent | — | NO_BASELINE | evidence verdict only |
+| NO_BASELINE | `load`/`load_at` | regular valid file | LOADED | policy in memory |
+| LOADED | one finding | fingerprint + severity match | MATCHED | suppress only if PROVEN blocking |
+| LOADED | one finding | past expiry | EXPIRED | not suppressed; reported |
+| LOADED | no finding | no fingerprint in run | STALE | reported; strict fails |
+| LOADED | base revision | baseline path changed in diff | REFUSED | exit 3 unless allowed |
+| MATCHED | all blocking proven suppressed | evidence not missing | GATED | exit 0, `evidence_verdict` retained |
+| MATCHED | other proven/new finding | — | GATED | exit 1 |
+| MATCHED | open finding/sample | — | GATED | exit 2 |
+
+**Invalid transitions found**
+
+- A PR could edit its own baseline and hide a new finding; now `ci`/`pr` read
+  the base blob and a changed baseline is refused
+  (`test_a_baseline_cannot_be_edited_by_the_diff_it_judges`).
+- An expired entry still suppressed; now it is reported and does not suppress
+  (`test_an_expired_entry_does_not_suppress`).
+- A severity escalation kept the old fingerprint; severity is now part of it
+  (`test_a_severity_escalation_is_not_covered_by_an_old_baseline`).
+- Missing evidence could be mistaken for a baseline candidate; only `PROVEN`
+  blocking findings are considered (`test_an_unsettled_finding_cannot_be_suppressed`,
+  `test_an_unrunnable_finding_cannot_be_suppressed`).
+
 ## Confirmed issues, priority, grouping, status
 
 Priority is impact × reachability. “Fixed” means a regression test is in the
@@ -567,6 +617,10 @@ silently accepted.
 | SM-24 | P2 | malformed `council.toml` read after git, prompt and context work | every cheap failure pays for expensive work; slow start failure | config loaded first in `_prepare`; `test_malformed_config_is_found_before_the_reviewer` | fixed |
 | SM-25 | P3 | boolean request number accepted as `0`/`1` | a flag silently becomes a count, budget or timeout | `_integer` rejects `bool`; `test_a_boolean_request_number_is_refused` | fixed |
 | SM-26 | P2 | `council.toml` symlink to an existing file read outside the checkout | untrusted repository redirects the policy input | any symlink refused; `test_a_symlinked_config_is_refused` | fixed |
+| SM-27 | P1 | a PR could edit the baseline it is judged by | new finding hidden by editing policy in the same diff | CI reads base revision; changed baseline refused; `test_a_baseline_cannot_be_edited_by_the_diff_it_judges` | fixed |
+| SM-28 | P2 | baseline could suppress `UNRUNNABLE`/`UNSETTLED` evidence | missing evidence converted to a pass | only `PROVEN` blocking findings; open-evidence tests | fixed |
+| SM-29 | P2 | expired baseline entry still suppressed | accepted risk outlives its stated expiry | `today > expires`; `test_an_expired_entry_does_not_suppress` | fixed |
+| SM-30 | P2 | severity escalation reused an old fingerprint | high waiver hid a critical finding | severity in fingerprint; escalation test | fixed |
 
 ## Live evidence
 

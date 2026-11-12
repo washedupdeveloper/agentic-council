@@ -59,6 +59,9 @@ class Finding:
     location: str = ""
     claim: str = ""
     detail: str = ""
+    #: Canonical proof identity, used only by the baseline policy. It is not a
+    #: state and cannot change `blocks` or the verdict.
+    proof: str = ""
 
     @property
     def blocks(self) -> bool:

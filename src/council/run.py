@@ -12,9 +12,11 @@ from pathlib import Path
 
 from .adjudicate import adjudicate, verdict
 from .base import resolve_base
+from .baseline import load as load_baseline, load_at as load_baseline_at
 from .changes import file_sections, hunk_range, hunk_sections
 from .config import CONFIG_NAME, Config, load as load_config
 from .context import Context, build as build_context
+from .domain.baseline import Baseline, GateResult, apply_baseline
 from .findings import OPEN_STATES, Finding, State, blocks
 from .merge import merge
 from .paths import run_dir as run_path, validate_run_id
@@ -84,6 +86,10 @@ class ReviewRequest:
     sandbox: bool = False
     state_dir: Path | None = None
     pull_request: PullRequest | None = None
+    baseline: Path | None = None
+    baseline_from_base: bool = False
+    baseline_strict: bool = False
+    allow_baseline_change: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -101,10 +107,11 @@ class Report:
     skipped: tuple[Skipped, ...] = ()
     diff_sha256: str = ""
     context_digest: str = ""
+    gate: GateResult | None = None
 
     @property
     def verdict(self) -> Verdict:
-        return self.result.verdict
+        return self.gate.verdict if self.gate is not None else self.result.verdict
 
     @property
     def findings(self) -> tuple[Finding, ...]:
@@ -112,7 +119,11 @@ class Report:
 
     @property
     def exit_code(self) -> int:
-        return self.result.exit_code
+        return self.gate.exit_code if self.gate is not None else self.result.exit_code
+
+    @property
+    def reason(self) -> str:
+        return self.gate.reason if self.gate is not None else self.result.reason
 
 
 @dataclass(frozen=True, slots=True)
@@ -143,6 +154,7 @@ class Prepared:
 
     root: Path
     config: Config
+    baseline: Baseline | None
     base: str
     head: str
     patch: str
@@ -349,7 +361,11 @@ def _write_verdict(run_dir: Path, request: ReviewRequest, base: str, head: str,
                    prompt_acknowledged: bool,
                    sliced: bool = False,
                    time_budget: int = 0,
-                   units: Sequence[dict[str, object]] = ()) -> None:
+                   units: Sequence[dict[str, object]] = (),
+                   baseline: Baseline | None = None,
+                   baseline_source: str = "",
+                   gate: GateResult | None = None) -> None:
+    effective = gate or result
     payload = {
         "run": run_dir.name,
         "base": base,
@@ -395,14 +411,22 @@ def _write_verdict(run_dir: Path, request: ReviewRequest, base: str, head: str,
         "unresolved": list(context.unresolved),
         "references": [{"url": item.url, "sha256": item.sha256, "bytes": len(item.text.encode("utf-8"))}
                        for item in references],
-        "verdict": result.verdict.value,
-        "exit_code": result.exit_code,
-        "reason": result.reason,
+        "verdict": effective.verdict.value,
+        "exit_code": effective.exit_code,
+        "reason": effective.reason,
+        "evidence_verdict": result.verdict.value,
+        "baseline": None if baseline is None else {
+            "source": baseline_source,
+            "entries": len(baseline.entries),
+            "suppressed": list(gate.suppressed) if gate is not None else [],
+            "expired": list(gate.expired) if gate is not None else [],
+            "stale": list(gate.stale) if gate is not None else [],
+        },
         "findings": [
             {"id": finding.id, "dimension": finding.dimension,
              "severity": finding.severity, "state": finding.state.value,
              "location": finding.location, "claim": finding.claim,
-             "detail": finding.detail}
+             "detail": finding.detail, "proof": finding.proof}
             for finding in result.findings
         ],
     }
@@ -414,18 +438,39 @@ def _write_verdict(run_dir: Path, request: ReviewRequest, base: str, head: str,
         raise ReviewError(f"cannot write {run_dir / 'verdict.json'}: {exc}") from exc
 
 
+def _load_baseline(request: ReviewRequest, root: Path, base: str) -> Baseline | None:
+    """Load the policy file before the expensive work; CI reads the base blob."""
+    if request.baseline is None:
+        return None
+    if request.baseline_from_base:
+        return load_baseline_at(root, base, str(request.baseline))
+    path = request.baseline if request.baseline.is_absolute() else root / request.baseline
+    return load_baseline(path)
+
+
+def _baseline_changed(request: ReviewRequest, patch: str) -> bool:
+    """Whether the committed baseline is itself part of the reviewed diff."""
+    if request.baseline is None or not request.baseline_from_base:
+        return False
+    rel = str(request.baseline).replace("\\", "/")
+    while rel.startswith("./"):
+        rel = rel[2:]
+    return any(section.path == rel for section in file_sections(patch))
+
+
 def _prepare(request: ReviewRequest) -> Prepared:
     """Resolve the change and build the prompt, writing nothing.
 
     This is an application step, not a pure decision: it reads git, the
-    repository configuration, the prompt and any caller-supplied references.
-    It deliberately loads the configuration and validates the change and prompt
-    before fetching references, so a cheap failure never pays for a network
-    call.
+    repository configuration, the baseline, the prompt and any caller-supplied
+    references. It loads the cheap policy inputs and validates the change and
+    prompt before fetching references, so a cheap failure never pays for a
+    network call.
     """
     root = repo_root(request.repo)
     config = load_config(root / CONFIG_NAME)
     base = resolve_base(root, request.base)
+    baseline = _load_baseline(request, root, base)
     head = output(root, "rev-parse", "HEAD").strip()
     change = diff(root, base)
     # `git` decodes with surrogateescape so a non-UTF-8 path stays readable; a
@@ -433,6 +478,12 @@ def _prepare(request: ReviewRequest) -> Prepared:
     # into the prompt. Replace those bytes once, here, so the prompt is valid.
     patch = change.patch.encode("utf-8", "surrogateescape").decode("utf-8", "replace")
     diff_sha256 = hashlib.sha256(patch.encode("utf-8")).hexdigest()
+
+    if _baseline_changed(request, patch) and not request.allow_baseline_change:
+        raise ReviewError(
+            "the baseline file is changed in this diff; refusing to use a "
+            "baseline the change itself can edit (use --allow-baseline-change "
+            "only for a deliberate maintenance change)")
 
     if not patch.strip():
         if change.skipped:
@@ -471,7 +522,7 @@ def _prepare(request: ReviewRequest) -> Prepared:
         raise ReviewError(f"the reviewer prompt is not usable: {exc}") from exc
     prompt_bytes = len(prompt.encode("utf-8"))
     sliced = prompt_bytes > request.max_prompt_bytes and not request.allow_large_prompt
-    return Prepared(root, config, base, head, patch, change.skipped, references, prompt_file,
+    return Prepared(root, config, baseline, base, head, patch, change.skipped, references, prompt_file,
                     template, digest, prompt, prompt_bytes, sliced, full_context,
                     diff_sha256)
 
@@ -569,10 +620,12 @@ def review(request: ReviewRequest, runner: Runner) -> Report:
     units = _build_units(template, base, patch, root, request, references) if sliced else []
     _claim(directory, run_id)
     units_payload: list[dict[str, object]] = []
+    missing_evidence = False
 
     try:
         if not sliced:
             samples, samples_run, agreement = _samples(prompt, runner, request.samples)
+            missing_evidence = any(not sample.ok for sample in samples)
             for sample in samples:
                 _write_sample(directory, sample)
             merged = merge([sample.output.findings if sample.output is not None else ()
@@ -649,9 +702,20 @@ def review(request: ReviewRequest, runner: Runner) -> Report:
             samples = ()
             samples_run = sum(run[2] for run in runs)
             agreement = None
+            missing_evidence = any(not run[4] for run in runs)
             reported_context = Context((), (), "", "")
 
         ignored = True if request.state_dir is not None else state_dir_ignored(root)
+        gate = None
+        if prepared.baseline is not None:
+            gate = apply_baseline(result, prepared.baseline,
+                                  today=datetime.now(timezone.utc).date(),
+                                  strict=request.baseline_strict,
+                                  missing_evidence=missing_evidence)
+        baseline_source = ""
+        if prepared.baseline is not None and request.baseline is not None:
+            baseline_source = (f"{base}:{request.baseline}"
+                               if request.baseline_from_base else str(request.baseline))
         _write_verdict(directory, request, base, head, digest, prompt_file, ignored,
                        samples, result, worktree=True, diff_sha256=diff_sha256,
                        skipped=prepared.skipped, context=reported_context,
@@ -660,9 +724,10 @@ def review(request: ReviewRequest, runner: Runner) -> Report:
                        prompt_bytes=prompt_bytes, prompt_limit=limit,
                        prompt_acknowledged=acknowledged,
                        sliced=sliced, time_budget=request.time_budget,
-                       units=units_payload)
+                       units=units_payload, baseline=prepared.baseline,
+                       baseline_source=baseline_source, gate=gate)
     except BaseException:
         _discard_empty(directory)
         raise
     return Report(directory, base, head, digest, result, samples, prompt_file, ignored,
-                  prepared.skipped, diff_sha256, reported_context.digest)
+                  prepared.skipped, diff_sha256, reported_context.digest, gate=gate)

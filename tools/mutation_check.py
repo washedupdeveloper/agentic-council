@@ -102,6 +102,22 @@ MUTATIONS: tuple[Mutation, ...] = (
              "domain/config.py",
              "return Config(allow=allow, timeout=timeout, sandbox=policy.sandbox or sandbox)",
              'return __import__("pathlib").Path(name).read_text()'),
+    Mutation("baseline-suppresses-open-findings",
+             "domain/baseline.py",
+             "for finding in result.findings:\n        if finding.state is not State.PROVEN or not finding.blocks:",
+             "for finding in result.findings:\n        if not finding.blocks:"),
+    Mutation("baseline-ignores-expiry",
+             "domain/baseline.py",
+             "if today > entry.expires:",
+             "if False:"),
+    Mutation("baseline-may-be-edited",
+             "run.py",
+             "if _baseline_changed(request, patch) and not request.allow_baseline_change:",
+             "if False:"),
+    Mutation("baseline-forgets-missing-evidence",
+             "domain/baseline.py",
+             "if fresh.verdict is Verdict.PASS and missing_evidence:",
+             "if False:"),
 )
 
 

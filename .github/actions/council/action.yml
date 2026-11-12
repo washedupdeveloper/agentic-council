@@ -44,6 +44,10 @@ inputs:
     description: Where to write the SARIF log (empty disables it)
     required: false
     default: "council.sarif"
+  baseline:
+    description: Committed baseline path, relative to the repository (empty disables it)
+    required: false
+    default: ""
   python:
     description: Interpreter used to create the private environment
     required: false
@@ -73,6 +77,7 @@ runs:
         STREAM: ${{ inputs.stream }}
         IDLE: ${{ inputs.idle-timeout }}
         SARIF: ${{ inputs.sarif }}
+        BASELINE: ${{ inputs.baseline }}
       run: |
         set -uo pipefail
         args=(ci
@@ -85,4 +90,5 @@ runs:
         if [ "$STREAM" = "true" ]; then args+=(--stream); else args+=(--no-stream); fi
         if [ -n "$IDLE" ]; then args+=(--idle-timeout "$IDLE"); fi
         if [ -n "$SARIF" ]; then args+=(--sarif "$SARIF"); fi
+        if [ -n "$BASELINE" ]; then args+=(--baseline "$BASELINE"); fi
         council "${args[@]}"

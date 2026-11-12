@@ -5,11 +5,13 @@ from __future__ import annotations
 import json
 import subprocess
 import time
+from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
 
 import pytest
 
+from council.baseline import from_run, write as write_baseline
 from council.prompt import instrument_digest
 from council.repo import init
 from council.run import (DEFAULT_PROFILE, PromptTooLarge, ReviewError, ReviewRequest,
@@ -75,6 +77,79 @@ def test_a_proven_finding_is_written_and_fails(tmp_path: Path) -> None:
     assert [s["ok"] for s in payload["samples"]] == [True, True]
     assert (report.run_dir / "sample-1.json").exists()
     assert (report.run_dir / "sample-2.json").exists()
+
+
+def test_a_baseline_suppresses_an_accepted_finding(tmp_path: Path) -> None:
+    repo, _ = make_repo(tmp_path)
+    first = review(ReviewRequest(repo=repo, samples=1, run_id="before"),
+                   lambda _: body({"security": [secret()]}))
+    assert first.verdict is Verdict.FAIL
+    path = Path("baseline.json")
+    created = date.today()
+    write_baseline(repo / path, from_run(first.run_dir, owner="team", reason="old issue",
+                                        created=created,
+                                        expires=created + timedelta(days=90)))
+
+    second = review(ReviewRequest(repo=repo, samples=1, run_id="after",
+                                  baseline=path),
+                    lambda _: body({"security": [secret()]}))
+    assert second.verdict is Verdict.PASS
+    assert second.exit_code == 0
+    assert second.gate is not None
+    assert second.gate.suppressed == ("F-01",)
+    payload = json.loads((second.run_dir / "verdict.json").read_text(encoding="utf-8"))
+    assert payload["verdict"] == "pass"
+    assert payload["evidence_verdict"] == "fail"
+    assert payload["baseline"]["suppressed"] == ["F-01"]
+
+
+def test_a_baseline_does_not_suppress_a_new_finding(tmp_path: Path) -> None:
+    repo, _ = make_repo(tmp_path)
+    first = review(ReviewRequest(repo=repo, samples=1, run_id="before2"),
+                   lambda _: body({"security": [secret()]}))
+    path = repo / "baseline.json"
+    created = date.today()
+    write_baseline(path, from_run(first.run_dir, owner="team", reason="old issue",
+                                  created=created, expires=created + timedelta(days=90)))
+
+    second = review(ReviewRequest(repo=repo, samples=1, run_id="after2", baseline=path),
+                    lambda _: body({"security": [secret(claim="A different issue.")]}))
+    assert second.verdict is Verdict.FAIL
+    assert second.gate is not None
+    assert second.gate.suppressed == ()
+    assert second.gate.stale
+
+
+def test_a_baseline_cannot_be_edited_by_the_diff_it_judges(tmp_path: Path) -> None:
+    repo, _ = make_repo(tmp_path)
+    baseline = repo / ".council" / "baseline.json"
+    baseline.parent.mkdir()
+    baseline.write_text('{"version": 1, "entries": []}\n', encoding="utf-8")
+    git(repo, "add", ".council/baseline.json")
+    git(repo, "commit", "-qm", "baseline")
+    base = git(repo, "rev-parse", "HEAD")
+    baseline.write_text('{"version": 1, "entries": []}\n# edited\n', encoding="utf-8")
+
+    with pytest.raises(ReviewError, match="baseline file is changed"):
+        review(ReviewRequest(repo=repo, base=base, run_id="baseline-edit",
+                             baseline=Path(".council/baseline.json"),
+                             baseline_from_base=True),
+               lambda _: body())
+
+
+def test_a_missing_baseline_is_a_start_failure_before_the_reviewer(tmp_path: Path) -> None:
+    repo, _ = make_repo(tmp_path)
+    calls: list[str] = []
+
+    def runner(prompt: str) -> str:
+        calls.append(prompt)
+        return body()
+
+    with pytest.raises(ReviewError, match="no baseline"):
+        review(ReviewRequest(repo=repo, run_id="no-baseline",
+                             baseline=Path("absent.json")), runner)
+    assert calls == []
+    assert not (repo / ".council" / "runs" / "no-baseline").exists()
 
 
 def test_a_file_the_diff_cannot_carry_is_recorded(tmp_path: Path) -> None:

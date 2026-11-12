@@ -12,6 +12,7 @@ import pytest
 
 import council.cli as cli
 from council.findings import Finding, State
+from council.domain.baseline import GateResult
 from council.repo import Skipped
 from council.run import PromptTooLarge, Report, ReviewError
 from council.verdict import Result, Verdict
@@ -19,7 +20,8 @@ from council.verdict import Result, Verdict
 
 def report(verdict: Verdict, *, run_dir: Path | None = None,
            findings: tuple[Finding, ...] = (),
-           skipped: tuple[Skipped, ...] = ()) -> Report:
+           skipped: tuple[Skipped, ...] = (),
+           gate: GateResult | None = None) -> Report:
     return Report(
         run_dir=run_dir or Path("/nonexistent"),
         base="a" * 40,
@@ -28,6 +30,7 @@ def report(verdict: Verdict, *, run_dir: Path | None = None,
         result=Result(verdict, "a reason", findings),
         samples=(),
         skipped=skipped,
+        gate=gate,
     )
 
 
@@ -85,6 +88,45 @@ def test_a_usage_error_exits_three() -> None:
     with pytest.raises(SystemExit) as raised:
         cli.main(["review", "--samples", "not-a-number"])
     assert raised.value.code == 3
+
+
+def test_ci_reads_a_baseline_from_the_base_revision_by_default() -> None:
+    parser = cli.build_parser()
+    assert parser.parse_args(["ci", "--baseline", ".council/baseline.json"]).baseline_from_base
+    assert not parser.parse_args(["review", "--baseline", "baseline.json"]).baseline_from_base
+
+
+def test_baseline_create_requires_an_owner() -> None:
+    with pytest.raises(SystemExit) as raised:
+        cli.main(["baseline", "create", "--from", "/tmp/run", "--out", "/tmp/b.json"])
+    assert raised.value.code == 3
+
+
+def test_baseline_flags_reach_the_request(monkeypatch: pytest.MonkeyPatch) -> None:
+    seen: dict[str, object] = {}
+
+    def capture(request: Any, runner: Any) -> Report:
+        seen["baseline"] = request.baseline
+        seen["strict"] = request.baseline_strict
+        return report(Verdict.PASS)
+
+    monkeypatch.setattr(cli, "review", capture)
+    assert cli.main(["review", "--baseline", "baseline.json", "--baseline-strict"]) == 0
+    assert seen == {"baseline": Path("baseline.json"), "strict": True}
+
+
+def test_a_baselined_finding_is_not_a_sarif_alert(tmp_path: Path,
+                                                  monkeypatch: pytest.MonkeyPatch) -> None:
+    item = Finding("F-01", "security", "high", State.PROVEN, "a.py:2",
+                   "A claim.", "detail", "proof")
+    gate = GateResult(Verdict.PASS, "baselined", suppressed=("F-01",), entries=1)
+    monkeypatch.setattr(cli, "review",
+                        lambda request, runner: report(Verdict.FAIL, findings=(item,),
+                                                        gate=gate))
+    path = tmp_path / "council.sarif"
+    assert cli.main(["review", "--sarif", str(path)]) == 0
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    assert payload["runs"][0]["results"] == []
 
 
 def test_the_context_urls_are_passed_through(monkeypatch: pytest.MonkeyPatch) -> None:

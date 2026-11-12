@@ -719,3 +719,102 @@ check = "python3 -m pytest tests/test_run.py::test_a_boolean_request_number_is_r
 id = "a-symlinked-config-is-refused"
 text = "A repository configuration that is a symlink is refused, not read."
 check = "python3 -m pytest tests/test_config.py::test_a_symlinked_config_is_refused -q"
+
+[[claim]]
+id = "a-baseline-suppresses-a-proven-finding"
+text = "A baseline suppresses a proven blocking finding after the evidence verdict."
+check = "python3 -m pytest tests/test_run.py::test_a_baseline_suppresses_an_accepted_finding -q"
+
+[[claim]]
+id = "a-baseline-does-not-suppress-a-new-finding"
+text = "A baseline does not suppress a new finding."
+check = "python3 -m pytest tests/test_run.py::test_a_baseline_does_not_suppress_a_new_finding -q"
+
+[[claim]]
+id = "a-baseline-does-not-suppress-missing-evidence"
+text = "A baseline cannot suppress an unsettled finding."
+check = "python3 -m pytest tests/test_baseline.py::test_an_unsettled_finding_cannot_be_suppressed -q"
+falsifier = "baseline-suppresses-open-findings"
+
+[[claim]]
+id = "a-baseline-does-not-suppress-unrunnable"
+text = "A baseline cannot suppress an unrunnable finding."
+check = "python3 -m pytest tests/test_baseline.py::test_an_unrunnable_finding_cannot_be_suppressed -q"
+
+[[claim]]
+id = "a-baseline-cannot-hide-missing-evidence"
+text = "A failing run with missing evidence cannot become PASS through a baseline."
+check = "python3 -m pytest tests/test_baseline.py::test_a_failing_verdict_with_missing_evidence_cannot_become_a_pass -q"
+falsifier = "baseline-forgets-missing-evidence"
+
+[[claim]]
+id = "a-baseline-expires"
+text = "An expired baseline entry does not suppress a finding."
+check = "python3 -m pytest tests/test_baseline.py::test_an_expired_entry_does_not_suppress -q"
+falsifier = "baseline-ignores-expiry"
+
+[[claim]]
+id = "a-baseline-cannot-be-edited-by-its-diff"
+text = "A baseline changed in the reviewed diff is refused unless explicitly allowed."
+check = "python3 -m pytest tests/test_run.py::test_a_baseline_cannot_be_edited_by_the_diff_it_judges -q"
+falsifier = "baseline-may-be-edited"
+
+[[claim]]
+id = "baseline-is-read-from-the-base-revision"
+text = "A baseline can be read from a committed revision, not the working tree."
+check = "python3 -m pytest tests/test_baseline.py::test_load_at_reads_the_base_revision_not_the_worktree -q"
+
+[[claim]]
+id = "baseline-fingerprint-includes-severity"
+text = "A severity escalation is not covered by a baseline for the lower severity."
+check = "python3 -m pytest tests/test_baseline.py::test_a_severity_escalation_is_not_covered_by_an_old_baseline -q"
+
+[[claim]]
+id = "baseline-entry-requires-owner-and-reason"
+text = "A baseline entry requires an owner and a reason."
+check = "python3 -m pytest tests/test_baseline.py::test_an_entry_requires_an_owner_and_reason -q"
+
+[[claim]]
+id = "baseline-create-uses-only-proven-blocking"
+text = "Baseline creation snapshots only proven blocking findings."
+check = "python3 -m pytest tests/test_baseline.py::test_only_proven_blocking_findings_enter_a_baseline -q"
+
+[[claim]]
+id = "baseline-prune-removes-stale"
+text = "Baseline prune removes entries whose finding is no longer present."
+check = "python3 -m pytest tests/test_baseline.py::test_the_cli_prunes_only_stale_entries -q"
+
+[[claim]]
+id = "baseline-strict-fails-stale"
+text = "Strict baseline mode fails a stale entry even when the evidence passes."
+check = "python3 -m pytest tests/test_baseline.py::test_strict_mode_fails_a_stale_baseline_even_when_evidence_passes -q"
+
+[[claim]]
+id = "a-baseline-file-is-a-regular-file"
+text = "A symlinked baseline file is refused."
+check = "python3 -m pytest tests/test_baseline.py::test_a_symlinked_baseline_is_refused -q"
+
+[[claim]]
+id = "a-missing-baseline-is-a-start-failure"
+text = "A missing baseline is a start failure before the reviewer is called."
+check = "python3 -m pytest tests/test_run.py::test_a_missing_baseline_is_a_start_failure_before_the_reviewer -q"
+
+[[claim]]
+id = "a-baselined-finding-is-not-a-sarif-alert"
+text = "A baselined finding is absent from the SARIF results."
+check = "python3 -m pytest tests/test_cli.py::test_a_baselined_finding_is_not_a_sarif_alert -q"
+
+[[claim]]
+id = "a-tampered-baseline-fingerprint-is-refused"
+text = "A baseline entry whose fingerprint does not match its fields is refused."
+check = "python3 -m pytest tests/test_baseline.py::test_a_tampered_fingerprint_is_refused -q"
+
+[[claim]]
+id = "a-non-utf8-baseline-is-refused"
+text = "A baseline blob that is not UTF-8 is refused, not decoded."
+check = "python3 -m pytest tests/test_baseline.py::test_load_at_refuses_a_non_utf8_baseline -q"
+
+[[claim]]
+id = "a-baseline-cannot-be-seeded-by-an-incomplete-run"
+text = "An incomplete run cannot create or prune a baseline."
+check = "python3 -m pytest tests/test_baseline.py::test_an_incomplete_run_cannot_seed_a_baseline -q"

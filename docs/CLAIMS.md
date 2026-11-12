@@ -147,3 +147,22 @@ registry, so it cannot describe a claim that has no check.
 | `config-is-preflighted-before-expensive-work` | A malformed council.toml is refused before the reviewer is called. | `python3 -m pytest tests/test_run.py::test_malformed_config_is_found_before_the_reviewer -q` |
 | `a-boolean-request-number-is-refused` | A boolean request number is refused instead of being read as 0 or 1. | `python3 -m pytest tests/test_run.py::test_a_boolean_request_number_is_refused -q` |
 | `a-symlinked-config-is-refused` | A repository configuration that is a symlink is refused, not read. | `python3 -m pytest tests/test_config.py::test_a_symlinked_config_is_refused -q` |
+| `a-baseline-suppresses-a-proven-finding` | A baseline suppresses a proven blocking finding after the evidence verdict. | `python3 -m pytest tests/test_run.py::test_a_baseline_suppresses_an_accepted_finding -q` |
+| `a-baseline-does-not-suppress-a-new-finding` | A baseline does not suppress a new finding. | `python3 -m pytest tests/test_run.py::test_a_baseline_does_not_suppress_a_new_finding -q` |
+| `a-baseline-does-not-suppress-missing-evidence` | A baseline cannot suppress an unsettled finding. | `python3 -m pytest tests/test_baseline.py::test_an_unsettled_finding_cannot_be_suppressed -q` |
+| `a-baseline-does-not-suppress-unrunnable` | A baseline cannot suppress an unrunnable finding. | `python3 -m pytest tests/test_baseline.py::test_an_unrunnable_finding_cannot_be_suppressed -q` |
+| `a-baseline-cannot-hide-missing-evidence` | A failing run with missing evidence cannot become PASS through a baseline. | `python3 -m pytest tests/test_baseline.py::test_a_failing_verdict_with_missing_evidence_cannot_become_a_pass -q` |
+| `a-baseline-expires` | An expired baseline entry does not suppress a finding. | `python3 -m pytest tests/test_baseline.py::test_an_expired_entry_does_not_suppress -q` |
+| `a-baseline-cannot-be-edited-by-its-diff` | A baseline changed in the reviewed diff is refused unless explicitly allowed. | `python3 -m pytest tests/test_run.py::test_a_baseline_cannot_be_edited_by_the_diff_it_judges -q` |
+| `baseline-is-read-from-the-base-revision` | A baseline can be read from a committed revision, not the working tree. | `python3 -m pytest tests/test_baseline.py::test_load_at_reads_the_base_revision_not_the_worktree -q` |
+| `baseline-fingerprint-includes-severity` | A severity escalation is not covered by a baseline for the lower severity. | `python3 -m pytest tests/test_baseline.py::test_a_severity_escalation_is_not_covered_by_an_old_baseline -q` |
+| `baseline-entry-requires-owner-and-reason` | A baseline entry requires an owner and a reason. | `python3 -m pytest tests/test_baseline.py::test_an_entry_requires_an_owner_and_reason -q` |
+| `baseline-create-uses-only-proven-blocking` | Baseline creation snapshots only proven blocking findings. | `python3 -m pytest tests/test_baseline.py::test_only_proven_blocking_findings_enter_a_baseline -q` |
+| `baseline-prune-removes-stale` | Baseline prune removes entries whose finding is no longer present. | `python3 -m pytest tests/test_baseline.py::test_the_cli_prunes_only_stale_entries -q` |
+| `baseline-strict-fails-stale` | Strict baseline mode fails a stale entry even when the evidence passes. | `python3 -m pytest tests/test_baseline.py::test_strict_mode_fails_a_stale_baseline_even_when_evidence_passes -q` |
+| `a-baseline-file-is-a-regular-file` | A symlinked baseline file is refused. | `python3 -m pytest tests/test_baseline.py::test_a_symlinked_baseline_is_refused -q` |
+| `a-missing-baseline-is-a-start-failure` | A missing baseline is a start failure before the reviewer is called. | `python3 -m pytest tests/test_run.py::test_a_missing_baseline_is_a_start_failure_before_the_reviewer -q` |
+| `a-baselined-finding-is-not-a-sarif-alert` | A baselined finding is absent from the SARIF results. | `python3 -m pytest tests/test_cli.py::test_a_baselined_finding_is_not_a_sarif_alert -q` |
+| `a-tampered-baseline-fingerprint-is-refused` | A baseline entry whose fingerprint does not match its fields is refused. | `python3 -m pytest tests/test_baseline.py::test_a_tampered_fingerprint_is_refused -q` |
+| `a-non-utf8-baseline-is-refused` | A baseline blob that is not UTF-8 is refused, not decoded. | `python3 -m pytest tests/test_baseline.py::test_load_at_refuses_a_non_utf8_baseline -q` |
+| `a-baseline-cannot-be-seeded-by-an-incomplete-run` | An incomplete run cannot create or prune a baseline. | `python3 -m pytest tests/test_baseline.py::test_an_incomplete_run_cannot_seed_a_baseline -q` |

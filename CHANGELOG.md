@@ -11,6 +11,15 @@ public surface, the definitions, and the release procedure — is
 
 ### Added
 
+- A committed accepted-risk baseline: `council baseline create/prune`,
+  `--baseline`, `--baseline-from-base`, `--baseline-strict` and
+  `--allow-baseline-change`. It applies only after the evidence verdict; only
+  proven blocking findings can be suppressed, never `UNRUNNABLE`, `UNSETTLED`,
+  a failed sample or an unreviewed unit. `ci` and `pr` read it from the base
+  revision so a PR cannot edit its own baseline; changing the baseline in the
+  reviewed diff is a start failure unless explicitly allowed. Entries carry an
+  owner, reason and expiry, and are fingerprinted by dimension, severity, file,
+  claim and proof. `verdict.json` records both `evidence_verdict` and `verdict`.
 - A pure domain kernel in `council.domain`: run-id validation, configuration
   parsing, adjudication from proof outcomes, and sandbox argv construction.
   `GLOSSARY.md` fixes the domain vocabulary; `docs/ARCHITECTURE.md` records the

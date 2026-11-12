@@ -59,6 +59,8 @@ a trend; it cannot change it.
 council review                # gate: 0 pass, 1 fail, 2 incomplete, 3 could not start
 council review --plan         # units, prompt sizes and skipped files; no model call
 council pr 123                # review a GitHub pull request (needs gh and its head checked out)
+council baseline create       # snapshot accepted proven findings from a kept run
+council baseline prune        # remove entries whose finding is gone
 council ci                    # the same gate for CI: verdict.json on stdout
 council doctor                # can this machine run a review? measure, don't assume
 council --version             # what is installed
@@ -100,6 +102,30 @@ reviewer and without writing a run directory**. `--json` gives the same as
 objects. It is how a user sees why a change will be sliced or refused before
 spending a model call.
 
+## Baselines
+
+Existing repositories need a way to adopt the gate without failing on every
+known issue. A baseline is a committed list of proven blocking findings that a
+team has explicitly accepted; it is applied after the evidence verdict and never
+changes a finding's state.
+
+```sh
+council review --no-ephemeral --run-id before
+council baseline create --from .council/runs/before \
+  --out council-baseline.json --owner platform-team --reason "legacy, tracked" --days 90
+council ci --baseline council-baseline.json
+```
+
+`ci` and `pr` read the baseline from the **base revision** by default, so a pull
+request cannot edit the baseline to hide its own new finding. A diff that changes
+the baseline is refused unless `--allow-baseline-change` is explicit.
+`--baseline-from-base` makes a local review use the base revision;
+`--baseline-strict` fails when any entry is expired or stale. Missing evidence —
+`UNRUNNABLE`, `UNSETTLED`, a failed sample, an unreviewed unit — is never
+suppressed. Entries expire; stale entries are reported and can be pruned.
+The full contract, file format and trust rules are in
+[`docs/BASELINE.md`](docs/BASELINE.md).
+
 ## Quickstart
 
 ### The wheel — no nix on the host
@@ -135,7 +161,9 @@ The composite action installs the wheel into a private environment, runs
 `council doctor`, then `council ci`, and writes `council.sarif`. It needs a
 runner that has Hermes; it never installs one. The workflow in
 `.github/workflows/council.yml` is the working example, including the
-`upload-sarif` step that puts proven findings in code scanning.
+`upload-sarif` step that puts proven findings in code scanning. Set the action's
+`baseline` input to the committed baseline path; `ci` reads it from the base
+revision.
 
 ## Configuration
 
@@ -288,19 +316,21 @@ as objects.
 
 A pure kernel and an enumerated effect shell. The kernel is `findings`, `verdict`,
 `merge`, `schema`, `prompt`, `changes`, `context`, `sarif` and
-`council.domain` (`run_id`, `config`, `adjudication`, `sandbox`). A kernel module
-may not import an adapter, spawn a process, read or write a path, read the
-environment or wait; a test parses the module that is actually imported and
-enforces it (`tests/test_architecture.py`), including method calls and import
-direction. The earlier version of that gate listed `paths` as pure even though it
-called `is_symlink()`; it was replaced rather than patched around.
+`council.domain` (`run_id`, `config`, `adjudication`, `baseline`, `proof`,
+`sandbox`). A kernel module may not import an adapter, spawn a process, read or
+write a path, read the environment or wait; a test parses the module that is
+actually imported and enforces it (`tests/test_architecture.py`), including
+method calls and import direction. The earlier version of that gate listed
+`paths` as pure even though it called `is_symlink()`; it was replaced rather than
+patched around.
 
 Everything that acts is in a module a reader can name: `repo` (git), `proofs` and
-`sandbox` (commands), `sample` and `runner` (the model), `config` and `version`
-(the environment and package metadata), `paths` (the state-directory guard), `run`
-(writes the run), `cli` (stdout), `claims` (runs the registry). That is the whole
-of the side effects. The boundary, the SOLID scorecard and the remaining debt are
-in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md); the domain vocabulary is in
+`sandbox` (commands), `sample` and `runner` (the model), `config`, `baseline`
+and `version` (the environment, policy file and package metadata), `paths` (the
+state-directory guard), `run` (writes the run), `cli` (stdout), `claims` (runs
+the registry). That is the whole of the side effects. The boundary, the SOLID
+scorecard and the remaining debt are in
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md); the domain vocabulary is in
 [`GLOSSARY.md`](GLOSSARY.md).
 
 The rebuild's acceptance criteria, every amendment to them, and the command that
