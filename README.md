@@ -286,17 +286,22 @@ as objects.
 
 ## Architecture
 
-A pure core and an enumerated effect shell. `findings`, `verdict`, `merge`, `schema`,
-`prompt` and `paths` may not import `subprocess`, `urllib`, `os`, `time`, `random`,
-`shutil`, `tempfile` or `sys`, and may not call `open`, `write_text`, `write_bytes`,
-`mkdir`, `unlink`, `rename`, `run`, `Popen`, `system` or `urlopen`. A test enforces it
-(`tests/test_architecture.py`), because "the verdict is a pure function" is a claim about
-the whole path from parsed sample to `Result`, not about one function.
+A pure kernel and an enumerated effect shell. The kernel is `findings`, `verdict`,
+`merge`, `schema`, `prompt`, `changes`, `context`, `sarif` and
+`council.domain` (`run_id`, `config`, `adjudication`, `sandbox`). A kernel module
+may not import an adapter, spawn a process, read or write a path, read the
+environment or wait; a test parses the module that is actually imported and
+enforces it (`tests/test_architecture.py`), including method calls and import
+direction. The earlier version of that gate listed `paths` as pure even though it
+called `is_symlink()`; it was replaced rather than patched around.
 
 Everything that acts is in a module a reader can name: `repo` (git), `proofs` and
-`sandbox` (commands), `sample` and `runner` (the model), `config` (the repository's
-file), `run` (writes the run), `cli` (stdout), `claims` (runs the registry). That is the
-whole of the side effects.
+`sandbox` (commands), `sample` and `runner` (the model), `config` and `version`
+(the environment and package metadata), `paths` (the state-directory guard), `run`
+(writes the run), `cli` (stdout), `claims` (runs the registry). That is the whole
+of the side effects. The boundary, the SOLID scorecard and the remaining debt are
+in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md); the domain vocabulary is in
+[`GLOSSARY.md`](GLOSSARY.md).
 
 The rebuild's acceptance criteria, every amendment to them, and the command that
 decides each one: `docs/M11.md`. The time budget and the doctor checks are

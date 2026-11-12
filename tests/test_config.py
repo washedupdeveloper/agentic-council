@@ -119,3 +119,13 @@ def test_a_broken_symlink_is_a_config_error(tmp_path: Path) -> None:
     path.symlink_to(tmp_path / "missing.toml")
     with pytest.raises(ConfigError, match="broken symlink"):
         load(path)
+
+
+def test_a_symlinked_config_is_refused(tmp_path: Path) -> None:
+    """The repository's config is untrusted; a link can point outside the checkout."""
+    target = tmp_path / "elsewhere.toml"
+    target.write_text("[proofs]\ntimeout = 5\n", encoding="utf-8")
+    path = tmp_path / "council.toml"
+    path.symlink_to(target)
+    with pytest.raises(ConfigError, match="symlink"):
+        load(path)

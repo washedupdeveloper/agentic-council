@@ -9,6 +9,42 @@ public surface, the definitions, and the release procedure — is
 
 ## Unreleased
 
+### Added
+
+- A pure domain kernel in `council.domain`: run-id validation, configuration
+  parsing, adjudication from proof outcomes, and sandbox argv construction.
+  `GLOSSARY.md` fixes the domain vocabulary; `docs/ARCHITECTURE.md` records the
+  dependency rule, the SOLID scorecard and the remaining debt.
+- A stronger architecture gate. It parses the imported module, checks effectful
+  method calls and import direction, and fails when a new module that acts is
+  not named as an adapter. The previous gate listed `paths` as pure even though
+  it called `is_symlink()`.
+- `adjudicate(..., prove=...)` injects the proof executor; the decision itself
+  is `council.domain.adjudication.decide` and refuses an outcome/finding count
+  mismatch.
+
+### Changed
+
+- `config.load` now only reads and delegates to the pure `domain.config.parse`.
+  `version.current_version()` is the only package-metadata reader; importing
+  `council` no longer performs I/O. SARIF renderers take the tool version as an
+  argument.
+- `paths` keeps the file-system symlink guard; the run-id *name* is validated by
+  the pure `domain.run_id`.
+- `sample.payload` is the pure serialisation decision; `write_sample` is the
+  adapter.
+
+### Fixed
+
+- A malformed `council.toml` is refused before git, context fetches, prompt
+  construction or a reviewer call. A missing prompt or an empty change no longer
+  triggers a context fetch.
+- A `council.toml` that is a symlink is refused rather than read through the
+  link; the repository config may not redirect the policy input outside the
+  checkout.
+- Boolean values are refused for samples, prompt budget, context depth, time
+  budget and idle timeout instead of being read as `0`/`1`.
+
 ## [2.0.0] — 2026-11-09
 
 The first release of the rebuilt engine: the wheel installs with no

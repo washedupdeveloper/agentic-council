@@ -137,3 +137,13 @@ registry, so it cannot describe a claim that has no check.
 | `a-stream-result-with-empty-text-falls-back` | An empty stream result falls back to the text events. | `python3 -m pytest tests/test_runner.py::test_a_stream_result_with_empty_text_falls_back_to_text_events -q` |
 | `run-id-rejects-format-characters` | A run id rejects bidi, zero-width and line-separator characters. | `python3 -m pytest tests/test_paths.py::test_a_run_id_must_be_a_portable_segment -q` |
 | `a-present-proof-refuses-a-fifo` | A present proof refuses a FIFO without opening it. | `python3 -m pytest tests/test_proofs.py::test_present_refuses_a_fifo_without_opening_it -q` |
+| `the-domain-kernel-does-not-act` | No domain-kernel module imports or calls an effect. | `python3 -m pytest tests/test_architecture.py::test_a_pure_module_calls_nothing_that_acts -q` |
+| `an-effectful-module-must-be-a-named-adapter` | A new module that acts must be named as an adapter. | `python3 -m pytest tests/test_architecture.py::test_every_module_that_acts_is_named_as_an_adapter -q` |
+| `the-package-import-reads-no-metadata` | Importing the package performs no installed-version lookup. | `python3 -m pytest tests/test_architecture.py::test_the_package_import_reads_no_metadata -q` |
+| `config-parsing-is-pure` | Configuration parsing takes text and returns a value without touching a file. | `python3 -m pytest tests/test_domain_kernel.py::test_config_parse_reads_text_not_a_file -q` |
+| `adjudication-is-a-pure-decision` | Adjudication decides findings from proof outcomes without executing a proof. | `python3 -m pytest tests/test_domain_kernel.py::test_adjudication_is_reproducible_from_outcomes -q` |
+| `adjudication-refuses-mismatched-outcomes` | Adjudication refuses a different number of outcome groups and findings. | `python3 -m pytest tests/test_domain_kernel.py::test_adjudication_refuses_a_mismatched_outcome_group -q` |
+| `sandbox-argv-is-a-pure-decision` | Sandbox argv construction takes resolved inputs and performs no lookup or spawn. | `python3 -m pytest tests/test_domain_kernel.py::test_sandbox_command_is_built_from_resolved_inputs -q` |
+| `config-is-preflighted-before-expensive-work` | A malformed council.toml is refused before the reviewer is called. | `python3 -m pytest tests/test_run.py::test_malformed_config_is_found_before_the_reviewer -q` |
+| `a-boolean-request-number-is-refused` | A boolean request number is refused instead of being read as 0 or 1. | `python3 -m pytest tests/test_run.py::test_a_boolean_request_number_is_refused -q` |
+| `a-symlinked-config-is-refused` | A repository configuration that is a symlink is refused, not read. | `python3 -m pytest tests/test_config.py::test_a_symlinked_config_is_refused -q` |

@@ -668,3 +668,54 @@ check = "python3 -m pytest tests/test_paths.py::test_a_run_id_must_be_a_portable
 id = "a-present-proof-refuses-a-fifo"
 text = "A present proof refuses a FIFO without opening it."
 check = "python3 -m pytest tests/test_proofs.py::test_present_refuses_a_fifo_without_opening_it -q"
+
+[[claim]]
+id = "the-domain-kernel-does-not-act"
+text = "No domain-kernel module imports or calls an effect."
+check = "python3 -m pytest tests/test_architecture.py::test_a_pure_module_calls_nothing_that_acts -q"
+
+[[claim]]
+id = "an-effectful-module-must-be-a-named-adapter"
+text = "A new module that acts must be named as an adapter."
+check = "python3 -m pytest tests/test_architecture.py::test_every_module_that_acts_is_named_as_an_adapter -q"
+
+[[claim]]
+id = "the-package-import-reads-no-metadata"
+text = "Importing the package performs no installed-version lookup."
+check = "python3 -m pytest tests/test_architecture.py::test_the_package_import_reads_no_metadata -q"
+
+[[claim]]
+id = "config-parsing-is-pure"
+text = "Configuration parsing takes text and returns a value without touching a file."
+check = "python3 -m pytest tests/test_domain_kernel.py::test_config_parse_reads_text_not_a_file -q"
+falsifier = "config-parsing-reads-a-file"
+
+[[claim]]
+id = "adjudication-is-a-pure-decision"
+text = "Adjudication decides findings from proof outcomes without executing a proof."
+check = "python3 -m pytest tests/test_domain_kernel.py::test_adjudication_is_reproducible_from_outcomes -q"
+
+[[claim]]
+id = "adjudication-refuses-mismatched-outcomes"
+text = "Adjudication refuses a different number of outcome groups and findings."
+check = "python3 -m pytest tests/test_domain_kernel.py::test_adjudication_refuses_a_mismatched_outcome_group -q"
+
+[[claim]]
+id = "sandbox-argv-is-a-pure-decision"
+text = "Sandbox argv construction takes resolved inputs and performs no lookup or spawn."
+check = "python3 -m pytest tests/test_domain_kernel.py::test_sandbox_command_is_built_from_resolved_inputs -q"
+
+[[claim]]
+id = "config-is-preflighted-before-expensive-work"
+text = "A malformed council.toml is refused before the reviewer is called."
+check = "python3 -m pytest tests/test_run.py::test_malformed_config_is_found_before_the_reviewer -q"
+
+[[claim]]
+id = "a-boolean-request-number-is-refused"
+text = "A boolean request number is refused instead of being read as 0 or 1."
+check = "python3 -m pytest tests/test_run.py::test_a_boolean_request_number_is_refused -q"
+
+[[claim]]
+id = "a-symlinked-config-is-refused"
+text = "A repository configuration that is a symlink is refused, not read."
+check = "python3 -m pytest tests/test_config.py::test_a_symlinked_config_is_refused -q"

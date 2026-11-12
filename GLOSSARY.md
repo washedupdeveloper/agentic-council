@@ -1,0 +1,28 @@
+# Glossary
+
+One meaning per term. If code and prose disagree, the glossary is wrong until the
+code changes; a second name for the same thing is a defect.
+
+| Term | Meaning |
+|---|---|
+| **Review** | One request to judge one change. It ends in exactly one verdict and, unless planned or ephemeral, one run directory. |
+| **Change** | The text between a base revision and a head revision, plus the files the tool could not include. A change is not a commit range in the domain; it is the diff the reviewer sees. |
+| **Base / head** | The revisions that bound the change. `head` is the revision the review describes; `base` is the merge base the caller asked for. |
+| **Unit** | One prompt-sized slice of a change. A unit exists only when the full prompt exceeds the budget; every unit is either reviewed or named as unreviewed. |
+| **Sample** | One reviewer answer to one prompt. A sample can fail; a failed sample is evidence of missing evidence, never a silent omission. |
+| **Attempt** | One try inside a sample. A sample records every attempt's failure and the last raw answer. |
+| **Finding** | A claim about the change, paired with the state its proof reached. A finding is the domain's atom; it is not a model opinion once adjudicated. |
+| **Claim** | The sentence a finding asserts, and the thing a caller can agree or disagree with. The reviewer proposes it; the proof settles it. |
+| **Proof** | A check named by a finding. A proof kind is one registered executor (`present`, `absent`, `command`, `json`, `diff`, …); it returns an outcome, not a boolean. |
+| **State** | `PROVEN`, `REFUTED`, `UNSETTLED` or `UNRUNNABLE`. `PROVEN` is the only failing state; `UNRUNNABLE` means the check could not be made, not that the claim is false. |
+| **Verdict** | `PASS`, `FAIL` or `INCOMPLETE`. It is a pure function of finding states and missing evidence, never a numeric threshold. |
+| **Agreement** | Whether the samples that answered describe the same blocking set. `null` when any sample has no usable answer; never computed from the survivors. |
+| **Evidence** | The artefacts that justify a verdict: samples, proof outcomes, the diff digest, the prompt digest and the reason. Evidence is not the reviewer's prose alone. |
+| **Run** | The directory that holds one review's evidence. It is claimed exclusively before the first sample and either kept or removed after the verdict. |
+| **Plan** | What a review would send and how it would slice it, without calling a reviewer or writing a run. |
+| **Instrument** | The reviewer prompt and the configuration that shape a sample. Its digest identifies the instrument independently of the answer. |
+| **Policy** | What the caller permits: allowed proof tools, timeout, sandbox. A repository may narrow a policy, never widen it. |
+| **Domain kernel** | The pure decision modules: run-id validation, configuration parsing, adjudication and sandbox argv construction. They take literals and return values; they do not read, write, spawn or wait. |
+| **Effect shell** | The adapters that read git, files, the environment and child processes, and write runs. Effects are allowed here, named in one list, and never imported by the kernel. |
+| **Adapter** | A concrete module at an effect seam: `repo`, `runner`, `proofs`, `pr`, `doctor`, `config`, `paths`, `sample`, `sandbox`, `cli`, `version`. An adapter may import the kernel; the kernel may not import an adapter. |
+| **Start failure** | The review could not begin: exit 3, no run directory, no model call. A review that ran and is missing evidence is `INCOMPLETE` (exit 2), not a start failure. |

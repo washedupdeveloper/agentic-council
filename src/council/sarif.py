@@ -7,7 +7,6 @@ state, where a reader can see why the run did or did not pass.
 
 from __future__ import annotations
 
-from . import __version__
 from .findings import Finding, State
 from .schema import DIMENSIONS
 from .verdict import Result
@@ -48,7 +47,7 @@ def _message(finding: Finding) -> str:
     return finding.claim + (f"\n\n{finding.detail}" if finding.detail else "")
 
 
-def render(result: Result) -> dict[str, object]:
+def render(result: Result, *, tool_version: str = "0.0.0+source") -> dict[str, object]:
     """The run as a SARIF log. Proven findings only, one rule per dimension."""
     results: list[dict[str, object]] = []
     for finding in result.findings:
@@ -79,7 +78,7 @@ def render(result: Result) -> dict[str, object]:
             "tool": {
                 "driver": {
                     "name": "council",
-                    "version": __version__,
+                    "version": tool_version,
                     "rules": RULES,
                 },
             },

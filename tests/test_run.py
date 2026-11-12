@@ -202,6 +202,53 @@ def test_an_explicit_prompt_that_does_not_exist_is_refused(tmp_path: Path) -> No
                lambda _: body())
 
 
+def test_a_missing_prompt_is_found_before_a_context_fetch(
+        tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A cheap failure must not pay for the network call that follows it."""
+    import council.run as run_module
+
+    repo, _ = make_repo(tmp_path)
+    fetched: list[str] = []
+    monkeypatch.setattr(run_module, "fetch", lambda url: fetched.append(url))
+    with pytest.raises(ReviewError, match="no reviewer prompt"):
+        review(ReviewRequest(repo=repo, run_id="r4d", prompt=tmp_path / "absent.md",
+                             context_urls=("https://example.invalid/context",)),
+               lambda _: body())
+    assert fetched == []
+
+
+def test_an_empty_change_is_found_before_a_context_fetch(
+        tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import council.run as run_module
+
+    repo, _ = make_repo(tmp_path)
+    (repo / "a.py").unlink()
+    fetched: list[str] = []
+    monkeypatch.setattr(run_module, "fetch", lambda url: fetched.append(url))
+    with pytest.raises(ReviewError, match="change is empty"):
+        review(ReviewRequest(repo=repo, base="HEAD", run_id="r4e",
+                             context_urls=("https://example.invalid/context",)),
+               lambda _: body())
+    assert fetched == []
+
+
+def test_malformed_config_is_found_before_the_reviewer(tmp_path: Path) -> None:
+    from council.config import ConfigError
+
+    repo, _ = make_repo(tmp_path)
+    (repo / "council.toml").write_text("[proofs\n", encoding="utf-8")
+    calls: list[str] = []
+
+    def runner(prompt: str) -> str:
+        calls.append(prompt)
+        return body()
+
+    with pytest.raises(ConfigError, match="not valid TOML"):
+        review(ReviewRequest(repo=repo, run_id="bad-config"), runner)
+    assert calls == []
+    assert not (repo / ".council" / "runs" / "bad-config").exists()
+
+
 def test_the_reviewed_repository_cannot_supply_the_instrument(tmp_path: Path) -> None:
     """A prompt committed to the code under review is ignored.
 
@@ -233,6 +280,17 @@ def test_zero_samples_is_refused(tmp_path: Path) -> None:
     repo, _ = make_repo(tmp_path)
     with pytest.raises(ReviewError, match="at least 1"):
         review(ReviewRequest(repo=repo, samples=0, run_id="r5"), lambda _: body())
+
+
+@pytest.mark.parametrize("field", ["samples", "max_prompt_bytes", "context_depth",
+                                   "time_budget", "idle_timeout"])
+def test_a_boolean_request_number_is_refused(tmp_path: Path, field: str) -> None:
+    """`bool` is an `int`; accepting it would turn a flag into a silent quantity."""
+    repo, _ = make_repo(tmp_path)
+    with pytest.raises(ReviewError, match="must be an integer"):
+        review(ReviewRequest(repo=repo, run_id=f"bool-{field}", **{field: True}),
+               lambda _: body())
+    assert not (repo / ".council" / "runs" / f"bool-{field}").exists()
 
 
 def test_a_run_id_is_never_overwritten(tmp_path: Path) -> None:

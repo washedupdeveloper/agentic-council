@@ -13,7 +13,7 @@ from pathlib import Path
 from .adjudicate import adjudicate, verdict
 from .base import resolve_base
 from .changes import file_sections, hunk_range, hunk_sections
-from .config import CONFIG_NAME, load as load_config
+from .config import CONFIG_NAME, Config, load as load_config
 from .context import Context, build as build_context
 from .findings import OPEN_STATES, Finding, State, blocks
 from .merge import merge
@@ -142,6 +142,7 @@ class Prepared:
     """Everything a review and a plan share: the change, the instrument, the prompt."""
 
     root: Path
+    config: Config
     base: str
     head: str
     patch: str
@@ -414,8 +415,16 @@ def _write_verdict(run_dir: Path, request: ReviewRequest, base: str, head: str,
 
 
 def _prepare(request: ReviewRequest) -> Prepared:
-    """Resolve the change and build the prompt, with no side effect on disk."""
+    """Resolve the change and build the prompt, writing nothing.
+
+    This is an application step, not a pure decision: it reads git, the
+    repository configuration, the prompt and any caller-supplied references.
+    It deliberately loads the configuration and validates the change and prompt
+    before fetching references, so a cheap failure never pays for a network
+    call.
+    """
     root = repo_root(request.repo)
+    config = load_config(root / CONFIG_NAME)
     base = resolve_base(root, request.base)
     head = output(root, "rev-parse", "HEAD").strip()
     change = diff(root, base)
@@ -424,10 +433,15 @@ def _prepare(request: ReviewRequest) -> Prepared:
     # into the prompt. Replace those bytes once, here, so the prompt is valid.
     patch = change.patch.encode("utf-8", "surrogateescape").decode("utf-8", "replace")
     diff_sha256 = hashlib.sha256(patch.encode("utf-8")).hexdigest()
-    try:
-        references = tuple(fetch(url) for url in request.context_urls)
-    except FetchError as exc:
-        raise ReviewError(str(exc)) from exc
+
+    if not patch.strip():
+        if change.skipped:
+            names = ", ".join(item.path for item in change.skipped[:5])
+            more = f", +{len(change.skipped) - 5} more" if len(change.skipped) > 5 else ""
+            raise ReviewError(
+                f"the change has no reviewable text; skipped {len(change.skipped)} "
+                f"file(s): {names}{more}")
+        raise ReviewError("the change is empty: base and head are the same")
 
     prompt_file = request.prompt if request.prompt is not None else default_prompt()
     try:
@@ -441,14 +455,10 @@ def _prepare(request: ReviewRequest) -> Prepared:
     digest = instrument_digest(template, profile=request.profile,
                                reasoning=request.reasoning)
 
-    if not patch.strip():
-        if change.skipped:
-            names = ", ".join(item.path for item in change.skipped[:5])
-            more = f", +{len(change.skipped) - 5} more" if len(change.skipped) > 5 else ""
-            raise ReviewError(
-                f"the change has no reviewable text; skipped {len(change.skipped)} "
-                f"file(s): {names}{more}")
-        raise ReviewError("the change is empty: base and head are the same")
+    try:
+        references = tuple(fetch(url) for url in request.context_urls)
+    except FetchError as exc:
+        raise ReviewError(str(exc)) from exc
 
     full_context = build_context(patch, _reader(root), python_files(root),
                                  max_depth=request.context_depth - 1)
@@ -461,7 +471,7 @@ def _prepare(request: ReviewRequest) -> Prepared:
         raise ReviewError(f"the reviewer prompt is not usable: {exc}") from exc
     prompt_bytes = len(prompt.encode("utf-8"))
     sliced = prompt_bytes > request.max_prompt_bytes and not request.allow_large_prompt
-    return Prepared(root, base, head, patch, change.skipped, references, prompt_file,
+    return Prepared(root, config, base, head, patch, change.skipped, references, prompt_file,
                     template, digest, prompt, prompt_bytes, sliced, full_context,
                     diff_sha256)
 
@@ -478,6 +488,15 @@ def plan(request: ReviewRequest) -> Plan:
                 prepared.skipped, request.context_depth)
 
 
+def _integer(label: str, value: object, *, minimum: int | None = None) -> int:
+    """A request integer, rejecting bool (a subclass of int) and non-integers."""
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ReviewError(f"{label} must be an integer")
+    if minimum is not None and value < minimum:
+        raise ReviewError(f"{label} must be at least {minimum}")
+    return value
+
+
 def review(request: ReviewRequest, runner: Runner) -> Report:
     """Run one review and write every artefact under `.council/runs/<id>/`.
 
@@ -487,22 +506,23 @@ def review(request: ReviewRequest, runner: Runner) -> Report:
     `allow_large_prompt`. The decision belongs to a person (or to an explicit
     flag), never to the tool guessing.
     """
-    if request.samples is not None and request.samples < 1:
-        raise ReviewError("samples must be at least 1")
-    if request.max_prompt_bytes < 1:
-        raise ReviewError("the prompt limit must be at least 1 byte")
+    if request.samples is not None:
+        _integer("samples", request.samples, minimum=1)
+    _integer("the prompt limit", request.max_prompt_bytes, minimum=1)
+    _integer("context depth", request.context_depth)
+    _integer("the time budget", request.time_budget, minimum=0)
+    _integer("the idle timeout", request.idle_timeout, minimum=1)
     if request.context_depth not in (0, 1, 2, 3):
         raise ReviewError("context depth must be 0, 1, 2 or 3")
-    if request.time_budget < 0:
-        raise ReviewError("the time budget must not be negative")
-    if request.idle_timeout < 1:
-        raise ReviewError("the idle timeout must be at least 1 second")
-    if not request.profile.strip():
+    if not isinstance(request.profile, str) or not request.profile.strip():
         raise ReviewError("--profile must not be empty")
     if any(ord(ch) < 32 or 0xD800 <= ord(ch) <= 0xDFFF for ch in request.profile):
         raise ReviewError("--profile must be printable text")
-    if request.base is not None and not request.base.strip():
+    if request.base is not None and (not isinstance(request.base, str)
+                                     or not request.base.strip()):
         raise ReviewError("--base must not be empty")
+    if request.run_id is not None and not isinstance(request.run_id, str):
+        raise ReviewError("run id must be text")
     try:
         run_id = validate_run_id(
             request.run_id if request.run_id is not None
@@ -543,7 +563,7 @@ def review(request: ReviewRequest, runner: Runner) -> Report:
         except (OSError, ValueError) as exc:
             raise ReviewError(f"cannot use the state directory {directory}: {exc}") from exc
 
-    config = load_config(root / CONFIG_NAME)
+    config = prepared.config
     proofs = ProofContext(repo=root, allow=config.allow, diff=patch,
                           timeout=config.timeout, sandbox=config.sandbox)
     units = _build_units(template, base, patch, root, request, references) if sliced else []

@@ -81,14 +81,17 @@ process, not a monkeypatched function.
 
 ## M2 — Preparation
 
-**States:** `UNPREPARED`, `REPO_RESOLVED`, `BASE_RESOLVED`, `HEAD_RESOLVED`,
-`PATCH_BUILT`, `PROMPT_BUILT`, `PREPARED`.
+**States:** `UNPREPARED`, `CONFIG_LOADED`, `REPO_RESOLVED`, `BASE_RESOLVED`,
+`HEAD_RESOLVED`, `PATCH_BUILT`, `PROMPT_BUILT`, `PREPARED`.
 
 **Invariants**
 
 - `base` and `head` are commit ids; `base` is resolved before the diff.
-- A change with no reviewable text is refused; it is never sent as an empty
-  prompt.
+- `council.toml` is loaded and validated before base resolution, the diff, the
+  prompt read and any context fetch; malformed configuration cannot pay for
+  expensive work.
+- A change with no reviewable text is refused before the prompt is read and
+  before any context URL is fetched.
 - The prompt is valid UTF-8 and contains `{{base}}` and `{{diff}}`.
 - A non-UTF-8 byte in a tracked diff is replaced once, not allowed to crash the
   prompt encoder.
@@ -100,7 +103,8 @@ process, not a monkeypatched function.
 | from | event | guard | to | side effect |
 |---|---|---|---|---|
 | UNPREPARED | `repo_root` | not a worktree | REFUSED | exit 3 |
-| REPO_RESOLVED | `resolve_base` | unknown rev | REFUSED | exit 3 |
+| REPO_RESOLVED | `load_config` | malformed/unknown config | REFUSED | `ConfigError`, exit 3 |
+| CONFIG_LOADED | `resolve_base` | unknown rev | REFUSED | exit 3 |
 | BASE_RESOLVED | `git diff` | git error/timeout | REFUSED | exit 3 |
 | PATCH_BUILT | empty patch | no skipped files | REFUSED | “change is empty” |
 | PATCH_BUILT | empty patch | skipped files | REFUSED | names skipped |
@@ -122,6 +126,11 @@ process, not a monkeypatched function.
   (`test_a_tracked_file_with_invalid_utf8_is_reviewable`).
 - An untracked symlink was followed outside the repository; now named and
   skipped (`test_an_untracked_symlink_is_named_not_followed`).
+- A malformed `council.toml` was read after git, prompt and context work; now
+  loaded first (`test_malformed_config_is_found_before_the_reviewer`). A missing
+  prompt or an empty change no longer triggers a context fetch
+  (`test_a_missing_prompt_is_found_before_a_context_fetch`,
+  `test_an_empty_change_is_found_before_a_context_fetch`).
 
 ## M3 — Slicing and units
 
@@ -502,8 +511,9 @@ afterwards. A lock would close it.
   default.
 - A repository can narrow `allow`/`timeout`/`sandbox`, never widen them.
 - `timeout` is a positive integer, not `true`/`1.5`; `sandbox` is a boolean.
-- The path must be a regular UTF-8 file; a FIFO/directory/broken symlink is an
-  error.
+- The path must be a regular UTF-8 file; a FIFO/directory/broken symlink or a
+  symlink to an existing file is an error (a repository config may not point
+  outside the checkout).
 
 **Transitions**
 
@@ -520,7 +530,8 @@ afterwards. A lock would close it.
   now `ConfigError` (`test_malformed_toml_is_a_config_error`,
   `test_a_directory_is_a_config_error`, `test_a_non_utf8_config_is_a_config_error`).
 - `timeout = true` was accepted as `1`; now refused.
-- A broken symlink silently meant “missing”; now an error.
+- A broken symlink silently meant “missing”; now an error. A symlink to an
+  existing file is refused too (`test_a_symlinked_config_is_refused`).
 
 ## Confirmed issues, priority, grouping, status
 
@@ -553,6 +564,9 @@ silently accepted.
 | SM-21 | P4 | concurrent `init` appends `.council/` twice | duplicate ignore line | idempotent afterwards; lock would fix | residual |
 | SM-22 | P4 | catastrophic regex in `absent`; huge file/JSON | CPU/memory denial of service from model params | bounded input/timeout would fix | residual |
 | SM-23 | P4 | bwrap disappears between preflight and sample | `INCOMPLETE` instead of start failure | narrow race; preflight covers the normal case | residual |
+| SM-24 | P2 | malformed `council.toml` read after git, prompt and context work | every cheap failure pays for expensive work; slow start failure | config loaded first in `_prepare`; `test_malformed_config_is_found_before_the_reviewer` | fixed |
+| SM-25 | P3 | boolean request number accepted as `0`/`1` | a flag silently becomes a count, budget or timeout | `_integer` rejects `bool`; `test_a_boolean_request_number_is_refused` | fixed |
+| SM-26 | P2 | `council.toml` symlink to an existing file read outside the checkout | untrusted repository redirects the policy input | any symlink refused; `test_a_symlinked_config_is_refused` | fixed |
 
 ## Live evidence
 

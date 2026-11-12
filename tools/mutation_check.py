@@ -74,12 +74,12 @@ MUTATIONS: tuple[Mutation, ...] = (
              'if prefix == " ":\n                old_line += 1\n                new_line += 1\n                old_left -= 1\n                new_left -= 1',
              'if prefix == " ":\n                old_left -= 1\n                new_left -= 1'),
     Mutation("config-ignores-unknown-keys",
-             "config.py", "if unknown:", "if False:"),
+             "domain/config.py", "if unknown:", "if False:"),
     Mutation("merge-takes-the-lowest-severity",
              "merge.py", "highest = max(entries, key=lambda entry: _RANK[entry[1].severity])",
              "highest = min(entries, key=lambda entry: _RANK[entry[1].severity])"),
     Mutation("a-missing-sample-can-still-pass",
-             "adjudicate.py",
+             "domain/adjudication.py",
              "if adjudication.failed_samples:",
              "if False:"),
     Mutation("report-mode-is-ignored",
@@ -98,6 +98,10 @@ MUTATIONS: tuple[Mutation, ...] = (
              "sliced = False"),
     Mutation("a-missing-prompt-is-not-refused",
              "run.py", "if not prompt_file.is_file():", "if False:"),
+    Mutation("config-parsing-reads-a-file",
+             "domain/config.py",
+             "return Config(allow=allow, timeout=timeout, sandbox=policy.sandbox or sandbox)",
+             'return __import__("pathlib").Path(name).read_text()'),
 )
 
 

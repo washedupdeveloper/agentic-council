@@ -1,68 +1,28 @@
-"""Proofs become states. A missing sample makes a run INCOMPLETE unless the
-evidence already fails it."""
+"""Run each finding's proof, then hand the outcomes to the pure adjudicator.
+
+The decision — what a set of outcomes means — is in
+`council.domain.adjudication`; this module is the shell that executes proofs.
+"""
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Sequence, cast
+from typing import Any, Callable, Sequence
 
-from .findings import Finding, Severity, State
+from .domain.adjudication import Adjudication, ProofOutcome, decide, verdict
 from .merge import MergedFinding
 from .proofs import ProofContext, run_proof
-from .verdict import Result, Verdict, judge
 
+Prover = Callable[[str, dict[str, Any], ProofContext], ProofOutcome]
 
-@dataclass(frozen=True, slots=True)
-class Adjudication:
-    findings: tuple[Finding, ...]
-    failed_samples: tuple[int, ...] = ()
+__all__ = ["Adjudication", "ProofOutcome", "adjudicate", "verdict"]
 
 
 def adjudicate(merged: Sequence[MergedFinding], ctx: ProofContext, *,
-               failed_samples: Sequence[int] = ()) -> Adjudication:
+               failed_samples: Sequence[int] = (),
+               prove: Prover = run_proof) -> Adjudication:
     """Run each finding's proof and record what it settled."""
-    findings: list[Finding] = []
-    for number, item in enumerate(merged, start=1):
-        outcomes = [run_proof(kind, params, ctx) for kind, params in item.proofs]
-        proven = [o for o in outcomes if o.state is State.PROVEN]
-        unrunnable = [o for o in outcomes if o.state is State.UNRUNNABLE]
-        if proven:
-            state, detail = State.PROVEN, proven[0].detail
-        elif unrunnable:
-            state, detail = State.UNRUNNABLE, unrunnable[0].detail
-        else:
-            state, detail = State.REFUTED, (outcomes[0].detail if outcomes else "no proof")
-        findings.append(Finding(
-            id=f"F-{number:02d}",
-            dimension=item.dimension,
-            severity=cast(Severity, item.severity),
-            state=state,
-            location=f"{item.file}:{item.line}",
-            claim=item.claims[0] if item.claims else "",
-            detail=detail,
-        ))
-    return Adjudication(tuple(findings), tuple(sorted(failed_samples)))
-
-
-def verdict(adjudication: Adjudication) -> Result:
-    """The verdict, with one addition the findings cannot express.
-
-    A sample that returned nothing usable means the review is missing evidence.
-    If the evidence that did arrive already fails the run, fail; otherwise the
-    honest answer is `INCOMPLETE`, never `PASS`.
-    """
-    result = judge(adjudication.findings)
-    if adjudication.failed_samples:
-        listed = ", ".join(str(index) for index in adjudication.failed_samples)
-        if result.verdict is Verdict.PASS:
-            return Result(
-                Verdict.INCOMPLETE,
-                f"sample(s) {listed} returned nothing usable: the review is missing evidence",
-                adjudication.findings,
-            )
-        return Result(
-            result.verdict,
-            f"{result.reason}; sample(s) {listed} returned nothing usable",
-            adjudication.findings,
-        )
-    return result
+    outcomes = [
+        [prove(kind, params, ctx) for kind, params in item.proofs]
+        for item in merged
+    ]
+    return decide(merged, outcomes, failed_samples=failed_samples)

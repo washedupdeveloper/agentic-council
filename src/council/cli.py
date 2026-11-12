@@ -14,7 +14,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import NoReturn, Sequence
 
-from . import __version__
 from . import doctor as diagnostics
 from .config import ConfigError
 from .paths import validate_run_id
@@ -25,6 +24,7 @@ from .run import (DEFAULT_PROFILE, PROMPT_LIMIT, Plan, PromptTooLarge, Report,
 from .runner import DEFAULT_IDLE_TIMEOUT, hermes_runner
 from .sarif import render as render_sarif
 from .verdict import Verdict
+from .version import current_version
 
 EXIT_ERROR = 3
 
@@ -147,7 +147,7 @@ def _add_review_arguments(parser: argparse.ArgumentParser, *, advice: bool,
 def build_parser() -> argparse.ArgumentParser:
     parser = _Parser(prog="council", description="A review is a claim until a check settles it.")
     parser.add_argument("--version", action="version",
-                        version=f"%(prog)s {__version__}")
+                        version=f"%(prog)s {current_version()}")
     sub = parser.add_subparsers(dest="command", required=True)
 
     run = sub.add_parser("review", help="review a change; exits 0/1/2")
@@ -553,7 +553,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.sarif is not None:
         try:
             args.sarif.write_text(
-                json.dumps(render_sarif(report.result), indent=2) + "\n",
+                json.dumps(render_sarif(report.result, tool_version=current_version()),
+                           indent=2) + "\n",
                 encoding="utf-8", newline="\n")
         except (OSError, ValueError) as exc:
             print(f"council: cannot write SARIF to {_safe(args.sarif)}: {_safe(exc)}",

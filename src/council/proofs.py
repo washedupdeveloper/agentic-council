@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any, Callable, Mapping
 
 from .changes import change_lines
+from .domain.adjudication import ProofOutcome
 from .findings import State
 from .sandbox import argv as sandbox_argv
 
@@ -25,12 +26,6 @@ class ProofContext:
     diff: str | None = None
     timeout: int = 120
     sandbox: bool = True
-
-
-@dataclass(frozen=True, slots=True)
-class ProofOutcome:
-    state: State
-    detail: str
 
 
 def _held(detail: str) -> ProofOutcome:

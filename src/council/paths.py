@@ -1,34 +1,23 @@
 """Artefacts live at `<repo>/.council/runs/<id>/`: inside the checkout,
-gitignored, one path segment per id."""
+gitignored, one path segment per id.
+
+The run-id *name* is validated by the pure `council.domain.run_id`; this
+module adds the file-system guard that refuses a symlinked state directory.
+"""
 
 from __future__ import annotations
 
-import unicodedata
 from pathlib import Path
+
+from .domain.run_id import MAX_RUN_ID, validate_run_id
 
 #: The directory name inside the repository. Gitignored by `council init`; a
 #: review never writes outside the checkout it was asked about.
 STATE_DIR = ".council"
 RUNS = "runs"
-MAX_RUN_ID = 128
-#: Characters a run id may not contain: separators, control characters, and the
-#: set Windows refuses in a file name. A run id is a directory name on every host.
-_FORBIDDEN = set('/\\<>:"|?*')
 
-
-def validate_run_id(run_id: str) -> str:
-    """One portable path segment, or a ValueError that names the problem."""
-    if not run_id or not run_id.strip():
-        raise ValueError("run id must not be empty")
-    if run_id in {".", ".."}:
-        raise ValueError(f"invalid run id {run_id!r}: expected one path segment")
-    if any(ch in _FORBIDDEN for ch in run_id):
-        raise ValueError(f"invalid run id {run_id!r}: expected one path segment")
-    if any(unicodedata.category(ch) in {"Cc", "Cf", "Cs", "Zl", "Zp"} for ch in run_id):
-        raise ValueError(f"invalid run id {run_id!r}: control or format characters are not allowed")
-    if len(run_id) > MAX_RUN_ID:
-        raise ValueError(f"invalid run id: longer than {MAX_RUN_ID} characters")
-    return run_id
+__all__ = ["MAX_RUN_ID", "RUNS", "STATE_DIR", "run_dir", "runs_root", "state_root",
+           "validate_run_id"]
 
 
 def runs_root(repo: Path) -> Path:

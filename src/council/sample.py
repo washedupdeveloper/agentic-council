@@ -63,12 +63,10 @@ def run_sample(prompt: str, runner: Runner, *, index: int = 1,
     return SampleResult(index, None, attempts, last, last_text[-4000:], tuple(failures))
 
 
-def write_sample(run_dir: Path, result: SampleResult) -> Path:
-    """Write the sample beside the run, in the same shape whatever happened."""
-    run_dir.mkdir(parents=True, exist_ok=True)
-    path = run_dir / f"sample-{result.index}.json"
+def payload(result: SampleResult) -> dict[str, object]:
+    """The sample's JSON-ready shape, identical whether it passed or failed."""
     findings = result.output.findings if result.output is not None else ()
-    payload: dict[str, object] = {
+    return {
         "index": result.index,
         "attempts": result.attempts,
         "error": result.error,
@@ -86,5 +84,12 @@ def write_sample(run_dir: Path, result: SampleResult) -> Path:
             for finding in findings
         ],
     }
-    path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8", newline="\n")
+
+
+def write_sample(run_dir: Path, result: SampleResult) -> Path:
+    """Write the sample beside the run, in the same shape whatever happened."""
+    run_dir.mkdir(parents=True, exist_ok=True)
+    path = run_dir / f"sample-{result.index}.json"
+    path.write_text(json.dumps(payload(result), indent=2) + "\n",
+                    encoding="utf-8", newline="\n")
     return path
