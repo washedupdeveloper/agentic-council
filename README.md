@@ -102,6 +102,23 @@ reviewer and without writing a run directory**. `--json` gives the same as
 objects. It is how a user sees why a change will be sliced or refused before
 spending a model call.
 
+## Scoped and staged review
+
+The caller owns the scope. `--include` and `--exclude` are repeated
+repository-relative globs: `*` stays in one path segment, `**` recurses, an
+exclude wins, and an include list that matches nothing is a start failure rather
+than an empty review. Every path the scope drops is named in
+`verdict.json.scope_ignored` and in `--plan`; nothing disappears silently. A
+repository cannot set a scope in `council.toml`.
+
+```sh
+council review --include 'src/**' --exclude 'src/generated/**'
+council ci --include 'src/**/*.py'
+council review --staged        # the index against the base, not the worktree
+```
+
+See [`docs/SCOPE.md`](docs/SCOPE.md).
+
 ## Baselines
 
 Existing repositories need a way to adopt the gate without failing on every
@@ -214,6 +231,9 @@ Every flag the tool accepts, what it changes, and why it exists. `council <comma
 |---|---|---|---|
 | `-C, --repo PATH` | `.` | the checkout to review | a review is about a repository, not a shell's idea of a directory |
 | `--base REV` | `origin/HEAD`, else `HEAD~1` | where the diff starts | a wrong base still produces a confident verdict, so the default is a chain and each step is checked |
+| `--staged` | off | review the index against the base, not the working tree | review exactly what the next commit would contain; untracked and unstaged edits are deliberately absent |
+| `--include GLOB` | all paths | review only paths matching GLOB (repeatable) | the caller, not the repository, decides what is in scope |
+| `--exclude GLOB` | none | never review paths matching GLOB (repeatable; exclude wins) | generated or vendored paths should be named, not silently forgotten |
 | `--samples N` | auto | samples to ask: N, or auto — 1 clean, 2 to confirm a finding, 3 to break a tie; per unit when a change is sliced | one sample is cheap; a second confirms a finding; a third only when the model disagrees with itself |
 | `--profile NAME` | `council-generalist` | the Hermes profile asked | the instrument is a profile, not a string in the prompt |
 | `--reviewer BIN` | `hermes` | the binary that answers a sample | the corpus harness needs a stub, and another host may need another binary |

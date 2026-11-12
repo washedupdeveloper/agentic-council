@@ -17,6 +17,7 @@ from .changes import file_sections, hunk_range, hunk_sections
 from .config import CONFIG_NAME, Config, load as load_config
 from .context import Context, build as build_context
 from .domain.baseline import Baseline, GateResult, apply_baseline
+from .domain.scope import Scope, ScopeError, ScopeIgnored
 from .findings import OPEN_STATES, Finding, State, blocks
 from .merge import merge
 from .paths import run_dir as run_path, validate_run_id
@@ -90,6 +91,9 @@ class ReviewRequest:
     baseline_from_base: bool = False
     baseline_strict: bool = False
     allow_baseline_change: bool = False
+    include: tuple[str, ...] = ()
+    exclude: tuple[str, ...] = ()
+    staged: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -105,6 +109,7 @@ class Report:
     prompt: Path | None = None
     ignored: bool = True
     skipped: tuple[Skipped, ...] = ()
+    scope_ignored: tuple[ScopeIgnored, ...] = ()
     diff_sha256: str = ""
     context_digest: str = ""
     gate: GateResult | None = None
@@ -159,6 +164,7 @@ class Prepared:
     head: str
     patch: str
     skipped: tuple[Skipped, ...]
+    scope_ignored: tuple[ScopeIgnored, ...]
     references: tuple[Reference, ...]
     prompt_file: Path
     template: str
@@ -182,6 +188,9 @@ class Plan:
     units: tuple[Unit, ...]
     skipped: tuple[Skipped, ...]
     depth: int
+    scope_ignored: tuple[ScopeIgnored, ...] = ()
+    scope_include: tuple[str, ...] = ()
+    scope_exclude: tuple[str, ...] = ()
 
 
 def _prompt_for(template: str, base: str, patch: str, root: Path, depth: int,
@@ -362,6 +371,7 @@ def _write_verdict(run_dir: Path, request: ReviewRequest, base: str, head: str,
                    sliced: bool = False,
                    time_budget: int = 0,
                    units: Sequence[dict[str, object]] = (),
+                   scope_ignored: tuple[ScopeIgnored, ...] = (),
                    baseline: Baseline | None = None,
                    baseline_source: str = "",
                    gate: GateResult | None = None) -> None:
@@ -371,6 +381,8 @@ def _write_verdict(run_dir: Path, request: ReviewRequest, base: str, head: str,
         "base": base,
         "head": head,
         "worktree": worktree,
+        "staged": request.staged,
+        "scope": {"include": list(request.include), "exclude": list(request.exclude)},
         "diff_sha256": diff_sha256,
         "digest": digest,
         "prompt": str(prompt),
@@ -404,6 +416,10 @@ def _write_verdict(run_dir: Path, request: ReviewRequest, base: str, head: str,
             for sample in samples
         ],
         "skipped": [{"path": item.path, "reason": item.reason} for item in skipped],
+        "scope_ignored": [
+            {"path": item.path, "reason": item.reason, "pattern": item.pattern}
+            for item in scope_ignored
+        ],
         "context_digest": context.digest,
         "context_depth": request.context_depth,
         "context": [{"file": span.file, "start": span.start, "end": span.end,
@@ -469,23 +485,36 @@ def _prepare(request: ReviewRequest) -> Prepared:
     """
     root = repo_root(request.repo)
     config = load_config(root / CONFIG_NAME)
+    try:
+        scope = Scope.create(request.include, request.exclude)
+    except ScopeError as exc:
+        raise ReviewError(str(exc)) from exc
     base = resolve_base(root, request.base)
     baseline = _load_baseline(request, root, base)
     head = output(root, "rev-parse", "HEAD").strip()
-    change = diff(root, base)
-    # `git` decodes with surrogateescape so a non-UTF-8 path stays readable; a
-    # non-UTF-8 *content* byte becomes a lone surrogate, which cannot be encoded
-    # into the prompt. Replace those bytes once, here, so the prompt is valid.
-    patch = change.patch.encode("utf-8", "surrogateescape").decode("utf-8", "replace")
-    diff_sha256 = hashlib.sha256(patch.encode("utf-8")).hexdigest()
-
-    if _baseline_changed(request, patch) and not request.allow_baseline_change:
+    change = diff(root, base, staged=request.staged)
+    if _baseline_changed(request, change.patch) and not request.allow_baseline_change:
         raise ReviewError(
             "the baseline file is changed in this diff; refusing to use a "
             "baseline the change itself can edit (use --allow-baseline-change "
             "only for a deliberate maintenance change)")
+    # `git` decodes with surrogateescape so a non-UTF-8 path stays readable; a
+    # non-UTF-8 *content* byte becomes a lone surrogate, which cannot be encoded
+    # into the prompt. Replace those bytes once, here, so the prompt is valid.
+    patch = change.patch.encode("utf-8", "surrogateescape").decode("utf-8", "replace")
+    if scope.includes or scope.excludes:
+        patch, scope_ignored = scope.filter_patch(patch)
+    else:
+        scope_ignored = ()
+    diff_sha256 = hashlib.sha256(patch.encode("utf-8")).hexdigest()
 
     if not patch.strip():
+        if scope_ignored:
+            names = ", ".join(item.path for item in scope_ignored[:5])
+            more = f", +{len(scope_ignored) - 5} more" if len(scope_ignored) > 5 else ""
+            raise ReviewError(
+                f"the change has no reviewable text in scope; ignored "
+                f"{len(scope_ignored)} file(s): {names}{more}")
         if change.skipped:
             names = ", ".join(item.path for item in change.skipped[:5])
             more = f", +{len(change.skipped) - 5} more" if len(change.skipped) > 5 else ""
@@ -522,9 +551,9 @@ def _prepare(request: ReviewRequest) -> Prepared:
         raise ReviewError(f"the reviewer prompt is not usable: {exc}") from exc
     prompt_bytes = len(prompt.encode("utf-8"))
     sliced = prompt_bytes > request.max_prompt_bytes and not request.allow_large_prompt
-    return Prepared(root, config, baseline, base, head, patch, change.skipped, references, prompt_file,
-                    template, digest, prompt, prompt_bytes, sliced, full_context,
-                    diff_sha256)
+    return Prepared(root, config, baseline, base, head, patch, change.skipped,
+                    scope_ignored, references, prompt_file, template, digest, prompt,
+                    prompt_bytes, sliced, full_context, diff_sha256)
 
 
 def plan(request: ReviewRequest) -> Plan:
@@ -536,7 +565,8 @@ def plan(request: ReviewRequest) -> Plan:
                                    prepared.root, request, prepared.references))
     return Plan(prepared.base, prepared.head, prepared.prompt_bytes,
                 request.max_prompt_bytes, prepared.sliced, units,
-                prepared.skipped, request.context_depth)
+                prepared.skipped, request.context_depth, prepared.scope_ignored,
+                request.include, request.exclude)
 
 
 def _integer(label: str, value: object, *, minimum: int | None = None) -> int:
@@ -717,17 +747,19 @@ def review(request: ReviewRequest, runner: Runner) -> Report:
             baseline_source = (f"{base}:{request.baseline}"
                                if request.baseline_from_base else str(request.baseline))
         _write_verdict(directory, request, base, head, digest, prompt_file, ignored,
-                       samples, result, worktree=True, diff_sha256=diff_sha256,
+                       samples, result, worktree=not request.staged, diff_sha256=diff_sha256,
                        skipped=prepared.skipped, context=reported_context,
                        references=references,
                        samples_run=samples_run, agreement=agreement,
                        prompt_bytes=prompt_bytes, prompt_limit=limit,
                        prompt_acknowledged=acknowledged,
                        sliced=sliced, time_budget=request.time_budget,
-                       units=units_payload, baseline=prepared.baseline,
+                       units=units_payload, scope_ignored=prepared.scope_ignored,
+                       baseline=prepared.baseline,
                        baseline_source=baseline_source, gate=gate)
     except BaseException:
         _discard_empty(directory)
         raise
     return Report(directory, base, head, digest, result, samples, prompt_file, ignored,
-                  prepared.skipped, diff_sha256, reported_context.digest, gate=gate)
+                  prepared.skipped, prepared.scope_ignored, diff_sha256,
+                  reported_context.digest, gate=gate)

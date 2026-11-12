@@ -107,10 +107,20 @@ def untracked_diff(root: Path) -> tuple[str, tuple[Skipped, ...]]:
     return "".join(patches), tuple(skipped)
 
 
-def diff(root: Path, base: str) -> Change:
-    """The change as a patch: tracked edits, plus new files git leaves out."""
-    tracked = output(root, "-c", "color.ui=false", "-c", "diff.srcPrefix=a/",
-                     "-c", "diff.dstPrefix=b/", "diff", "--no-color", "--no-ext-diff", base)
+def diff(root: Path, base: str, *, staged: bool = False) -> Change:
+    """The change as a patch: tracked edits, plus new files git leaves out.
+
+    `staged` reads the index against the base, not the working tree. It is the
+    exact question "what would this commit contain?"; unstaged edits and
+    untracked files are deliberately absent.
+    """
+    options = ["-c", "color.ui=false", "-c", "diff.srcPrefix=a/",
+               "-c", "diff.dstPrefix=b/", "diff", "--no-color", "--no-ext-diff"]
+    if staged:
+        options.append("--cached")
+    tracked = output(root, *options, base)
+    if staged:
+        return Change(tracked)
     untracked, skipped = untracked_diff(root)
     return Change(tracked + untracked, skipped)
 

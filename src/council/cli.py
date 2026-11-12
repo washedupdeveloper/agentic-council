@@ -18,6 +18,7 @@ from . import baseline as baseline_io
 from . import doctor as diagnostics
 from .config import ConfigError
 from .domain.baseline import Baseline
+from .domain.scope import Scope, ScopeError
 from .paths import validate_run_id
 from .pr import PullRequest, resolve as resolve_pr, verify_checkout
 from .repo import ReviewError, init as init_repo
@@ -85,7 +86,7 @@ def _safe(text: object) -> str:
 
 
 def _add_review_arguments(parser: argparse.ArgumentParser, *, advice: bool,
-                          base: bool = True) -> None:
+                          base: bool = True, staged: bool = True) -> None:
     """The review surface, shared by `review` and `ci`.
 
     `ci` is the gate without the advice switches: it always prints the verdict
@@ -96,6 +97,13 @@ def _add_review_arguments(parser: argparse.ArgumentParser, *, advice: bool,
                         help="repository to review (default: the current directory)")
     if base:
         parser.add_argument("--base", help="revision to diff against (default: origin/HEAD, then HEAD~1)")
+    if staged:
+        parser.add_argument("--staged", action="store_true",
+                            help="review the index against the base, not the working tree")
+    parser.add_argument("--include", action="append", default=[], metavar="GLOB",
+                        help="review only paths matching GLOB (repeatable; caller-owned)")
+    parser.add_argument("--exclude", action="append", default=[], metavar="GLOB",
+                        help="never review paths matching GLOB (repeatable; exclude wins)")
     parser.add_argument("--samples", type=_samples, default=None,
                         help="samples: N, or auto (default: 1 clean, 2 to confirm, 3 to break a tie); per unit when sliced")
     parser.add_argument("--profile", default=DEFAULT_PROFILE, help="Hermes profile to ask")
@@ -169,7 +177,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     pr = sub.add_parser("pr", help="review a GitHub pull request by number")
     pr.add_argument("number", type=int, help="pull request number")
-    _add_review_arguments(pr, advice=True, base=False)
+    _add_review_arguments(pr, advice=True, base=False, staged=False)
     pr.set_defaults(baseline_from_base=True)
 
     baseline = sub.add_parser("baseline", help="create or prune an accepted-risk baseline")
@@ -291,6 +299,9 @@ def _request(args: argparse.Namespace, *, allow: bool | None = None) -> ReviewRe
         baseline_from_base=bool(getattr(args, "baseline_from_base", False)),
         baseline_strict=bool(getattr(args, "baseline_strict", False)),
         allow_baseline_change=bool(getattr(args, "allow_baseline_change", False)),
+        include=tuple(getattr(args, "include", ())),
+        exclude=tuple(getattr(args, "exclude", ())),
+        staged=bool(getattr(args, "staged", False)),
     )
 
 
@@ -357,6 +368,11 @@ def _preflight(args: argparse.Namespace) -> None:
         raise ReviewError("--baseline must be repository-relative when read from the base revision")
     if args.baseline_strict and args.baseline is None:
         raise ReviewError("--baseline-strict requires --baseline")
+    try:
+        Scope.create(tuple(getattr(args, "include", ())),
+                     tuple(getattr(args, "exclude", ())))
+    except ScopeError as exc:
+        raise ReviewError(str(exc)) from exc
     if args.sarif is not None:
         _check_output(args.sarif, "--sarif", directory=False)
     if args.keep is not None:
@@ -481,12 +497,20 @@ def _print_plan(planned: Plan) -> None:
                            for item in planned.skipped[:5])
         more = f", +{len(planned.skipped) - 5} more" if len(planned.skipped) > 5 else ""
         print(f"  skipped: {len(planned.skipped)} file(s): {listed}{more}")
+    if planned.scope_ignored:
+        listed = ", ".join(f"{_safe(item.path)} ({_safe(item.reason)})"
+                           for item in planned.scope_ignored[:5])
+        more = (f", +{len(planned.scope_ignored) - 5} more"
+                if len(planned.scope_ignored) > 5 else "")
+        print(f"  outside scope: {len(planned.scope_ignored)} file(s): {listed}{more}")
 
 
 def _plan_payload(planned: Plan) -> dict[str, object]:
     return {
         "base": planned.base,
         "head": planned.head,
+        "scope": {"include": list(planned.scope_include),
+                  "exclude": list(planned.scope_exclude)},
         "prompt_bytes": planned.prompt_bytes,
         "prompt_limit": planned.prompt_limit,
         "sliced": planned.sliced,
@@ -502,6 +526,10 @@ def _plan_payload(planned: Plan) -> dict[str, object]:
             for unit in planned.units
         ],
         "skipped": [{"path": item.path, "reason": item.reason} for item in planned.skipped],
+        "scope_ignored": [
+            {"path": item.path, "reason": item.reason, "pattern": item.pattern}
+            for item in planned.scope_ignored
+        ],
     }
 
 
@@ -656,6 +684,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         more = f", +{len(report.skipped) - 5} more" if len(report.skipped) > 5 else ""
         print(f"note: {len(report.skipped)} file(s) in the change were not reviewed: "
               f"{_safe(listed)}{more}", file=sys.stderr)
+    if report.scope_ignored:
+        listed = ", ".join(f"{item.path} ({item.reason})" for item in report.scope_ignored[:5])
+        more = (f", +{len(report.scope_ignored) - 5} more"
+                if len(report.scope_ignored) > 5 else "")
+        print(f"note: {len(report.scope_ignored)} file(s) were outside the caller's "
+              f"scope and were not reviewed: {_safe(listed)}{more}", file=sys.stderr)
 
     if not report.ignored:
         print("note: .council/ is not ignored here; run `council init` to keep git clean",

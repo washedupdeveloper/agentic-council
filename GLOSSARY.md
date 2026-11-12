@@ -24,9 +24,12 @@ code changes; a second name for the same thing is a defect.
 | **Policy** | What the caller permits: allowed proof tools, timeout, sandbox. A repository may narrow a policy, never widen it. |
 | **Baseline** | A committed, expiring list of proven blocking findings a team has explicitly accepted. It is applied after the evidence verdict and can never suppress missing evidence. |
 | **Accepted risk** | One baseline entry: a fingerprint, owner, reason and expiry for a finding the team chooses not to block on. |
+| **Scope** | The caller-owned include/exclude globs applied to changed paths before the prompt is built. It is not repository configuration. |
+| **Staged** | A review of the index against the base, not the working tree. Untracked and unstaged edits are deliberately not in the change. |
+| **Scope ignored** | A changed path the scope removed, recorded with its reason and matching pattern. It is not a skipped file and not a finding. |
 | **Gate result** | The verdict after baseline policy: `verdict` in `verdict.json` may differ from `evidence_verdict`. A gate result is not a finding state. |
 | **Fingerprint** | The stable identity of a finding for baseline matching: dimension, severity, file, normalized claim and canonical proof. A changed severity or proof is a new identity. |
-| **Domain kernel** | The pure decision modules: run-id validation, configuration parsing, adjudication, baseline policy, proof identity and sandbox argv construction. They take literals and return values; they do not read, write, spawn or wait. |
+| **Domain kernel** | The pure decision modules: run-id validation, configuration parsing, adjudication, baseline policy, scope matching, proof identity and sandbox argv construction. They take literals and return values; they do not read, write, spawn or wait. |
 | **Effect shell** | The adapters that read git, files, the environment and child processes, and write runs. Effects are allowed here, named in one list, and never imported by the kernel. |
 | **Adapter** | A concrete module at an effect seam: `repo`, `runner`, `proofs`, `pr`, `doctor`, `config`, `baseline`, `paths`, `sample`, `sandbox`, `cli`, `version`. An adapter may import the kernel; the kernel may not import an adapter. |
 | **Start failure** | The review could not begin: exit 3, no run directory, no model call. A review that ran and is missing evidence is `INCOMPLETE` (exit 2), not a start failure. |

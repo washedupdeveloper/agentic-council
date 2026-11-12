@@ -115,6 +115,40 @@ def test_baseline_flags_reach_the_request(monkeypatch: pytest.MonkeyPatch) -> No
     assert seen == {"baseline": Path("baseline.json"), "strict": True}
 
 
+def test_scope_and_staged_flags_reach_the_request(monkeypatch: pytest.MonkeyPatch) -> None:
+    seen: dict[str, object] = {}
+
+    def capture(request: Any, runner: Any) -> Report:
+        seen["include"] = request.include
+        seen["exclude"] = request.exclude
+        seen["staged"] = request.staged
+        return report(Verdict.PASS)
+
+    monkeypatch.setattr(cli, "review", capture)
+    assert cli.main(["review", "--include", "src/**", "--exclude", "src/generated/**",
+                     "--staged"]) == 0
+    assert seen == {"include": ("src/**",), "exclude": ("src/generated/**",),
+                    "staged": True}
+
+
+def test_a_bad_scope_pattern_is_a_start_failure(monkeypatch: pytest.MonkeyPatch) -> None:
+    called: list[object] = []
+
+    def capture(request: Any, runner: Any) -> Report:
+        called.append(request)
+        return report(Verdict.PASS)
+
+    monkeypatch.setattr(cli, "review", capture)
+    assert cli.main(["review", "--include", "/absolute"]) == 3
+    assert called == []
+
+
+def test_pr_does_not_expose_staged() -> None:
+    parser = cli.build_parser()
+    with pytest.raises(SystemExit):
+        parser.parse_args(["pr", "1", "--staged"])
+
+
 def test_a_baselined_finding_is_not_a_sarif_alert(tmp_path: Path,
                                                   monkeypatch: pytest.MonkeyPatch) -> None:
     item = Finding("F-01", "security", "high", State.PROVEN, "a.py:2",

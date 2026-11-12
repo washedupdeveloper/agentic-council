@@ -34,6 +34,7 @@ PURE = (
     "domain.adjudication",
     "domain.baseline",
     "domain.proof",
+    "domain.scope",
     "domain.sandbox",
 )
 

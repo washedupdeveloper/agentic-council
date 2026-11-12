@@ -17,7 +17,7 @@ direction, and fails when an effectful module is not explicitly named as an
 adapter.
 
 The implementation is not fully DDD or fully SOLID. `run.review` is still a
-733-line application module that validates, prepares, samples, adjudicates and
+765-line application module that validates, prepares, samples, adjudicates and
 serialises in one place; `proofs.py` executes checks in the same module that
 defines proof semantics. Those are recorded below as debt, not relabelled as
 architecture.
@@ -41,6 +41,9 @@ architecture.
 | A PR cannot edit its own baseline | CI reads the baseline from the base revision and refuses a baseline changed in the diff. | `test_load_at_reads_the_base_revision_not_the_worktree`, `test_a_baseline_cannot_be_edited_by_the_diff_it_judges`. |
 | A baseline expires and a severity escalation is new | Entries carry an expiry; severity is part of the fingerprint. | `test_an_expired_entry_does_not_suppress`, `test_a_severity_escalation_is_not_covered_by_an_old_baseline`. |
 | A baselined finding is not an alert | SARIF receives only the unsuppressed findings; the evidence remains in `verdict.json`. | `test_a_baselined_finding_is_not_a_sarif_alert`. |
+| Scope is caller-owned and excludes win | The scope is a request field, not configuration; an exclude beats an include, and a dropped path is named. | `test_scope_and_staged_flags_reach_the_request`, `test_exclude_wins`, `test_filter_names_every_dropped_path`. |
+| A scope cannot silently review nothing | An include that matches no path is a start failure before the model is called. | `test_a_scope_that_removes_everything_is_a_start_failure`. |
+| A staged review reads the index, not the worktree | Staged review uses `git diff --cached`; unstaged and untracked files are absent. | `test_staged_diff_reads_only_the_index`, `test_staged_review_records_the_index_source`. |
 
 ## Dependency rule
 
@@ -64,7 +67,7 @@ adapter; `tests/test_architecture.py` enforces the direction.
 
 | Principle | What is true | Where it is weaker |
 |---|---|---|
-| **S**ingle responsibility | `config` splits read (`load`) from decision (`parse`); `paths` splits name validation (`domain.run_id`) from the symlink guard; `adjudicate` splits proof execution from `decide`; `baseline` splits file/git access from the pure `domain.baseline`; `sample` splits `payload` from `write_sample`; `sandbox` splits lookup from `command`; `version` is the only metadata reader. | `run.review` still orchestrates preparation, sampling, adjudication, baseline gate, persistence and serialisation. `proofs` still owns both the six executors and their parameter rules. |
+| **S**ingle responsibility | `config` splits read (`load`) from decision (`parse`); `paths` splits name validation (`domain.run_id`) from the symlink guard; `adjudicate` splits proof execution from `decide`; `baseline` splits file/git access from the pure `domain.baseline`; `scope` is a pure matcher; `sample` splits `payload` from `write_sample`; `sandbox` splits lookup from `command`; `version` is the only metadata reader. | `run.review` still orchestrates preparation, sampling, adjudication, baseline gate, persistence and serialisation. `proofs` still owns both the six executors and their parameter rules. |
 | **O**pen/closed | A proof kind is a row in `EXECUTORS` plus the schema's kind set; a new kind does not add a branch to `run`. | A new **review mode** would still touch `run.review`; there is no separate application service per mode. |
 | **L**iskov substitution | `ProofOutcome` is one domain value regardless of executor; `ReviewerMissing` is both a `ReviewError` and an `OSError`, so a start failure is not retried as a sample. | No subclass hierarchy beyond this; the test is behavioural, not inheritance-shaped. |
 | **I**nterface segregation | `Runner` is `Callable[[str], str]`; `Prover` is the narrow proof-executor shape; callers do not receive a repository object with unrelated methods. | The CLI parser object is a large mutable namespace; it is a boundary object, not a domain interface. |
@@ -99,7 +102,7 @@ evidence; `INCOMPLETE` is exit 2 and means the review ran with missing evidence.
 
 ## Residual architecture debt
 
-1. **`run.py` is an application god module (733 lines).** It performs request
+1. **`run.py` is an application god module (765 lines).** It performs request
    validation, git preparation, prompt construction, sampling, adjudication,
    payload construction and persistence. Splitting it is a larger change than
    this pass and would risk the state-machine guarantees; the next safe cut is

@@ -583,6 +583,54 @@ after the evidence verdict.
   blocking findings are considered (`test_an_unsettled_finding_cannot_be_suppressed`,
   `test_an_unrunnable_finding_cannot_be_suppressed`).
 
+## M14 — Scope and staged review
+
+**Owner:** `domain.scope` decides from two pattern lists; `run._prepare` applies
+the decision to the parsed diff before any prompt or context work.
+
+**States:** `UNSCOPED`, `SCOPED`, `EMPTY_SCOPE`, `STAGED`, `WORKTREE`.
+
+**Invariants**
+
+- Scope is caller-owned: `--include` and `--exclude` are request fields; no
+  repository configuration key can set it.
+- `*` and `?` stay in one path segment; a `**` segment matches zero or more
+  segments.
+- An exclude wins over an include. An empty include list means every path.
+- A pattern that is empty, absolute, backslash-separated or contains `.`, `..`
+  or an empty segment is a start failure (exit 3).
+- Every path removed by the scope is named in `scope_ignored` with its reason
+  and, for an exclude, the matching pattern.
+- A scope that removes every changed file is a start failure before the
+  reviewer is called; it is never an empty PASS.
+- `--staged` reads `git diff --cached` against the base. Untracked and unstaged
+  edits are absent; `worktree` is false and `staged` is true.
+- `pr` does not expose `--staged`; a pull request is a committed revision.
+- The baseline-edit guard examines the unfiltered diff, so excluding the
+  baseline path cannot hide an edit to it.
+
+**Transitions**
+
+| from | event | guard | to | side effect |
+|---|---|---|---|---|
+| UNSCOPED | no include/exclude | — | UNSCOPED | patch unchanged |
+| UNSCOPED | valid patterns | every pattern valid | SCOPED | filter sections; name drops |
+| UNSCOPED | invalid pattern | — | REFUSED | exit 3 before git work |
+| STAGED | `--staged` | review/ci only | STAGED | `git diff --cached` |
+| STAGED | `--staged` on pr | — | REFUSED | parser usage error, exit 3 |
+| SCOPED | no kept section | included paths empty | EMPTY_SCOPE | exit 3; names ignored files |
+| SCOPED | kept section | — | SCOPED | prompt built from filtered patch |
+| SCOPED | baseline path changed | unfiltered diff | REFUSED | exit 3 unless allowed |
+
+**Invalid transitions found**
+
+- An include list with no match could have become an empty review; it is now a
+  start failure (`test_a_scope_that_removes_everything_is_a_start_failure`).
+- Filtering the patch before the baseline guard could have hidden an edit to the
+  baseline; the guard now sees the unfiltered diff.
+- A staged review that used the working-tree diff would include unstaged edits;
+  the source is `git diff --cached` (`test_staged_diff_reads_only_the_index`).
+
 ## Confirmed issues, priority, grouping, status
 
 Priority is impact × reachability. “Fixed” means a regression test is in the
@@ -621,6 +669,9 @@ silently accepted.
 | SM-28 | P2 | baseline could suppress `UNRUNNABLE`/`UNSETTLED` evidence | missing evidence converted to a pass | only `PROVEN` blocking findings; open-evidence tests | fixed |
 | SM-29 | P2 | expired baseline entry still suppressed | accepted risk outlives its stated expiry | `today > expires`; `test_an_expired_entry_does_not_suppress` | fixed |
 | SM-30 | P2 | severity escalation reused an old fingerprint | high waiver hid a critical finding | severity in fingerprint; escalation test | fixed |
+| SM-31 | P2 | scope dropped paths without recording them | a review could look narrower than it was | `scope_ignored` names every path; `test_filter_names_every_dropped_path` | fixed |
+| SM-32 | P2 | an include matching nothing could become an empty pass | a typo silently reviewed nothing | start failure before the reviewer; `test_a_scope_that_removes_everything_is_a_start_failure` | fixed |
+| SM-33 | P2 | staged review could read unstaged edits | reviewed content differed from the commit under review | `git diff --cached`; `test_staged_diff_reads_only_the_index` | fixed |
 
 ## Live evidence
 

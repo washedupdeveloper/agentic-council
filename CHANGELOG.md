@@ -11,6 +11,12 @@ public surface, the definitions, and the release procedure — is
 
 ### Added
 
+- Caller-owned path scope: `--include` and `--exclude` (repeatable POSIX globs;
+  `*` stays in one segment, `**` recurses, exclude wins). Dropped paths are
+  named in `scope_ignored`; an include matching nothing is a start failure.
+  `--staged` reviews the index against the base (`git diff --cached`), not the
+  working tree, and is available on `review`/`ci` but not `pr`. See
+  `docs/SCOPE.md`.
 - A committed accepted-risk baseline: `council baseline create/prune`,
   `--baseline`, `--baseline-from-base`, `--baseline-strict` and
   `--allow-baseline-change`. It applies only after the evidence verdict; only
