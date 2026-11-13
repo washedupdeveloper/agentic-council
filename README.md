@@ -2,6 +2,10 @@
 
 A review is a claim until a check settles it.
 
+> **Continuing on another machine?** Read [`HANDOFF.md`](HANDOFF.md) first. It
+> records the verified commit, the gate commands, the known limits and the next
+> work item. The full gate is `./scripts/verify.sh`.
+
 ## The rule
 
 Every finding carries one of four states, and the verdict is a pure function of
