@@ -869,3 +869,48 @@ check = "python3 -m pytest tests/test_cli.py::test_scope_and_staged_flags_reach_
 id = "pr-does-not-accept-staged"
 text = "A pull request review does not expose the staged mode."
 check = "python3 -m pytest tests/test_cli.py::test_pr_does_not_expose_staged -q"
+
+[[claim]]
+id = "scope-question-mark-matches-one-character"
+text = "A question mark matches exactly one character inside one path segment."
+check = "python3 -m pytest tests/test_scope.py::test_question_mark_matches_one_character_in_one_segment -q"
+falsifier = "scope-ignores-includes"
+
+[[claim]]
+id = "a-repository-cannot-set-a-scope"
+text = "A scope section in council.toml is refused; scope remains caller-owned."
+check = "python3 -m pytest tests/test_config.py::test_a_repository_cannot_set_a_scope -q"
+
+[[claim]]
+id = "scope-is-applied-before-slicing"
+text = "The scope filters the patch before units are built."
+check = "python3 -m pytest tests/test_scope.py::test_scope_is_applied_before_slicing -q"
+falsifier = "scope-ignores-includes"
+
+[[claim]]
+id = "plan-names-paths-outside-scope"
+text = "Plan output and its JSON payload name paths removed by the scope."
+check = "python3 -m pytest tests/test_cli.py::test_plan_names_paths_outside_the_scope -q"
+
+[[claim]]
+id = "the-cli-scope-reaches-the-reviewer"
+text = "The real CLI parser and request pass repeated includes and an exclude into the reviewer prompt."
+check = "python3 -m pytest tests/test_cli_scope.py::test_the_cli_scope_reaches_the_reviewer -q"
+falsifier = "scope-ignores-excludes"
+
+[[claim]]
+id = "the-cli-staged-mode-reaches-the-reviewer"
+text = "The real CLI staged mode sends only the index change to the reviewer."
+check = "python3 -m pytest tests/test_cli_scope.py::test_the_cli_staged_mode_reaches_the_reviewer -q"
+falsifier = "staged-reads-worktree"
+
+[[claim]]
+id = "ci-accepts-staged"
+text = "The ci command exposes the staged review mode."
+check = "python3 -m pytest tests/test_cli_scope.py::test_ci_exposes_staged_mode -q"
+
+[[claim]]
+id = "ci-staged-reaches-the-reviewer"
+text = "The ci command runs a staged review through the real CLI into the reviewer prompt."
+check = "python3 -m pytest tests/test_cli_scope.py::test_ci_runs_a_staged_review -q"
+falsifier = "staged-reads-worktree"

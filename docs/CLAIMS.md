@@ -175,3 +175,11 @@ registry, so it cannot describe a claim that has no check.
 | `a-staged-review-reads-only-the-index` | A staged review reads the index against the base, not unstaged or untracked files. | `python3 -m pytest tests/test_scope.py::test_staged_diff_reads_only_the_index tests/test_scope.py::test_staged_review_records_the_index_source -q` |
 | `scope-is-caller-owned` | Scope and staged mode reach the review request from the caller's flags. | `python3 -m pytest tests/test_cli.py::test_scope_and_staged_flags_reach_the_request -q` |
 | `pr-does-not-accept-staged` | A pull request review does not expose the staged mode. | `python3 -m pytest tests/test_cli.py::test_pr_does_not_expose_staged -q` |
+| `scope-question-mark-matches-one-character` | A question mark matches exactly one character inside one path segment. | `python3 -m pytest tests/test_scope.py::test_question_mark_matches_one_character_in_one_segment -q` |
+| `a-repository-cannot-set-a-scope` | A scope section in council.toml is refused; scope remains caller-owned. | `python3 -m pytest tests/test_config.py::test_a_repository_cannot_set_a_scope -q` |
+| `scope-is-applied-before-slicing` | The scope filters the patch before units are built. | `python3 -m pytest tests/test_scope.py::test_scope_is_applied_before_slicing -q` |
+| `plan-names-paths-outside-scope` | Plan output and its JSON payload name paths removed by the scope. | `python3 -m pytest tests/test_cli.py::test_plan_names_paths_outside_the_scope -q` |
+| `the-cli-scope-reaches-the-reviewer` | The real CLI parser and request pass repeated includes and an exclude into the reviewer prompt. | `python3 -m pytest tests/test_cli_scope.py::test_the_cli_scope_reaches_the_reviewer -q` |
+| `the-cli-staged-mode-reaches-the-reviewer` | The real CLI staged mode sends only the index change to the reviewer. | `python3 -m pytest tests/test_cli_scope.py::test_the_cli_staged_mode_reaches_the_reviewer -q` |
+| `ci-accepts-staged` | The ci command exposes the staged review mode. | `python3 -m pytest tests/test_cli_scope.py::test_ci_exposes_staged_mode -q` |
+| `ci-staged-reaches-the-reviewer` | The ci command runs a staged review through the real CLI into the reviewer prompt. | `python3 -m pytest tests/test_cli_scope.py::test_ci_runs_a_staged_review -q` |

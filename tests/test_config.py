@@ -32,6 +32,12 @@ def test_an_unknown_top_level_key_is_refused(tmp_path: Path) -> None:
         load(write(tmp_path, "[profs]\nallow = []\n"))
 
 
+def test_a_repository_cannot_set_a_scope(tmp_path: Path) -> None:
+    """Scope is caller-owned; a repository config section is not a second owner."""
+    with pytest.raises(ConfigError, match="unknown key"):
+        load(write(tmp_path, '[scope]\ninclude = ["src/**"]\n'))
+
+
 def test_an_unknown_proofs_key_is_refused(tmp_path: Path) -> None:
     with pytest.raises(ConfigError, match="unknown key"):
         load(write(tmp_path, "[proofs]\nallows = []\n"))

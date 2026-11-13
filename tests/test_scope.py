@@ -67,6 +67,13 @@ def test_star_stays_in_one_segment_and_double_star_recurses() -> None:
     assert not recursive.keeps("src/deep/a.txt")
 
 
+def test_question_mark_matches_one_character_in_one_segment() -> None:
+    scope = Scope.create(("src/?.py",))
+    assert scope.keeps("src/a.py")
+    assert not scope.keeps("src/ab.py")
+    assert not scope.keeps("src/deep/a.py")
+
+
 def test_exclude_wins() -> None:
     scope = Scope.create(("**/*.py",), ("src/generated/**",))
     assert scope.keeps("src/a.py")
@@ -206,3 +213,30 @@ def test_excluding_the_baseline_does_not_hide_its_edit(tmp_path: Path) -> None:
                              baseline=Path("baseline.json"),
                              baseline_from_base=True,
                              include=("a.py",)), lambda _: _body())
+
+
+def test_scope_is_applied_before_slicing(tmp_path: Path,
+                                         monkeypatch: pytest.MonkeyPatch) -> None:
+    import council.run as run_module
+
+    repo, base = _repo(tmp_path)
+    (repo / "src").mkdir()
+    (repo / "docs").mkdir()
+    (repo / "src" / "a.py").write_text("print('new')\n", encoding="utf-8")
+    (repo / "docs" / "b.md").write_text("new docs\n", encoding="utf-8")
+    prompt = tmp_path / "prompt.md"
+    prompt.write_text("Base {{base}}\n\n{{diff}}\n", encoding="utf-8")
+    seen: list[str] = []
+
+    def capture(template: str, base_rev: str, patch: str, root: Path,
+                request: ReviewRequest, references: object) -> list[object]:
+        seen.append(patch)
+        return []
+
+    monkeypatch.setattr(run_module, "_build_units", capture)
+    planned = run_module.plan(ReviewRequest(repo=repo, base=base, prompt=prompt,
+                                            max_prompt_bytes=1, include=("src/**",)))
+    assert planned.sliced is True
+    assert seen
+    assert "src/a.py" in seen[0]
+    assert "docs/b.md" not in seen[0]

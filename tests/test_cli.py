@@ -13,6 +13,7 @@ import pytest
 import council.cli as cli
 from council.findings import Finding, State
 from council.domain.baseline import GateResult
+from council.domain.scope import ScopeIgnored
 from council.repo import Skipped
 from council.run import PromptTooLarge, Report, ReviewError
 from council.verdict import Result, Verdict
@@ -344,6 +345,28 @@ def test_plan_prints_and_writes_nothing(monkeypatch: pytest.MonkeyPatch,
     out = capsys.readouterr().out
     assert "PLAN" in out
     assert "1,234" in out
+
+
+def test_plan_names_paths_outside_the_scope(monkeypatch: pytest.MonkeyPatch,
+                                            capsys: pytest.CaptureFixture[str]) -> None:
+    planned = cli.Plan(
+        "a" * 40, "b" * 40, 1234, 32768, False, (), (), 3,
+        scope_ignored=(ScopeIgnored("docs/b.md", "outside include"),),
+        scope_include=("src/**",),
+    )
+    monkeypatch.setattr(cli, "plan", lambda request: planned)
+    assert cli.main(["review", "--plan", "--base", "HEAD"]) == 0
+    out = capsys.readouterr().out
+    assert "outside scope" in out
+    assert "docs/b.md" in out
+    payload = cli._plan_payload(planned)  # noqa: SLF001 - asserting the JSON contract
+    assert payload["scope"] == {"include": ["src/**"], "exclude": []}
+    assert payload["scope_ignored"] == [
+        {"path": "docs/b.md", "reason": "outside include", "pattern": None},
+    ]
+    assert cli.main(["review", "--plan", "--json", "--base", "HEAD"]) == 0
+    emitted = json.loads(capsys.readouterr().out)
+    assert emitted["scope_ignored"] == payload["scope_ignored"]
 
 
 def test_pr_takes_its_base_from_github_and_records_it(

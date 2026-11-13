@@ -41,9 +41,10 @@ architecture.
 | A PR cannot edit its own baseline | CI reads the baseline from the base revision and refuses a baseline changed in the diff. | `test_load_at_reads_the_base_revision_not_the_worktree`, `test_a_baseline_cannot_be_edited_by_the_diff_it_judges`. |
 | A baseline expires and a severity escalation is new | Entries carry an expiry; severity is part of the fingerprint. | `test_an_expired_entry_does_not_suppress`, `test_a_severity_escalation_is_not_covered_by_an_old_baseline`. |
 | A baselined finding is not an alert | SARIF receives only the unsuppressed findings; the evidence remains in `verdict.json`. | `test_a_baselined_finding_is_not_a_sarif_alert`. |
-| Scope is caller-owned and excludes win | The scope is a request field, not configuration; an exclude beats an include, and a dropped path is named. | `test_scope_and_staged_flags_reach_the_request`, `test_exclude_wins`, `test_filter_names_every_dropped_path`. |
+| Scope is caller-owned and excludes win | The scope is a request field, not configuration; an exclude beats an include, and a dropped path is named. | `test_a_repository_cannot_set_a_scope`, `test_exclude_wins`, `test_filter_names_every_dropped_path`, `test_the_cli_scope_reaches_the_reviewer`. |
 | A scope cannot silently review nothing | An include that matches no path is a start failure before the model is called. | `test_a_scope_that_removes_everything_is_a_start_failure`. |
-| A staged review reads the index, not the worktree | Staged review uses `git diff --cached`; unstaged and untracked files are absent. | `test_staged_diff_reads_only_the_index`, `test_staged_review_records_the_index_source`. |
+| A staged review reads the index, not the worktree | Staged review uses `git diff --cached`; unstaged and untracked files are absent. | `test_staged_diff_reads_only_the_index`, `test_staged_review_records_the_index_source`, `test_the_cli_staged_mode_reaches_the_reviewer`. |
+| Plan names what the scope removed | Plan output and its JSON payload carry `scope_ignored`. | `test_plan_names_paths_outside_the_scope`. |
 
 ## Dependency rule
 
