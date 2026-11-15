@@ -707,6 +707,7 @@ A retry is recorded, not hidden; a missing binary is a different state
 ```
 nix develop -c python -m pytest -q
 nix develop -c mypy src
+nix develop -c pyright
 nix develop -c ruff check --select F,E9 src tools tests
 nix flake check
 ./bin/council-verify --check docs/CLAIMS.md

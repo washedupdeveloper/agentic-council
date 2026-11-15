@@ -141,6 +141,7 @@ evidence; `INCOMPLETE` is exit 2 and means the review ran with missing evidence.
 ```sh
 nix develop -c python -m pytest -q
 nix develop -c mypy src
+nix develop -c pyright
 nix flake check
 ./bin/council-verify --check docs/CLAIMS.md
 ```

@@ -11,6 +11,8 @@ what asks for it.
 
 from __future__ import annotations
 
+from . import findings, verdict
+
 __all__ = ["findings", "verdict"]
 
 

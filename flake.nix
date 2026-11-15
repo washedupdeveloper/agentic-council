@@ -85,7 +85,7 @@
           # Each check runs in a writable copy: the flake source in the store is
           # read-only, and pytest, mypy and the mutation check all write.
           mkCheck = name: command: pkgs.runCommand name {
-            nativeBuildInputs = [ py pkgs.git pkgs.bubblewrap pkgs.ruff ];
+            nativeBuildInputs = [ py pkgs.git pkgs.bubblewrap pkgs.ruff pkgs.pyright ];
           } ''
             cp -r ${src} work
             chmod -R u+w work
@@ -104,6 +104,10 @@
           tests = mkCheck "council-tests" "python -m pytest -q -p no:cacheprovider";
 
           types = mkCheck "council-types" "mypy src";
+
+          # The editor's language server over the same source. mypy owns the
+          # package contract; pyright catches Optional access in tools too.
+          pyright = mkCheck "council-pyright" "pyright";
 
           # F: a name that is imported and never used. E9: code that cannot run.
           lint = mkCheck "council-lint" "ruff check --select F,E9 src tools tests";
@@ -135,11 +139,12 @@
 
       devShells = each (pkgs: {
         default = pkgs.mkShell {
-          packages = [ (pythonEnv pkgs) pkgs.git pkgs.ruff pkgs.jq pkgs.bubblewrap ];
+          packages = [ (pythonEnv pkgs) pkgs.git pkgs.ruff pkgs.jq pkgs.bubblewrap pkgs.pyright ];
           shellHook = ''
             echo "council devshell — $(python --version 2>&1)"
             echo "  python -m pytest     the suite"
             echo "  mypy src             strict types"
+            echo "  pyright               LSP diagnostics"
             echo "  ./bin/council-verify every claim"
           '';
         };

@@ -1,0 +1,13 @@
+{
+  "include": ["src", "tools"],
+  "exclude": [
+    "**/__pycache__",
+    ".council",
+    ".hypothesis",
+    "tests"
+  ],
+  "pythonVersion": "3.11",
+  "typeCheckingMode": "basic",
+  "reportMissingImports": "error",
+  "extraPaths": ["src"]
+}

@@ -10,4 +10,6 @@ shell is `council.cli`, `council.run`, `council.adjudicate`, `council.base`,
 
 from __future__ import annotations
 
-__all__ = ["adjudication", "baseline", "config", "proof", "run_id", "sandbox"]
+# Names are imported explicitly by their consumers; this is a namespace marker,
+# not a re-export surface. Keeping a stale __all__ here made `proof` look public
+# after the module was removed.

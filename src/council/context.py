@@ -231,7 +231,7 @@ def build(patch: str, read: Reader, files: Sequence[str],
                     module, symbol = names[node.func.id]
                     target = _resolve_call(symbol, module, path, files, read, cache)
                 else:
-                    local = _top_level(tree, functions, node.func.id)
+                    local = _top_level(tree, _functions(tree), node.func.id)
                     if local is not None and local is not function:
                         target = (path, local)
             elif isinstance(node.func, ast.Attribute) and isinstance(node.func.value, ast.Name):
