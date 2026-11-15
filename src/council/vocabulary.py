@@ -15,4 +15,6 @@ DIMENSIONS: tuple[str, ...] = (
     "architecture",
     "performance",
 )
-PROOF_KINDS: tuple[str, ...] = ("absent", "present", "command", "json", "diff")
+#: The closed set a finding may name. `repro` is the only kind whose pass
+#: condition is a non-zero exit: it settles a defect by demonstrating it.
+PROOF_KINDS: tuple[str, ...] = ("absent", "present", "command", "repro", "json", "diff")

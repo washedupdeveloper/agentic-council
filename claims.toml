@@ -910,6 +910,44 @@ text = "The ci command exposes the staged review mode."
 check = "python3 -m pytest tests/test_cli_scope.py::test_ci_exposes_staged_mode -q"
 
 [[claim]]
+id = "a-scoped-absence-ignores-an-unrelated-hit"
+text = "An absence claim scoped with `within` is not refuted by a hit outside that scope."
+check = "python3 -m pytest tests/test_proofs.py::test_a_scoped_absence_ignores_a_hit_outside_the_scope -q"
+falsifier = "absent-ignores-within"
+
+[[claim]]
+id = "a-scope-that-matches-nothing-cannot-prove-an-absence"
+text = "An absence claim whose scope matches no file is UNRUNNABLE, never proven."
+check = "python3 -m pytest tests/test_proofs.py::test_a_scope_that_matches_no_file_cannot_prove_an_absence -q"
+
+[[claim]]
+id = "a-repro-that-fails-proves-the-finding"
+text = "A repro proof is proven when its command fails."
+check = "python3 -m pytest tests/test_proofs.py::test_a_repro_that_fails_proves_the_finding -q"
+
+[[claim]]
+id = "a-repro-that-succeeds-refutes-the-finding"
+text = "A repro proof is refuted when its command exits zero, because the defect did not reproduce."
+check = "python3 -m pytest tests/test_proofs.py::test_a_repro_that_succeeds_refutes_the_finding -q"
+falsifier = "repro-passes-on-success"
+
+[[claim]]
+id = "a-repro-must-show-the-claimed-failure"
+text = "A repro that fails without the claimed output refutes the finding rather than proving it."
+check = "python3 -m pytest tests/test_proofs.py::test_a_repro_must_show_the_claimed_failure -q"
+
+[[claim]]
+id = "a-repro-needs-the-allowlist"
+text = "A repro naming an executable outside [proofs].allow cannot run."
+check = "python3 -m pytest tests/test_proofs.py::test_a_repro_naming_an_unlisted_binary_cannot_run -q"
+
+[[claim]]
+id = "the-digest-covers-the-profile-configuration"
+text = "The instrument digest changes when the profile's configuration changes, not only its name."
+check = "python3 -m pytest tests/test_prompt.py::test_the_digest_covers_the_profile_configuration tests/test_profile.py -q"
+falsifier = "digest-ignores-the-profile-config"
+
+[[claim]]
 id = "ci-staged-reaches-the-reviewer"
 text = "The ci command runs a staged review through the real CLI into the reviewer prompt."
 check = "python3 -m pytest tests/test_cli_scope.py::test_ci_runs_a_staged_review -q"

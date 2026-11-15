@@ -8,6 +8,7 @@ timeout, not the whole sample timeout.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import shutil
@@ -16,6 +17,7 @@ import subprocess
 import tempfile
 import threading
 import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TextIO
 
@@ -194,3 +196,66 @@ def hermes_runner(profile: str, *, timeout: int = DEFAULT_TIMEOUT,
         return proc.stdout
 
     return run
+
+
+#: A profile's own configuration, in the order Hermes writes it. Both are read
+#: when present: `config.yaml` carries the model, `profile.yaml` the persona.
+PROFILE_CONFIG_FILES = ("config.yaml", "profile.yaml")
+
+
+@dataclass(frozen=True, slots=True)
+class ProfileFingerprint:
+    """A reviewer's configuration, identified without parsing it.
+
+    The model, provider, reasoning default and every prompt-affecting setting
+    live in the profile's own configuration, which this tool deliberately does
+    not parse: it is another program's format, and a parser that guessed would be
+    wrong silently. Hashing the bytes is the conservative direction. A profile
+    edited for an unrelated setting breaks the digest, so two runs are reported
+    as different instruments — that costs a comparison, never a verdict. A missed
+    model swap would let two instruments be compared as one, which is the failure
+    this exists to prevent.
+    """
+
+    path: str = ""
+    sha256: str = ""
+
+
+def hermes_home() -> Path:
+    """Where Hermes keeps its profiles: `$HERMES_HOME`, else `~/.hermes`."""
+    configured = os.environ.get("HERMES_HOME")
+    return Path(configured) if configured else Path.home() / ".hermes"
+
+
+def profile_fingerprint(profile: str) -> ProfileFingerprint:
+    """Digest the configuration a review's samples are asked under.
+
+    A profile names one directory under the Hermes home; it is not a path, and a
+    value that tries to be one is not read. A missing profile is reported as
+    missing, never as an empty match.
+    """
+    if not profile or profile in {".", ".."} or "/" in profile or "\\" in profile:
+        return ProfileFingerprint()
+    try:
+        home = hermes_home()
+    except RuntimeError:
+        # No HOME to resolve a default from. An unknown instrument is the honest
+        # answer; a traceback on every review is not.
+        return ProfileFingerprint()
+    directory = home / "profiles" / profile
+    digest = hashlib.sha256()
+    found = ""
+    for name in PROFILE_CONFIG_FILES:
+        try:
+            data = (directory / name).read_bytes()
+        except (OSError, ValueError):
+            continue
+        digest.update(name.encode("utf-8"))
+        digest.update(b"\x00")
+        digest.update(data)
+        digest.update(b"\x00")
+        if not found:
+            found = f"profiles/{profile}/{name}"
+    if not found:
+        return ProfileFingerprint()
+    return ProfileFingerprint(found, digest.hexdigest()[:16])

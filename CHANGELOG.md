@@ -11,6 +11,22 @@ public surface, the definitions, and the release procedure — is
 
 ### Added
 
+- `repro` proofs, and absence claims that carry a scope. `repro` runs one
+  allowlisted command and is `PROVEN` only when the command fails, so a defect
+  that can be demonstrated is settled by demonstration rather than by quoting a
+  line; `contains` pins the failure to the one claimed. `absent` takes
+  `within` — repository-relative POSIX globs — so a module-level absence is not
+  refuted by an unrelated hit elsewhere. A scope that matches no file is
+  `UNRUNNABLE`: an absence proved over nothing is not an absence.
+  The proof-kind set is part of the instrument digest, so this changes every
+  digest deliberately: a run under the old contract and a run under this one are
+  not comparable, and the tool says so instead of averaging them.
+- The instrument digest covers the reviewer profile's own configuration. The
+  model, provider and reasoning default live in a Hermes profile file this tool
+  does not parse, so `runner.profile_fingerprint` hashes its bytes and
+  `verdict.json` records the path and the digest. A profile that cannot be read
+  is recorded as unknown, never assumed unchanged.
+- A licence: MIT, in `LICENSE` and in the package metadata.
 - Caller-owned path scope: `--include` and `--exclude` (repeatable POSIX globs;
   `*` stays in one segment, `**` recurses, exclude wins). Dropped paths are
   named in `scope_ignored`; an include matching nothing is a start failure.

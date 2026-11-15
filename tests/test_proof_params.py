@@ -17,6 +17,7 @@ from hypothesis import given
 from hypothesis import strategies as st
 
 from council.findings import State
+from council.schema import PROOF_KINDS
 from council.proofs import ProofContext, ProofOutcome, _BadParams, _int_param, _pointer, _str_param, run_proof
 
 ALLOW = frozenset({"true", "false"})
@@ -71,5 +72,5 @@ def test_run_proof_is_total_over_malformed_parameters(
     with tempfile.TemporaryDirectory() as directory:
         outcome = run_proof(kind, params, ctx(Path(directory)))
     assert isinstance(outcome, ProofOutcome)
-    if kind not in ("absent", "present", "command", "json", "diff"):
+    if kind not in PROOF_KINDS:
         assert outcome.state is State.UNRUNNABLE

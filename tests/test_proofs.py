@@ -310,3 +310,73 @@ def test_an_unknown_kind_cannot_run(tmp_path: Path) -> None:
 
 def test_malformed_params_cannot_run(tmp_path: Path) -> None:
     assert run_proof("present", {"path": "a.py"}, ctx(tmp_path)).state is State.UNRUNNABLE
+
+
+# --- absent, scoped ---------------------------------------------------------
+
+def test_a_scoped_absence_ignores_a_hit_outside_the_scope(tmp_path: Path) -> None:
+    """The module-level claim, not the repository, is what the finding is about."""
+    write(tmp_path, "src/a.py", "x = 1\n")
+    write(tmp_path, "docs/notes.md", "no lru_cache here either\n")
+    outcome = run_proof("absent", {"pattern": "lru_cache", "within": ["src/**"]}, ctx(tmp_path))
+    assert outcome.state is State.PROVEN
+
+
+def test_a_scoped_absence_still_names_a_hit_inside_the_scope(tmp_path: Path) -> None:
+    write(tmp_path, "src/a.py", "x = 1\nlru_cache = 2\n")
+    write(tmp_path, "docs/notes.md", "nothing\n")
+    outcome = run_proof("absent", {"pattern": "lru_cache", "within": ["src/**"]}, ctx(tmp_path))
+    assert outcome.state is State.REFUTED
+    assert "src/a.py:2" in outcome.detail
+
+
+def test_a_scope_that_matches_no_file_cannot_prove_an_absence(tmp_path: Path) -> None:
+    write(tmp_path, "src/a.py", "x = 1\n")
+    outcome = run_proof("absent", {"pattern": "x", "within": ["nowhere/**"]}, ctx(tmp_path))
+    assert outcome.state is State.UNRUNNABLE
+    assert "nothing was searched" in outcome.detail
+
+
+def test_a_scope_that_leaves_the_repository_cannot_run(tmp_path: Path) -> None:
+    outcome = run_proof("absent", {"pattern": "x", "within": ["../etc/**"]}, ctx(tmp_path))
+    assert outcome.state is State.UNRUNNABLE
+
+
+# --- repro ------------------------------------------------------------------
+
+def test_a_repro_that_fails_proves_the_finding(tmp_path: Path) -> None:
+    outcome = run_proof("repro", {"argv": ["sh", "-c", "exit 1"]}, ctx(tmp_path))
+    assert outcome.state is State.PROVEN
+
+
+def test_a_repro_that_succeeds_refutes_the_finding(tmp_path: Path) -> None:
+    outcome = run_proof("repro", {"argv": ["true"]}, ctx(tmp_path))
+    assert outcome.state is State.REFUTED
+    assert "did not reproduce" in outcome.detail
+
+
+def test_a_repro_must_show_the_claimed_failure(tmp_path: Path) -> None:
+    outcome = run_proof("repro", {"argv": ["sh", "-c", "echo other >&2; exit 1"],
+                                  "contains": "boom"}, ctx(tmp_path))
+    assert outcome.state is State.REFUTED
+    assert "not the failure" in outcome.detail
+
+
+def test_a_repro_that_shows_the_claimed_failure_proves(tmp_path: Path) -> None:
+    outcome = run_proof("repro", {"argv": ["sh", "-c", "echo boom; exit 2"],
+                                  "contains": "boom"}, ctx(tmp_path))
+    assert outcome.state is State.PROVEN
+
+
+def test_a_repro_naming_an_unlisted_binary_cannot_run(tmp_path: Path) -> None:
+    outcome = run_proof("repro", {"argv": ["curl", "http://example.invalid"]}, ctx(tmp_path))
+    assert outcome.state is State.UNRUNNABLE
+    assert "allow" in outcome.detail
+
+
+def test_without_bwrap_a_repro_does_not_run(tmp_path: Path,
+                                           monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("council.sandbox.shutil.which", lambda _: None)
+    outcome = run_proof("repro", {"argv": ["true"]}, sandbox_ctx(tmp_path))
+    assert outcome.state is State.UNRUNNABLE
+    assert "bwrap" in outcome.detail

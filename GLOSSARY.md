@@ -13,14 +13,14 @@ code changes; a second name for the same thing is a defect.
 | **Attempt** | One try inside a sample. A sample records every attempt's failure and the last raw answer. |
 | **Finding** | A claim about the change, paired with the state its proof reached. A finding is the domain's atom; it is not a model opinion once adjudicated. |
 | **Claim** | The sentence a finding asserts, and the thing a caller can agree or disagree with. The reviewer proposes it; the proof settles it. |
-| **Proof** | A check named by a finding. A proof kind is one registered executor (`present`, `absent`, `command`, `json`, `diff`, …); it returns an outcome, not a boolean. |
+| **Proof** | A check named by a finding. A proof kind is one registered executor (`present`, `absent`, `command`, `repro`, `json`, `diff`, …); it returns an outcome, not a boolean. `repro` passes only when its command fails. |
 | **State** | `PROVEN`, `REFUTED`, `UNSETTLED` or `UNRUNNABLE`. `PROVEN` is the only failing state; `UNRUNNABLE` means the check could not be made, not that the claim is false. |
 | **Verdict** | `PASS`, `FAIL` or `INCOMPLETE`. It is a pure function of finding states and missing evidence, never a numeric threshold. |
 | **Agreement** | Whether the samples that answered describe the same blocking set. `null` when any sample has no usable answer; never computed from the survivors. |
 | **Evidence** | The artefacts that justify a verdict: samples, proof outcomes, the diff digest, the prompt digest and the reason. Evidence is not the reviewer's prose alone. |
 | **Run** | The directory that holds one review's evidence. It is claimed exclusively before the first sample and either kept or removed after the verdict. |
 | **Plan** | What a review would send and how it would slice it, without calling a reviewer or writing a run. |
-| **Instrument** | The reviewer prompt and the configuration that shape a sample. Its digest identifies the instrument independently of the answer. |
+| **Instrument** | The reviewer prompt, the profile and the profile's own configuration. Its digest identifies the instrument independently of the answer; the model is part of it because the profile file's bytes are hashed. |
 | **Policy** | What the caller permits: allowed proof tools, timeout, sandbox. A repository may narrow a policy, never widen it. |
 | **Baseline** | A committed, expiring list of proven blocking findings a team has explicitly accepted. It is applied after the evidence verdict and can never suppress missing evidence. |
 | **Accepted risk** | One baseline entry: a fingerprint, owner, reason and expiry for a finding the team chooses not to block on. |

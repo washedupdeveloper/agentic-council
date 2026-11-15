@@ -13,6 +13,7 @@ import pytest
 
 from council.baseline import from_run, write as write_baseline
 from council.prompt import instrument_digest
+from council.runner import profile_fingerprint
 from council.repo import init
 from council.run import (DEFAULT_PROFILE, PromptTooLarge, ReviewError, ReviewRequest,
                          _claim, default_prompt, plan, review)
@@ -21,6 +22,17 @@ from council.schema import DIMENSIONS
 from council.verdict import Verdict
 
 PROMPT = "Base {{base}}\n\n{{diff}}\n"
+
+def instrument(template: str) -> str:
+    """The digest `prepare` records: the template, the profile, and its config.
+
+    Resolved through the same function the run uses, so the test states the rule
+    (the configuration is part of the instrument) instead of a fixture.
+    """
+    fingerprint = profile_fingerprint(DEFAULT_PROFILE)
+    return instrument_digest(template, profile=DEFAULT_PROFILE,
+                             profile_fingerprint=fingerprint.sha256 or None)
+
 
 
 def git(repo: Path, *args: str) -> str:
@@ -337,7 +349,7 @@ def test_the_reviewed_repository_cannot_supply_the_instrument(tmp_path: Path) ->
     report = review(ReviewRequest(repo=repo, run_id="r4b"), lambda _: body())
     shipped = default_prompt().read_text(encoding="utf-8")
     assert report.prompt == default_prompt()
-    assert report.digest == instrument_digest(shipped, profile=DEFAULT_PROFILE)
+    assert report.digest == instrument(shipped)
 
 
 def test_an_explicit_prompt_is_used_and_its_digest_recorded(tmp_path: Path) -> None:
@@ -347,8 +359,8 @@ def test_an_explicit_prompt_is_used_and_its_digest_recorded(tmp_path: Path) -> N
     report = review(ReviewRequest(repo=repo, run_id="r4c", prompt=custom), lambda _: body())
     shipped = default_prompt().read_text(encoding="utf-8")
     assert report.prompt == custom
-    assert report.digest == instrument_digest(PROMPT, profile=DEFAULT_PROFILE)
-    assert report.digest != instrument_digest(shipped, profile=DEFAULT_PROFILE)
+    assert report.digest == instrument(PROMPT)
+    assert report.digest != instrument(shipped)
 
 
 def test_zero_samples_is_refused(tmp_path: Path) -> None:

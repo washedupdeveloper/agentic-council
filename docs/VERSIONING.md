@@ -26,7 +26,8 @@ Enumerated from the tool, not from memory (`council --help`, `council review
   `diff_sha256`, `skipped`, `context`, `unresolved`, `references`, `sliced` and
   `units[]` (each unit's files, ranges, digest, prompt size, depth and verdict);
 - the shipped reviewer prompt's contract: one JSON object with five sections,
-  and the closed proof-kind set (`absent`, `present`, `command`, `json`, `diff`);
+  and the closed proof-kind set (`absent`, `present`, `command`, `repro`,
+  `json`, `diff`);
 - the wheel (`council-<version>-py3-none-any.whl`) and the OCI image
   (`council:<version>`, entrypoint `/bin/council`);
 - the configuration file `council.toml` and its keys.

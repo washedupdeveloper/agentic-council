@@ -26,5 +26,7 @@ holds.
 ## Rules
 
 - A finding without a proof is not a finding; do not restate one from the output.
+- `repro` passes only when its command fails; `present` only quotes a line.
+  Prefer the one that can fail for the reason the finding claims.
 - Do not weaken the prompt to clear a verdict; fix the code or add the proof.
 - There is no score. Do not invent a threshold.

@@ -89,6 +89,8 @@ def write_verdict(document: VerdictDocument) -> None:
         "units": list(document.units),
         "state_dir_ignored": document.ignored,
         "profile": request.profile,
+        "profile_config": prepared.profile_config,
+        "profile_config_sha256": prepared.profile_config_sha256,
         "reasoning": request.reasoning or "profile-default",
         "transport": "stream" if request.stream else "plain",
         "idle_timeout": request.idle_timeout,

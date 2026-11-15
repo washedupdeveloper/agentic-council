@@ -1,5 +1,7 @@
-"""Five proof kinds returning PROVEN, REFUTED, or UNRUNNABLE when the check
-cannot be made here. `command` is an argv list allowlisted by name: no shell."""
+"""Six proof kinds returning PROVEN, REFUTED, or UNRUNNABLE when the check
+cannot be made here. `command` and `repro` are an argv list allowlisted by
+name: no shell.
+"""
 
 from __future__ import annotations
 
@@ -60,6 +62,30 @@ def _int_param(params: Mapping[str, Any], key: str) -> int:
     return value
 
 
+def _glob_list(params: Mapping[str, Any], key: str) -> tuple[str, ...]:
+    value = params.get(key, [])
+    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+        raise _BadParams(f"params.{key}: expected a list of globs")
+    return tuple(value)
+
+
+def _scope_globs(params: Mapping[str, Any]) -> tuple[str, ...]:
+    """`within` narrows an absence claim to the paths it is about.
+
+    Without it an absence claim is repository-wide ("nothing else references
+    this"), and an unrelated hit anywhere refutes it: a module-level claim,
+    settled by a file that has nothing to do with it. The globs are validated
+    like a review scope, so a path that leaves the repository is a parameter
+    error rather than a scope that silently matches nothing.
+    """
+    within = _glob_list(params, "within")
+    for glob in within:
+        if not glob or glob.startswith("/") or "\\" in glob or ".." in glob.split("/"):
+            raise _BadParams(
+                f"params.within: {glob!r} must be a repository-relative POSIX glob")
+    return within
+
+
 def _path_param(ctx: ProofContext, params: Mapping[str, Any], key: str = "path") -> Path:
     raw = _str_param(params, key)
     root = ctx.repo.resolve()
@@ -93,18 +119,21 @@ def proof_absent(params: Mapping[str, Any], ctx: ProofContext) -> ProofOutcome:
         rx = re.compile(pattern)
     except re.error as exc:
         return _cannot(f"params.pattern is not a valid regex: {exc}")
-    exclude = params.get("exclude", [])
-    if not isinstance(exclude, list) or not all(isinstance(x, str) for x in exclude):
-        raise _BadParams("params.exclude: expected a list of globs")
+    exclude = _glob_list(params, "exclude")
+    within = _scope_globs(params)
 
     try:
         paths = _walk(ctx.repo)
     except OSError as exc:
         return _cannot(f"the repository cannot be walked: {exc}")
+    considered = 0
     for path in paths:
         rel = path.relative_to(ctx.repo).as_posix()
+        if within and not any(fnmatch.fnmatch(rel, glob) for glob in within):
+            continue
         if any(fnmatch.fnmatch(rel, glob) for glob in exclude):
             continue
+        considered += 1
         try:
             text = path.read_text(encoding="utf-8")
         except (UnicodeDecodeError, OSError):
@@ -113,7 +142,12 @@ def proof_absent(params: Mapping[str, Any], ctx: ProofContext) -> ProofOutcome:
         if found is not None:
             line = text.count("\n", 0, found.start()) + 1
             return _failed(f"/{pattern}/ is present at {rel}:{line}")
-    return _held(f"/{pattern}/ appears in no file")
+    if within and considered == 0:
+        # An absence proved over nothing is not an absence. This is the same
+        # rule as a review scope that removes every file: refused, not passed.
+        return _cannot(f"no readable file matches {', '.join(within)}: nothing was searched")
+    scope = f" under {', '.join(within)}" if within else ""
+    return _held(f"/{pattern}/ appears in no file{scope}")
 
 
 def proof_present(params: Mapping[str, Any], ctx: ProofContext) -> ProofOutcome:
@@ -132,22 +166,35 @@ def proof_present(params: Mapping[str, Any], ctx: ProofContext) -> ProofOutcome:
     return _failed(f"{path.name}:{line} says {actual!r}")
 
 
-def proof_command(params: Mapping[str, Any], ctx: ProofContext) -> ProofOutcome:
+def _argv_param(params: Mapping[str, Any]) -> list[str]:
     argv = params.get("argv")
-    if not isinstance(argv, list) or not argv or not all(isinstance(a, str) and a for a in argv):
+    if not isinstance(argv, list) or not argv or not all(
+            isinstance(item, str) and item for item in argv):
         raise _BadParams("params.argv: expected a non-empty list of strings")
+    return argv
+
+
+@dataclass(frozen=True, slots=True)
+class _Ran:
+    """A command that ran: its exit code and everything it printed."""
+
+    returncode: int
+    output: str
+
+
+def _attempt(argv: list[str], ctx: ProofContext) -> _Ran | ProofOutcome:
+    """Run an allowlisted argv in the sandbox.
+
+    A `ProofOutcome` return means "this could not be run here" — never "the
+    claim is false". Both command-shaped kinds share it, so a new kind cannot
+    invent a weaker way to start a process: same allowlist, same overlay, same
+    refusals.
+    """
     binary = argv[0]
     if "/" in binary or "\\" in binary:
         return _cannot(f"{binary!r} is a path; a proof names an allowlisted executable, not a path")
     if binary not in ctx.allow:
         return _cannot(f"{binary!r} is not on [proofs].allow")
-
-    expectation = params.get("expect", {})
-    if not isinstance(expectation, dict):
-        raise _BadParams("params.expect: expected an object")
-    mode = expectation.get("exit", "zero")
-    if mode not in ("zero", "nonzero"):
-        raise _BadParams("params.expect.exit: expected 'zero' or 'nonzero'")
 
     command = argv
     if ctx.sandbox:
@@ -169,19 +216,61 @@ def proof_command(params: Mapping[str, Any], ctx: ProofContext) -> ProofOutcome:
     except (OSError, ValueError) as exc:
         return _cannot(f"{binary!r} could not be started: {exc}")
 
-    if proc.returncode != 0 and (proc.stderr or "").startswith("bwrap:"):
-        first = (proc.stderr or "").strip().splitlines()[0]
+    stderr = proc.stderr or ""
+    if proc.returncode != 0 and stderr.startswith("bwrap:"):
+        first = stderr.strip().splitlines()[0]
         return _cannot(f"the sandbox could not start: {first}")
 
-    if proc.returncode != 0 and "read-only file system" in (proc.stderr or "").lower():
-        tail = (proc.stderr or "").strip().splitlines()
+    if proc.returncode != 0 and "read-only file system" in stderr.lower():
+        tail = stderr.strip().splitlines()
         return _cannot("the command needed to write outside the repository and /tmp, "
                        f"which the sandbox keeps read-only: {tail[-1] if tail else 'EROFS'}")
 
-    passed = proc.returncode == 0 if mode == "zero" else proc.returncode != 0
+    return _Ran(proc.returncode, (proc.stdout or "") + stderr)
+
+
+def proof_command(params: Mapping[str, Any], ctx: ProofContext) -> ProofOutcome:
+    argv = _argv_param(params)
+    expectation = params.get("expect", {})
+    if not isinstance(expectation, dict):
+        raise _BadParams("params.expect: expected an object")
+    mode = expectation.get("exit", "zero")
+    if mode not in ("zero", "nonzero"):
+        raise _BadParams("params.expect.exit: expected 'zero' or 'nonzero'")
+
+    ran = _attempt(argv, ctx)
+    if isinstance(ran, ProofOutcome):
+        return ran
+    passed = ran.returncode == 0 if mode == "zero" else ran.returncode != 0
     if passed:
-        return _held(f"{' '.join(argv)} exited {proc.returncode} (expected {mode})")
-    return _failed(f"{' '.join(argv)} exited {proc.returncode} (expected {mode})")
+        return _held(f"{' '.join(argv)} exited {ran.returncode} (expected {mode})")
+    return _failed(f"{' '.join(argv)} exited {ran.returncode} (expected {mode})")
+
+
+def proof_repro(params: Mapping[str, Any], ctx: ProofContext) -> ProofOutcome:
+    """The defect reproduces when the command fails.
+
+    A `command` proof asserts an expectation the reviewer chose; a `repro` proof
+    asserts one thing only — that the defect can be demonstrated here. Its pass
+    condition is a non-zero exit, which is why it is a kind of its own rather
+    than `command` with `expect.exit = "nonzero"`: the finding's meaning decides,
+    not the reviewer's optimism. `contains` pins the failure to the one claimed,
+    so a command that fails for an unrelated reason does not settle it.
+    """
+    argv = _argv_param(params)
+    contains = params.get("contains")
+    if contains is not None and (not isinstance(contains, str) or not contains):
+        raise _BadParams("params.contains: expected a non-empty string")
+
+    ran = _attempt(argv, ctx)
+    if isinstance(ran, ProofOutcome):
+        return ran
+    if ran.returncode == 0:
+        return _failed(f"{' '.join(argv)} exited 0: the defect did not reproduce")
+    if contains is not None and contains not in ran.output:
+        return _failed(f"{' '.join(argv)} exited {ran.returncode} without {contains!r}: "
+                       "not the failure the finding claims")
+    return _held(f"{' '.join(argv)} exited {ran.returncode}, reproducing the defect")
 
 
 def _pointer(document: Any, pointer: str) -> Any:
@@ -228,9 +317,6 @@ def proof_json(params: Mapping[str, Any], ctx: ProofContext) -> ProofOutcome:
     return _failed(f"{path.name}{pointer} is {value!r}, not {params['equals']!r}")
 
 
-
-
-
 def proof_diff(params: Mapping[str, Any], ctx: ProofContext) -> ProofOutcome:
     if ctx.diff is None:
         return _cannot("no diff was supplied to this run")
@@ -253,6 +339,7 @@ EXECUTORS: dict[str, Callable[[Mapping[str, Any], ProofContext], ProofOutcome]] 
     "absent": proof_absent,
     "present": proof_present,
     "command": proof_command,
+    "repro": proof_repro,
     "json": proof_json,
     "diff": proof_diff,
 }

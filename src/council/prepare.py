@@ -24,6 +24,7 @@ from .reference import FetchError, fetch
 from .repo import ReviewError, diff, output
 from .repo import root as repo_root
 from .request import ReviewRequest
+from .runner import profile_fingerprint
 
 
 def default_prompt() -> Path:
@@ -118,8 +119,10 @@ def prepare(request: ReviewRequest) -> Prepared:
         raise
     except (OSError, UnicodeDecodeError) as exc:
         raise ReviewError(f"cannot read the reviewer prompt at {prompt_file}: {exc}") from exc
+    identity = profile_fingerprint(request.profile)
     digest = instrument_digest(template, profile=request.profile,
-                               reasoning=request.reasoning)
+                               reasoning=request.reasoning,
+                               profile_fingerprint=identity.sha256 or None)
 
     try:
         references = tuple(fetch(url) for url in request.context_urls)
@@ -135,4 +138,5 @@ def prepare(request: ReviewRequest) -> Prepared:
     sliced = prompt_bytes > request.max_prompt_bytes and not request.allow_large_prompt
     return Prepared(root, config, baseline, base, head, patch, change.skipped,
                     scope_ignored, references, prompt_file, template, digest,
-                    fitted.prompt, prompt_bytes, sliced, fitted.context, diff_sha256)
+                    fitted.prompt, prompt_bytes, sliced, fitted.context, diff_sha256,
+                    identity.path, identity.sha256)

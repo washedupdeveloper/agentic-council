@@ -384,8 +384,15 @@ can never be `pass`.
 
 One call, five sections (`security`, `correctness`, `readability`,
 `architecture`, `performance`), one JSON object. A finding without a proof from
-the closed set (`absent`, `present`, `command`, `json`, `diff`)
+the closed set (`absent`, `present`, `command`, `repro`, `json`, `diff`)
 is refused by the parser, not by the prompt alone.
+
+Two kinds carry the weight. `repro` is the only kind whose pass condition is a
+non-zero exit: the command must fail, because the finding claims a defect that
+can be demonstrated, and a quotation cannot demonstrate one. `absent` takes an
+optional `within` list of POSIX globs, so an absence claim is settled inside the
+subtree it is about — and a scope that matches no file is `UNRUNNABLE`, never a
+free pass.
 
 The prompt ships with the tool at `src/council/prompts/reviewer.md`; `--prompt`
 names a different one. It carries the change **and the functions around it**: for
@@ -396,7 +403,11 @@ default). Anything the resolver could not follow is
 named in the prompt rather than left out. It is deliberately **not** read from
 the repository under review — otherwise the code being judged could supply a
 prompt that reports nothing. Every run records a digest over the template, the
-profile and the dimensions; two runs are comparable only when the digest matches.
+profile, the dimensions **and the profile's own configuration**: the model,
+provider and reasoning default live in a Hermes profile file this tool does not
+parse, so its bytes are hashed instead. Two runs are comparable only when the
+digest matches, and a run that could not read that file says so rather than
+assuming it did.
 
 ## Container
 
@@ -436,7 +447,7 @@ src/council/prompt.py     render the template, digest the instrument
 src/council/changes.py    the diff parser, shared by the diff proof and context
 src/council/context.py    the functions around the change, and their calls
 src/council/sample.py     one sample: run, retry once, record
-src/council/proofs.py     the five proof kinds
+src/council/proofs.py     the six proof kinds
 src/council/sandbox.py    bubblewrap: no network, overlay tree
 src/council/claims.py     the claim registry and its runner
 src/council/prompts/      the reviewer prompt, shipped with the tool

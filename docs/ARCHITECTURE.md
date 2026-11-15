@@ -28,6 +28,7 @@ not relabelled as architecture.
 | Claim | What would make it true | Evidence |
 |---|---|---|
 | The domain kernel is pure | No kernel module imports an adapter, and none calls a known effectful method. | `tests/test_architecture.py` parses each imported module; `tests/test_domain_kernel.py` calls the decisions with literals. |
+| A sample from another model is a different instrument | The digest covers the profile's configuration bytes, not only its name. | `prompt.instrument_digest`; `runner.profile_fingerprint`; `tests/test_profile.py`; claim `the-digest-covers-the-profile-configuration`. |
 | Configuration parsing is a decision, not a file read | Text in, `Config` out; the path check lives in the adapter. | `domain.config.parse`; `council.config.load` only reads and delegates. |
 | Adjudication does not execute proofs | Outcomes in, findings and verdict out; the executor stays in the shell. | `domain.adjudication.decide`; `adjudicate.adjudicate` calls the one executor. |
 | A finding's place has one parser | `Finding.file`/`line` are structured; `location` is the derived wire form. | `domain.location.Location`; `Finding.__post_init__`; `test_location.py`. |

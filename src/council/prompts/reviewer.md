@@ -30,9 +30,10 @@ Each finding is:
 
 | kind | params |
 |---|---|
-| `absent` | `{"pattern": "regex", "exclude": ["file"]}` — the pattern appears nowhere else |
+| `absent` | `{"pattern": "regex", "within": ["src/**"], "exclude": ["file"]}` — the pattern appears in no file in scope |
 | `present` | `{"path": "a.py", "line": 3, "text": "exact line"}` — that line says this |
 | `command` | `{"argv": ["tool", "arg"], "expect": {"exit": "zero"}}` |
+| `repro` | `{"argv": ["tool", "arg"], "contains": "text"}` — the command fails, so the defect reproduces |
 | `json` | `{"path": "data.json", "pointer": "/a/b", "equals": 3}` |
 | `diff` | `{"path": "a.py", "line": 12, "mode": "added"}` |
 
@@ -47,6 +48,17 @@ Each finding is:
 - Every section is present, even when empty.
 - `file` is a path from the repository root, without a leading `./`.
 - `line` is 1-based and inside the file.
+
+## Choosing a proof
+
+- `present` settles only what a line says, never what the code does. For a
+  behavioural or security claim, prefer `repro`: it passes only when the command
+  demonstrates the defect by failing.
+- `absent` searches the whole repository unless you give `within`. Scope it to
+  the subtree the claim is about, or an unrelated hit anywhere refutes it.
+- `command` and `repro` name one allowlisted executable with arguments. Do not
+  wrap a check in `sh -c`: the shell is not on the default allowlist, and a
+  proof that cannot start is `UNRUNNABLE`, not evidence.
 
 ## Context
 

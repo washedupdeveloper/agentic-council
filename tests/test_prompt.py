@@ -50,3 +50,15 @@ def test_the_contract_names_every_kind_and_severity() -> None:
 def test_the_digest_changes_with_the_dimensions() -> None:
     assert instrument_digest(TEMPLATE, profile="p", dimensions=("security",)) != \
         instrument_digest(TEMPLATE, profile="p", dimensions=("security", "correctness"))
+
+
+def test_the_digest_covers_the_profile_configuration() -> None:
+    """Two profiles with the same name and different models are instruments apart."""
+    assert instrument_digest(TEMPLATE, profile="p") != \
+        instrument_digest(TEMPLATE, profile="p", profile_fingerprint="deadbeef")
+
+
+def test_an_unread_profile_configuration_is_recorded_as_unknown() -> None:
+    """An empty fingerprint and no fingerprint are the same statement: not known."""
+    assert instrument_digest(TEMPLATE, profile="p") == \
+        instrument_digest(TEMPLATE, profile="p", profile_fingerprint="")

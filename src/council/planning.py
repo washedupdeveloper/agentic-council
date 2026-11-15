@@ -81,6 +81,11 @@ class Prepared:
     sliced: bool
     full_context: Context
     diff_sha256: str
+    #: The profile configuration the samples were asked under: its path from the
+    #: Hermes home and a digest of its bytes. Empty when it could not be read,
+    #: which makes the run's instrument unknown rather than assumed.
+    profile_config: str = ""
+    profile_config_sha256: str = ""
 
 
 @dataclass(frozen=True, slots=True)
