@@ -24,7 +24,9 @@ Enumerated from the tool, not from memory (`council --help`, `council review
 - `verdict.json` and its fields, including `verdict`, `findings[].state`,
   `prompt_bytes`, `prompt_limit`, `prompt_acknowledged`, `context_depth`,
   `diff_sha256`, `skipped`, `context`, `unresolved`, `references`, `sliced` and
-  `units[]` (each unit's files, ranges, digest, prompt size, depth and verdict);
+  `units[]` (each unit's files, ranges, digest, prompt size, depth, whether it is a
+  window, and verdict); and the `--plan` fields `windows` and
+  `estimated_samples`;
 - the shipped reviewer prompt's contract: one JSON object with five sections,
   and the closed proof-kind set (`absent`, `present`, `command`, `repro`,
   `json`, `diff`);

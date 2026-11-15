@@ -11,6 +11,17 @@ public surface, the definitions, and the release procedure — is
 
 ### Added
 
+- Large files are reviewable, by choice. A file that no budget admits — an added
+  file is one hunk carrying every line, so `src/agent_loop.py`'s 38,416 lines are
+  a single 1.8 MB prompt — is still refused by default, and the refusal now states
+  what splitting it would cost: *N* windows, one sample each. `--window-large-files`
+  splits that hunk into line windows, each its own unit at `--max-prompt-bytes`,
+  sliced at depth 0 and recorded with its own range in `units[]`; `--max-windows`
+  (default 200) is the ceiling. The interactive prompt gained the same choice, and
+  `--plan` prints the window count and the samples it implies before anything is
+  asked. Windows are disjoint: a defect spanning a boundary is missed, which is
+  the price of reviewing the file at all.
+
 - `repro` proofs, and absence claims that carry a scope. `repro` runs one
   allowlisted command and is `PROVEN` only when the command fails, so a defect
   that can be demonstrated is settled by demonstration rather than by quoting a

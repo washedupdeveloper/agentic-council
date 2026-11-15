@@ -47,23 +47,38 @@ council: why there is a limit
   wait. Measured with this provider: a 2.8 KB prompt was answered; a 60 KB
   prompt was not. The limit is a starting point, not a rule — raise it for this
   run, or narrow the change with a base revision.
+
+  A file too large to send at any depth can be split into line windows instead
+  (`window`, or --window-large-files). Each window is its own sample, so the cost
+  is the window count and not the file: a 38,000-line addition is tens of
+  windows, which is hours. That is why the default refuses, and why the count is
+  printed before the choice.
 """
 
 _OVERSIZE_ADVICE = ("narrow the change with --base, raise the budget with "
-                    "--max-prompt-bytes, or allow it with --allow-large-prompt")
+                    "--max-prompt-bytes, split it with --window-large-files, or allow "
+                    "it with --allow-large-prompt")
 
 
-def _oversize_decision(exc: PromptTooLarge, *, allow_base: bool = True) -> tuple[str, int | str | None]:
+def _oversize_decision(exc: PromptTooLarge, *, allow_base: bool = True,
+                       allow_window: bool = True) -> tuple[str, int | str | None]:
     """Ask a person what to do. Empty input or EOF cancels: silence is not consent."""
     while True:
         print(f"council: the prompt for this change is {exc.size:,} bytes; "
               f"the limit is {exc.limit:,}.", file=sys.stderr)
+        if exc.windows:
+            print(f"council: split into line windows it would be {exc.windows:,} unit(s): "
+                  f"{exc.windows:,}–{exc.windows * 3:,} sample(s), one per window. The wait "
+                  "grows with that count, not with the file.", file=sys.stderr)
         print("council: nothing has been sent to the model. how should this proceed?",
               file=sys.stderr)
+        window = ("  window          split it into line windows, one sample each\n"
+                  if exc.windows and allow_window else "")
         print("  allow           send it anyway\n"
               "  budget N        set the limit to N bytes and retry\n"
               "  base REV        review a narrower change\n"
               "  context N       layers: 0 none, 1 enclosing, 2 +1 call, 3 +2\n"
+              + window +
               "  ?               explain the limit\n"
               "  cancel          stop (exit 3)", file=sys.stderr)
         try:
@@ -76,6 +91,11 @@ def _oversize_decision(exc: PromptTooLarge, *, allow_base: bool = True) -> tuple
         rest = rest.strip()
         if command == "allow":
             return ("allow", None)
+        if command == "window":
+            if not exc.windows or not allow_window:
+                print("council: splitting is not available for this change", file=sys.stderr)
+                continue
+            return ("window", None)
         if command == "budget":
             try:
                 number = int(rest)
@@ -121,6 +141,8 @@ def _request(args: argparse.Namespace, *, allow: bool | None = None) -> ReviewRe
         context_urls=tuple(args.context_url),
         allow_large_prompt=args.allow_large_prompt if allow is None else allow,
         max_prompt_bytes=args.max_prompt_bytes,
+        window_large_files=bool(getattr(args, "window_large_files", False)),
+        max_windows=int(getattr(args, "max_windows", 200)),
         context_depth=args.context_depth,
         time_budget=args.time_budget,
         reasoning=args.reasoning,
@@ -239,9 +261,13 @@ def _review(args: argparse.Namespace) -> Report:
                            and sys.stdin.isatty())
             if not interactive:
                 raise
-            decision, value = _oversize_decision(exc, allow_base=args.command != "pr")
+            decision, value = _oversize_decision(
+                exc, allow_base=args.command != "pr",
+                allow_window=not bool(getattr(args, "window_large_files", False)))
             if decision == "allow":
                 allow = True
+            elif decision == "window":
+                args.window_large_files = True
             elif decision == "budget" and isinstance(value, int):
                 args.max_prompt_bytes = value
             elif decision == "base" and isinstance(value, str):

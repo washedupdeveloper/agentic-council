@@ -42,7 +42,13 @@ def print_plan(planned: Plan) -> None:
         print(f"  whole change  {planned.prompt_bytes:,} bytes  context depth {planned.depth}")
     for unit in planned.units:
         files = ", ".join(safe(name) for name in unit.files)
-        print(f"  {safe(unit.id)}  {files}  {unit.bytes:,} bytes  depth {unit.depth}")
+        window = (f"  lines {unit.ranges[0][1]}–{unit.ranges[0][2]}"
+                  if unit.window and unit.ranges else "")
+        print(f"  {safe(unit.id)}  {files}{window}  {unit.bytes:,} bytes  depth {unit.depth}")
+    if planned.windows:
+        low, high = planned.estimated_samples
+        print(f"  windows: {planned.windows} of {len(planned.units)} unit(s): "
+              f"{low:,}–{high:,} sample(s) expected")
     if planned.skipped:
         listed = ", ".join(f"{safe(item.path)} ({safe(item.reason)})"
                            for item in planned.skipped[:5])
@@ -65,6 +71,8 @@ def plan_payload(planned: Plan) -> dict[str, object]:
         "prompt_bytes": planned.prompt_bytes,
         "prompt_limit": planned.prompt_limit,
         "sliced": planned.sliced,
+        "windows": planned.windows,
+        "estimated_samples": list(planned.estimated_samples),
         "units": [
             {
                 "id": unit.id,
@@ -73,6 +81,7 @@ def plan_payload(planned: Plan) -> dict[str, object]:
                            for file, start, end in unit.ranges],
                 "prompt_bytes": unit.bytes,
                 "context_depth": unit.depth,
+                "window": unit.window,
             }
             for unit in planned.units
         ],

@@ -948,6 +948,33 @@ check = "python3 -m pytest tests/test_prompt.py::test_the_digest_covers_the_prof
 falsifier = "digest-ignores-the-profile-config"
 
 [[claim]]
+id = "a-file-too-large-for-one-prompt-states-its-window-cost"
+text = "Refusing a file that needs windows names the window count and the flag that splits it."
+check = "python3 -m pytest tests/test_windows.py::test_a_file_too_large_for_one_prompt_states_its_window_cost -q"
+falsifier = "windows-never-refused"
+
+[[claim]]
+id = "windowing-splits-a-file-into-units-that-fit"
+text = "With --window-large-files a file too large for one prompt becomes units that each fit the budget and tile the file."
+check = "python3 -m pytest tests/test_windows.py::test_windowing_splits_a_file_into_units_that_fit -q"
+falsifier = "window-bounds-ignore-the-budget"
+
+[[claim]]
+id = "windowing-past-the-limit-is-refused"
+text = "A change needing more windows than --max-windows is refused before the reviewer is called."
+check = "python3 -m pytest tests/test_windows.py::test_windowing_past_the_window_limit_is_refused -q"
+
+[[claim]]
+id = "a-window-keeps-the-line-numbers-of-the-whole-hunk"
+text = "Slicing a hunk into windows preserves the added and removed line numbers of the whole hunk."
+check = "python3 -m pytest tests/test_changes.py::test_a_window_keeps_the_line_numbers_of_the_whole_hunk -q"
+
+[[claim]]
+id = "the-plan-states-the-samples-a-windowed-run-costs"
+text = "A plan for a windowed review reports the window count and the sample span it implies."
+check = "python3 -m pytest tests/test_windows.py::test_the_plan_states_the_windows_and_their_samples -q"
+
+[[claim]]
 id = "ci-staged-reaches-the-reviewer"
 text = "The ci command runs a staged review through the real CLI into the reviewer prompt."
 check = "python3 -m pytest tests/test_cli_scope.py::test_ci_runs_a_staged_review -q"

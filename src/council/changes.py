@@ -150,3 +150,54 @@ def hunk_range(hunk: str) -> tuple[int, int]:
             count = int(match.group(2)) if match.group(2) is not None else 1
             return start, start + max(count, 1) - 1
     return 1, 1
+
+
+@dataclass(frozen=True, slots=True)
+class HunkParts:
+    """A hunk split into its file header, its counters and its body lines."""
+
+    header: str
+    start_old: int
+    start_new: int
+    body: tuple[str, ...]
+
+
+def hunk_parts(hunk: str) -> HunkParts:
+    """Split a hunk into the parts a window needs; refuse one with no header."""
+    lines = hunk.splitlines(keepends=True)
+    for index, line in enumerate(lines):
+        match = re.match(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@", line)
+        if match is None:
+            continue
+        return HunkParts("".join(lines[:index]), int(match.group(1)),
+                         int(match.group(3)), tuple(lines[index + 1:]))
+    raise ValueError("the hunk has no @@ header")
+
+
+def slice_hunk(hunk: str, start: int, end: int) -> str:
+    """Re-emit the part of a hunk covering body lines [start, end).
+
+    Splitting an added file means splitting the one hunk that carries every line,
+    so the slice must still be a diff a reader and `change_lines` agree about.
+    The new side is the slice's own range; the old side is wherever walking the
+    lines before it left the old counter, because a hunk with context or removals
+    advances both counters and the offset cannot be assumed from the index.
+    """
+    parts = hunk_parts(hunk)
+    if not 0 <= start < end <= len(parts.body):
+        raise ValueError(f"window {start}:{end} is outside a {len(parts.body)}-line hunk")
+    old_line, new_line = parts.start_old, parts.start_new
+    for line in parts.body[:start]:
+        prefix = line[:1]
+        if prefix == " ":
+            old_line += 1
+            new_line += 1
+        elif prefix == "-":
+            old_line += 1
+        elif prefix == "+":
+            new_line += 1
+    window = parts.body[start:end]
+    old_count = sum(1 for line in window if line[:1] in (" ", "-"))
+    new_count = sum(1 for line in window if line[:1] in (" ", "+"))
+    header = f"@@ -{old_line},{old_count} +{new_line},{new_count} @@\n"
+    return parts.header + header + "".join(window)

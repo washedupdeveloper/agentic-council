@@ -10,10 +10,12 @@ from __future__ import annotations
 
 import difflib
 
+import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
-from council.changes import change_lines, file_sections, hunk_range, hunk_sections
+from council.changes import (change_lines, file_sections, hunk_range, hunk_sections,
+                             slice_hunk)
 
 # Lines that cannot confuse the diff format with a newline of their own.
 LINE = st.text(alphabet=st.characters(blacklist_categories=("Cc", "Cs")), max_size=20)
@@ -124,6 +126,41 @@ def test_a_section_splits_into_hunks_that_keep_the_file_header() -> None:
 def test_a_hunk_range_is_the_new_side() -> None:
     assert hunk_range("diff --git a/f b/f\n@@ -5,2 +7,3 @@\n") == (7, 9)
     assert hunk_range("@@ -5 +7 @@\n") == (7, 7)
+
+
+MIXED_HUNK = """diff --git a/a.py b/a.py
+--- a/a.py
++++ b/a.py
+@@ -10,3 +10,4 @@
+ ctx
+-old
++new
++extra
+ ctx2
+"""
+
+
+def test_a_window_keeps_the_line_numbers_of_the_whole_hunk() -> None:
+    """Windows over one hunk must add and remove exactly what the hunk did."""
+    whole_added, whole_removed = change_lines(MIXED_HUNK)["a.py"]
+    added: set[int] = set()
+    removed: set[int] = set()
+    for start, end in ((0, 2), (2, 4), (4, 5)):
+        piece_added, piece_removed = change_lines(slice_hunk(MIXED_HUNK, start, end))["a.py"]
+        added |= piece_added
+        removed |= piece_removed
+    assert (added, removed) == (whole_added, whole_removed)
+
+
+def test_a_window_claims_the_new_side_range_it_covers() -> None:
+    assert hunk_range(slice_hunk(MIXED_HUNK, 0, 2)) == (10, 10)
+    assert hunk_range(slice_hunk(MIXED_HUNK, 2, 4)) == (11, 12)
+    assert hunk_range(slice_hunk(MIXED_HUNK, 4, 5)) == (13, 13)
+
+
+def test_a_window_outside_the_hunk_is_refused() -> None:
+    with pytest.raises(ValueError, match="outside"):
+        slice_hunk(MIXED_HUNK, 0, 99)
 
 
 def test_a_deleted_file_keeps_its_removed_lines() -> None:

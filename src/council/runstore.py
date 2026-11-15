@@ -84,6 +84,8 @@ def write_verdict(document: VerdictDocument) -> None:
         "prompt_bytes": prepared.prompt_bytes,
         "prompt_limit": request.max_prompt_bytes,
         "prompt_acknowledged": request.allow_large_prompt,
+        "window_large_files": request.window_large_files,
+        "max_windows": request.max_windows,
         "sliced": prepared.sliced,
         "time_budget": request.time_budget,
         "units": list(document.units),

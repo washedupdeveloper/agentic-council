@@ -259,6 +259,8 @@ Every flag the tool accepts, what it changes, and why it exists. `council <comma
 | `--context-depth N` | `3` | `0` diff only, `1` enclosing function, `2` +one call level, `3` +two | the context is what makes a prompt large; the caller can trade depth for size |
 | `--max-prompt-bytes N` | `32768` | refuse a prompt larger than N bytes | a prompt past the model's practical envelope is a hang, not a review; refusal is immediate |
 | `--allow-large-prompt` | off | send an oversized prompt without asking | an autonomous caller that has measured the cost can say yes in advance |
+| `--window-large-files` | off | split a file too large for one prompt into line windows, one sample each | the default refuses: windowing is the only way to review a 38,000-line addition, and it costs one sample per few hundred lines |
+| `--max-windows N` | `200` | refuse a change that would need more than N windows | a run of thousands of samples is a crawl, not a review; the limit is stated before anything is asked |
 | `--autonomous` | off | never ask: refuse an oversized prompt, exit 3 | a script running in a terminal must not block on a question |
 | `-h, --help` | — | usage | — |
 
@@ -277,6 +279,7 @@ asks the person at the terminal what should happen:
 | answer | effect |
 |---|---|
 | `allow` | send this prompt anyway; the verdict records `prompt_acknowledged: true` |
+| `window` | split the file into line windows and review each, one sample per window; the count and the samples it implies are printed first |
 | `budget N` | change the limit to N bytes for this run and retry |
 | `base REV` | review a narrower change and retry |
 | `context N` | keep the diff, change the context depth to N (0–3) and retry |
@@ -290,6 +293,17 @@ terminal attached, or with `--autonomous`.
 The default is a starting point measured, not assumed: a 2.8 KB prompt was
 answered by the reviewer, a 60 KB prompt was not, on the same profile. A run
 that needs more says so before the wait rather than after it.
+
+A file that no budget admits is refused rather than quietly dropped, and the
+refusal states what splitting it would cost: an added file arrives as one hunk
+carrying every line, so a 38,000-line addition cannot be sliced by file or by
+hunk and is one prompt of 1.8 MB. `--window-large-files` (or `window` at the
+prompt) splits such a hunk into line windows instead, each its own unit at
+`--max-prompt-bytes`, reviewed at context depth 0 because a fragment's enclosing
+function is not the thing under review. `--max-windows` (default 200) is the
+ceiling past which the run is refused even then. Windows are disjoint, so a
+defect that spans a boundary is missed; that is the price of reviewing the file
+at all, and it is recorded in `units[].ranges` rather than hidden.
 
 ### `council ci`
 

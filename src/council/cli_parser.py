@@ -12,7 +12,7 @@ import sys
 from pathlib import Path
 from typing import NoReturn
 
-from .request import DEFAULT_PROFILE, PROMPT_LIMIT
+from .request import DEFAULT_PROFILE, PROMPT_LIMIT, WINDOW_LIMIT
 from .runner import DEFAULT_IDLE_TIMEOUT
 from .version import current_version
 
@@ -133,6 +133,12 @@ def add_review_arguments(parser: argparse.ArgumentParser, *, advice: bool,
                         help="refuse a prompt larger than N bytes (default: 32768)")
     parser.add_argument("--allow-large-prompt", action="store_true",
                         help="send an oversized prompt without asking (autonomous allow)")
+    parser.add_argument("--window-large-files", action="store_true",
+                        help="split a file too large for one prompt into line windows "
+                             "(one sample per window; refused by default)")
+    parser.add_argument("--max-windows", type=positive, default=WINDOW_LIMIT, metavar="N",
+                        help="refuse a change that would need more than N windows "
+                             "(default: 200)")
     if advice:
         parser.add_argument("--autonomous", action="store_true",
                             help="never ask: refuse an oversized prompt, exit 3")

@@ -18,6 +18,9 @@ from .pr import PullRequest
 
 DEFAULT_PROFILE = "council-generalist"
 PROMPT_LIMIT = 32 * 1024
+#: The most windows one change may be split into. Past this the run is no longer
+#: a review but a crawl, and refusing is cheaper than starting it.
+WINDOW_LIMIT = 200
 
 
 def _integer(label: str, value: object, *, minimum: int | None = None) -> int:
@@ -40,6 +43,8 @@ class ReviewRequest:
     context_urls: tuple[str, ...] = ()
     allow_large_prompt: bool = False
     max_prompt_bytes: int = PROMPT_LIMIT
+    window_large_files: bool = False
+    max_windows: int = WINDOW_LIMIT
     context_depth: int = 3
     time_budget: int = 0
     reasoning: str | None = None
@@ -61,6 +66,7 @@ class ReviewRequest:
         if self.samples is not None:
             _integer("samples", self.samples, minimum=1)
         _integer("the prompt limit", self.max_prompt_bytes, minimum=1)
+        _integer("the window limit", self.max_windows, minimum=1)
         _integer("context depth", self.context_depth)
         _integer("the time budget", self.time_budget, minimum=0)
         _integer("the idle timeout", self.idle_timeout, minimum=1)

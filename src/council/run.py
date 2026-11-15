@@ -86,10 +86,15 @@ def plan(request: ReviewRequest) -> Plan:
     if prepared.sliced:
         units = tuple(_build_units(prepared.template, prepared.base, prepared.patch,
                                    prepared.root, request, prepared.references))
+    windows = sum(1 for unit in units if unit.window)
+    # One sample per unit when it is clean, two to confirm a finding, three to
+    # break a tie: the plan states the span rather than a single number.
+    low = len(units) * (request.samples if request.samples is not None else 1)
+    high = len(units) * (request.samples if request.samples is not None else 3)
     return Plan(prepared.base, prepared.head, prepared.prompt_bytes,
                 request.max_prompt_bytes, prepared.sliced, units,
                 prepared.skipped, request.context_depth, prepared.scope_ignored,
-                request.include, request.exclude)
+                request.include, request.exclude, windows, (low, high))
 
 
 def review(request: ReviewRequest, runner: Runner) -> Report:
@@ -224,6 +229,7 @@ def review(request: ReviewRequest, runner: Runner) -> Report:
                     "context_digest": unit.context_digest,
                     "context_depth": unit.depth,
                     "prompt_bytes": unit.bytes,
+                    "window": unit.window,
                     "samples_run": unit_run,
                     "agreement": unit_agreement,
                     "ok": ok,
