@@ -6,7 +6,8 @@ is authoritative for design; this file is the index and resume note.
 
 - **Project:** `reviewc/council`, the v2 review engine
 - **Branch:** `v2`
-- **Last verified commit:** `ba9ef80` (`M24.2: close the scope proof gaps`)
+- **Last verified code commit:** `ba9ef80` (`M24.2: close the scope proof gaps`)
+- **Handoff commit:** documentation-only, published on `v2`; run the gate after cloning
 - **Published at:** `https://github.com/washedupdeveloper/agentic-council/tree/v2`
 - **Tag:** `v2.0.0` is at `4247078`; it does **not** point at this handoff's
   commit. Do not move it without following `docs/VERSIONING.md`.
