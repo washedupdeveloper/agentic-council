@@ -9,7 +9,6 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 from .findings import Finding, blocks
-from .planning import Unit
 from .sample import Runner, SampleResult, run_sample
 from .verdict import Verdict, judge
 
@@ -21,16 +20,6 @@ def unit_verdict(findings: Sequence[Finding], ok: bool) -> str:
     if not ok:
         return Verdict.INCOMPLETE.value
     return judge(findings).verdict.value
-
-
-def belongs(finding: Finding, unit: Unit) -> bool:
-    """Whether a finding's structured place is inside a unit's ranges."""
-    if finding.file not in unit.files:
-        return False
-    if not unit.ranges:
-        return True
-    return any(file == finding.file and start <= finding.line <= end
-               for file, start, end in unit.ranges)
 
 
 def blocking_key(sample: SampleResult) -> frozenset[tuple[str, str, int, str]] | None:

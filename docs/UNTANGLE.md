@@ -58,9 +58,9 @@ edit, in the categories from `untangle-codebase`.
 
 1. `proofs.py` said “six” kinds; there are five. **Fixed** in the docstring and
    guarded by the registry assertion.
-2. `_belongs` re-derived unit attribution after the merge. **Moved** to
-   `sampling.belongs`; the residual architectural debt (keep the mapping while
-   collecting samples) is recorded in `ARCHITECTURE.md`.
+2. `_belongs` re-derived unit attribution after the merge. **Fixed:** the
+   sliced loop keeps `unit.id -> RawFinding[]` while samples arrive, and builds
+   each unit's findings from that evidence instead of re-parsing locations.
 3. `_write_sample` was a wrapper only translating errors. **Moved** to
    `runstore.write_sample`, where the run-store error boundary belongs.
 4. `domain/proof.py` was a 13-line module with one caller. **Fixed:** inlined
@@ -92,6 +92,9 @@ edit, in the categories from `untangle-codebase`.
 ## Tests and comments
 
 - Added `tests/test_location.py` for colon paths and structured places.
+- Added `test_a_unit_keeps_a_finding_that_cites_another_file`: sliced unit
+  attribution comes from the samples, not from re-matching the final finding
+  location.
 - Expanded `tests/test_verdict.py` to the full dimension × severity × state
   matrix; the old severity-only matrix missed the dimension axis of `blocks`.
 - Added the exit-code mapping test and a single-rule proof.

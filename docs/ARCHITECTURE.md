@@ -108,11 +108,11 @@ evidence; `INCOMPLETE` is exit 2 and means the review ran with missing evidence.
 
 ## Residual architecture debt
 
-1. **Unit attribution is still derived after the merge.** Findings are flattened
-   across units and then matched back by file and line. A reviewer citing a
-   callee outside its unit's ranges is attributed to none; the unit can report
-   `findings: 0`. Keeping `unit.id -> RawFinding[]` as samples arrive is the next
-   cut.
+1. **Unit attribution is now collected as evidence arrives.** The sliced loop
+   keeps `unit.id -> RawFinding[]`; `units[].findings` counts a finding reported
+   by that unit even when the finding cites a callee outside the unit's ranges.
+   The remaining layout difference (sliced `units/<id>` versus the whole-change
+   root) is recorded below.
 2. **`proofs.py` mixes execution and semantics.** The `ProofOutcome` value and
    the decision moved to the kernel; the five executors, file reads and
    subprocesses remain. They are correctly an adapter, but the module is not
@@ -132,8 +132,8 @@ evidence; `INCOMPLETE` is exit 2 and means the review ran with missing evidence.
 
 ## What would change the verdict
 
-- `run.py` below ~300 lines with one unit loop and `unit.id -> RawFinding[]`
-  attribution, while the existing state-machine tests stay green.
+- `run.py` below ~300 lines with one unit loop for the whole change and the
+  sliced change, while the existing state-machine tests stay green.
 - A second real implementation of a seam (for example a non-git change source)
   would justify a port; until then, adding protocols would be indirection.
 - The purity gate exercised through mutation: a deliberately inserted

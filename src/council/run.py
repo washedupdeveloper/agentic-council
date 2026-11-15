@@ -30,8 +30,7 @@ from .request import (DEFAULT_PROFILE as DEFAULT_PROFILE,
 from .runstore import (VerdictDocument, claim as _claim,
                        discard_empty as _discard_empty,
                        write_sample as _write_sample, write_verdict)
-from .sampling import (belongs as _belongs, samples as _samples,
-                       unit_verdict as _unit_verdict)
+from .sampling import (samples as _samples, unit_verdict as _unit_verdict)
 from .prompt import PromptError, instrument_digest
 from .proofs import ProofContext
 from .reference import FetchError, fetch
@@ -288,6 +287,7 @@ def review(request: ReviewRequest, runner: Runner) -> Report:
         else:
             runs: list[tuple[Unit, tuple[SampleResult, ...], int, bool | None, bool]] = []
             raw: list[RawFinding] = []
+            raw_by_unit: dict[str, list[RawFinding]] = {}
             skipped_by_budget: set[str] = set()
             started = time.monotonic()
             for unit in units:
@@ -306,6 +306,7 @@ def review(request: ReviewRequest, runner: Runner) -> Report:
                 for sample in unit_samples:
                     if sample.output is not None:
                         raw.extend(sample.output.findings)
+                        raw_by_unit.setdefault(unit.id, []).extend(sample.output.findings)
             merged = merge([raw])
             adjudication = adjudicate(merged, proofs)
             result = verdict(adjudication)
@@ -331,7 +332,10 @@ def review(request: ReviewRequest, runner: Runner) -> Report:
                     # must still say what was never looked at.
                     result = Result(result.verdict, f"{result.reason}; {note}", result.findings)
             for unit, unit_samples, unit_run, unit_agreement, ok in runs:
-                mine = [finding for finding in result.findings if _belongs(finding, unit)]
+                places = {(item.dimension, item.file, item.line)
+                          for item in raw_by_unit.get(unit.id, ())}
+                mine = [finding for finding in result.findings
+                        if (finding.dimension, finding.file, finding.line) in places]
                 units_payload.append({
                     "id": unit.id,
                     "files": list(unit.files),

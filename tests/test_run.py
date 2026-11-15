@@ -632,6 +632,26 @@ def test_the_same_place_reported_by_two_units_is_merged_once(tmp_path: Path) -> 
     assert len(payload["units"]) == 2
 
 
+def test_a_unit_keeps_a_finding_that_cites_another_file(tmp_path: Path) -> None:
+    repo, prompt = make_two_changes(tmp_path)
+
+    def runner(text: str) -> str:
+        if "a.py" in text and "b.py" not in text:
+            return body({"security": [secret(
+                file="b.py", line=1,
+                proof={"kind": "present",
+                       "params": {"path": "b.py", "line": 1, "text": "one"}})]})
+        return body()
+
+    report = review(
+        ReviewRequest(repo=repo, base="HEAD", samples=1, run_id="slice-callee",
+                      prompt=prompt, max_prompt_bytes=200),
+        runner)
+
+    payload = json.loads((report.run_dir / "verdict.json").read_text(encoding="utf-8"))
+    assert [unit["findings"] for unit in payload["units"]] == [1, 0]
+
+
 def test_a_spent_time_budget_leaves_the_remaining_units_unreviewed(
         tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     repo, prompt = make_two_changes(tmp_path)
