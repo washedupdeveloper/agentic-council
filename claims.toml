@@ -970,6 +970,10 @@ text = "Slicing a hunk into windows preserves the added and removed line numbers
 check = "python3 -m pytest tests/test_changes.py::test_a_window_keeps_the_line_numbers_of_the_whole_hunk -q"
 
 [[claim]]
+id = "the-prompt-offers-windowing-and-honours-the-answer"
+text = "At the interactive prompt `window` allows windowing for the retry, and is refused when the prompt carries no window count."
+check = "python3 -m pytest tests/test_cli.py::test_review_asks_and_window_splits_it tests/test_cli.py::test_the_window_answer_is_refused_when_nothing_can_be_split -q"
+[[claim]]
 id = "the-plan-states-the-samples-a-windowed-run-costs"
 text = "A plan for a windowed review reports the window count and the sample span it implies."
 check = "python3 -m pytest tests/test_windows.py::test_the_plan_states_the_windows_and_their_samples -q"

@@ -689,6 +689,35 @@ def test_review_asks_and_allow_sends_it(monkeypatch: pytest.MonkeyPatch) -> None
     assert calls[1].allow_large_prompt is True
 
 
+def test_review_asks_and_window_splits_it(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[Any] = []
+
+    def fake(request: Any, runner: Any) -> Report:
+        calls.append(request)
+        if len(calls) == 1:
+            raise PromptTooLarge(60_000, 32_768, unit="a.py", windows=4)
+        return report(Verdict.PASS)
+
+    monkeypatch.setattr(cli, "review", fake)
+    monkeypatch.setattr(cli.sys, "stdin", _Stdin(["window\n"]))
+    assert cli.main(["review"]) == 0
+    assert calls[1].window_large_files is True
+    assert calls[1].max_windows == 200
+
+
+def test_the_window_answer_is_refused_when_nothing_can_be_split(
+        monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    """A prompt over the limit for no splittable reason must not offer the choice."""
+
+    def boom(request: Any, runner: Any) -> Report:
+        raise PromptTooLarge(60_000, 32_768)
+
+    monkeypatch.setattr(cli, "review", boom)
+    monkeypatch.setattr(cli.sys, "stdin", _Stdin(["window\n", "cancel\n"]))
+    assert cli.main(["review"]) == 3
+    assert "not available" in capsys.readouterr().err
+
+
 def test_review_can_raise_the_budget(monkeypatch: pytest.MonkeyPatch) -> None:
     calls: list[Any] = []
 
