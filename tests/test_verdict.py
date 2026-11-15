@@ -11,7 +11,8 @@ from __future__ import annotations
 import pytest
 
 from council.findings import SEVERITIES, Finding, State
-from council.verdict import Result, Verdict, judge
+from council.schema import DIMENSIONS
+from council.verdict import Result, Verdict, exit_code, judge
 
 
 def finding(severity: str = "high", state: State = State.PROVEN, ident: str = "F-1",
@@ -23,6 +24,14 @@ def test_an_empty_run_passes() -> None:
     result = judge([])
     assert result.verdict is Verdict.PASS
     assert result.exit_code == 0
+
+
+def test_every_verdict_has_one_exit_code() -> None:
+    assert exit_code(Verdict.PASS) == 0
+    assert exit_code(Verdict.FAIL) == 1
+    assert exit_code(Verdict.INCOMPLETE) == 2
+    assert judge([finding("high")]).exit_code == exit_code(Verdict.FAIL)
+    assert judge([finding("high", State.UNSETTLED)]).exit_code == exit_code(Verdict.INCOMPLETE)
 
 
 def test_a_proven_high_fails() -> None:
@@ -93,21 +102,24 @@ def test_the_reason_cites_at_most_three_ids() -> None:
     assert reason.count("F-") == 3
 
 
+ALWAYS_BLOCKING = frozenset({"security", "correctness"})
+
+
+@pytest.mark.parametrize("dimension", DIMENSIONS)
 @pytest.mark.parametrize("severity", SEVERITIES)
 @pytest.mark.parametrize("state", list(State))
-def test_every_pair_has_one_outcome(severity: str, state: State) -> None:
-    """Exhaustive over 4 severities × 4 states: the rule is total."""
-    result: Result = judge([finding(severity, state)])
-    expected = {
-        (State.PROVEN, True): Verdict.FAIL,
-        (State.PROVEN, False): Verdict.PASS,
-        (State.REFUTED, True): Verdict.PASS,
-        (State.REFUTED, False): Verdict.PASS,
-        (State.UNSETTLED, True): Verdict.INCOMPLETE,
-        (State.UNSETTLED, False): Verdict.PASS,
-        (State.UNRUNNABLE, True): Verdict.INCOMPLETE,
-        (State.UNRUNNABLE, False): Verdict.PASS,
-    }[(state, severity in ("high", "critical"))]
+def test_every_dimension_severity_and_state_has_one_outcome(
+    dimension: str, severity: str, state: State,
+) -> None:
+    """The blocking rule has a dimension axis; a severity-only matrix misses it."""
+    blocks = severity in ("high", "critical") or dimension in ALWAYS_BLOCKING
+    if state is State.REFUTED or not blocks:
+        expected = Verdict.PASS
+    elif state is State.PROVEN:
+        expected = Verdict.FAIL
+    else:
+        expected = Verdict.INCOMPLETE
+    result: Result = judge([finding(severity, state, dimension=dimension)])
     assert result.verdict is expected
 
 

@@ -250,22 +250,6 @@ def test_json_pointer_rejects_a_leading_zero(tmp_path: Path) -> None:
     assert outcome.state is State.UNRUNNABLE
 
 
-# --- http / dom -------------------------------------------------------------
-
-def test_http_is_not_a_proof_kind(tmp_path: Path) -> None:
-    """Retrieval is context, not evidence: the caller fetches, the model does not."""
-    outcome = run_proof("http", {"url": "http://127.0.0.1:1/", "expect_status": 200}, ctx(tmp_path))
-    assert outcome.state is State.UNRUNNABLE
-    assert "not a proof kind" in outcome.detail
-
-
-def test_dom_is_not_a_proof_kind(tmp_path: Path) -> None:
-    """A kind the tool cannot run is not offered: DOM claims cite a `command` proof."""
-    outcome = run_proof("dom", {"selector": "#x"}, ctx(tmp_path))
-    assert outcome.state is State.UNRUNNABLE
-    assert "not a proof kind" in outcome.detail
-
-
 def test_every_declared_kind_has_an_executor() -> None:
     assert set(PROOF_KINDS) == set(EXECUTORS)
 

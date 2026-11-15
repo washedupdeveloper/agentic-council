@@ -31,16 +31,9 @@ RULES = [
 ]
 
 
-def _location(text: str) -> tuple[str, int]:
-    """`path:line` as SARIF wants it; a location without a line starts at 1."""
-    path, _, raw = text.rpartition(":")
-    if not path:
-        return text, 1
-    try:
-        line = int(raw)
-    except ValueError:
-        return text, 1
-    return path, max(1, line)
+def _location(finding: Finding) -> tuple[str, int]:
+    """The structured place SARIF wants; no parsing of the display string."""
+    return finding.file, max(1, finding.line)
 
 
 def _message(finding: Finding) -> str:
@@ -53,7 +46,7 @@ def render(result: Result, *, tool_version: str = "0.0.0+source") -> dict[str, o
     for finding in result.findings:
         if finding.state is not State.PROVEN:
             continue
-        path, line = _location(finding.location)
+        path, line = _location(finding)
         results.append({
             "ruleId": finding.dimension,
             "level": LEVEL.get(finding.severity, "note"),

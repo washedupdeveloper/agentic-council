@@ -1,61 +1,45 @@
 """One review: request in, written run out. The runner is a parameter."""
 
+# ruff: noqa: I001, PLC0414 - explicit aliases are the public re-export surface
+
 from __future__ import annotations
 
 import hashlib
-import json
 import time
-from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from .adjudicate import adjudicate, verdict
 from .base import resolve_base
 from .baseline import load as load_baseline, load_at as load_baseline_at
-from .changes import file_sections, hunk_range, hunk_sections
-from .config import CONFIG_NAME, Config, load as load_config
-from .context import Context, build as build_context
+from .changes import file_sections
+from .config import CONFIG_NAME, load as load_config
 from .domain.baseline import Baseline, GateResult, apply_baseline
 from .domain.scope import Scope, ScopeError, ScopeIgnored
-from .findings import OPEN_STATES, Finding, State, blocks
+from .findings import Finding
 from .merge import merge
 from .paths import run_dir as run_path, validate_run_id
-from .pr import PullRequest
-from .prompt import PromptError, instrument_digest, render
+from .planning import (Plan as Plan, Prepared as Prepared,
+                       PromptTooLarge as PromptTooLarge, Unit as Unit,
+                       build_units as _build_units,
+                       prompt_for as _prompt_for)
+from .request import (DEFAULT_PROFILE as DEFAULT_PROFILE,
+                      PROMPT_LIMIT as PROMPT_LIMIT,
+                      ReviewRequest as ReviewRequest)
+from .runstore import (VerdictDocument, claim as _claim,
+                       discard_empty as _discard_empty,
+                       write_sample as _write_sample, write_verdict)
+from .sampling import (belongs as _belongs, samples as _samples,
+                       unit_verdict as _unit_verdict)
+from .prompt import PromptError, instrument_digest
 from .proofs import ProofContext
-from .reference import FetchError, Reference, fetch
-from .repo import (ReviewError, Skipped, diff, output, python_files,
+from .reference import FetchError, fetch
+from .repo import (ReviewError, Skipped, diff, output,
                    root as repo_root, state_dir_ignored)
-from .sample import Runner, SampleResult, run_sample, write_sample
+from .sample import Runner, SampleResult
 from .schema import RawFinding
 from .verdict import Result, Verdict
-
-DEFAULT_PROFILE = "council-generalist"
-AUTO_MAX = 3
-# A prompt past this size is not sent to the reviewer without a person's word.
-# The failure is silent and expensive otherwise: the model can sit for its whole
-# timeout and the sample is retried once.
-PROMPT_LIMIT = 32 * 1024
-
-
-class PromptTooLarge(ReviewError):
-    """The prompt is over the limit and nobody has allowed it."""
-
-    def __init__(self, size: int, limit: int, *, declined: bool = False,
-                 unit: str | None = None) -> None:
-        self.size = size
-        self.limit = limit
-        self.unit = unit
-        if declined:
-            tail = "Nothing was asked: proceeding was declined."
-        else:
-            tail = ("Nothing was asked. Narrow the change with --base, raise the "
-                    "budget with --max-prompt-bytes, or allow it with "
-                    "--allow-large-prompt.")
-        where = f" for {unit}" if unit else ""
-        super().__init__(
-            f"the prompt{where} is {size:,} bytes; the limit is {limit:,}. {tail}")
 
 
 def default_prompt() -> Path:
@@ -66,34 +50,6 @@ def default_prompt() -> Path:
     and the verdict would look exactly like a clean change.
     """
     return Path(__file__).parent / "prompts" / "reviewer.md"
-
-
-@dataclass(frozen=True, slots=True)
-class ReviewRequest:
-    repo: Path
-    base: str | None = None
-    samples: int | None = None
-    profile: str = DEFAULT_PROFILE
-    run_id: str | None = None
-    prompt: Path | None = None
-    context_urls: tuple[str, ...] = ()
-    allow_large_prompt: bool = False
-    max_prompt_bytes: int = PROMPT_LIMIT
-    context_depth: int = 3
-    time_budget: int = 0
-    reasoning: str | None = None
-    stream: bool = False
-    idle_timeout: int = 120
-    sandbox: bool = False
-    state_dir: Path | None = None
-    pull_request: PullRequest | None = None
-    baseline: Path | None = None
-    baseline_from_base: bool = False
-    baseline_strict: bool = False
-    allow_baseline_change: bool = False
-    include: tuple[str, ...] = ()
-    exclude: tuple[str, ...] = ()
-    staged: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -130,328 +86,15 @@ class Report:
     def reason(self) -> str:
         return self.gate.reason if self.gate is not None else self.result.reason
 
-
-@dataclass(frozen=True, slots=True)
-class Unit:
-    """One prompt-sized slice of the change."""
-
-    id: str
-    files: tuple[str, ...]
-    ranges: tuple[tuple[str, int, int], ...]
-    patch: str
-    prompt: str
-    depth: int
-    bytes: int
-    context_digest: str
-
-
-@dataclass(frozen=True, slots=True)
-class Fitted:
-    prompt: str
-    context: Context
-    depth: int
-    bytes: int
-
-
-@dataclass(frozen=True, slots=True)
-class Prepared:
-    """Everything a review and a plan share: the change, the instrument, the prompt."""
-
-    root: Path
-    config: Config
-    baseline: Baseline | None
-    base: str
-    head: str
-    patch: str
-    skipped: tuple[Skipped, ...]
-    scope_ignored: tuple[ScopeIgnored, ...]
-    references: tuple[Reference, ...]
-    prompt_file: Path
-    template: str
-    digest: str
-    prompt: str
-    prompt_bytes: int
-    sliced: bool
-    full_context: Context
-    diff_sha256: str
-
-
-@dataclass(frozen=True, slots=True)
-class Plan:
-    """What a review would do, without asking anyone or writing a run."""
-
-    base: str
-    head: str
-    prompt_bytes: int
-    prompt_limit: int
-    sliced: bool
-    units: tuple[Unit, ...]
-    skipped: tuple[Skipped, ...]
-    depth: int
-    scope_ignored: tuple[ScopeIgnored, ...] = ()
-    scope_include: tuple[str, ...] = ()
-    scope_exclude: tuple[str, ...] = ()
-
-
-def _prompt_for(template: str, base: str, patch: str, root: Path, depth: int,
-                references: tuple[Reference, ...]) -> Fitted:
-    context = build_context(patch, _reader(root), python_files(root),
-                            max_depth=depth - 1)
-    text = context.text
-    if references:
-        text = f"{text}\n\n{_reference_text(references)}"
-    prompt = render(template, base=base, diff=patch, context=text)
-    return Fitted(prompt, context, depth, len(prompt.encode("utf-8")))
-
-
-def _fit(template: str, base: str, patch: str, root: Path, depth: int,
-         references: tuple[Reference, ...], limit: int) -> Fitted | None:
-    """The deepest context depth whose prompt fits, or None if even depth 0 does not."""
-    for candidate in range(depth, -1, -1):
-        fitted = _prompt_for(template, base, patch, root, candidate, references)
-        if fitted.bytes <= limit:
-            return fitted
-    return None
-
-
-def _build_units(template: str, base: str, patch: str, root: Path,
-                 request: ReviewRequest, references: tuple[Reference, ...]) -> list[Unit]:
-    """File first, then hunks; deterministic, and each unit fits the budget."""
-    limit = request.max_prompt_bytes
-    units: list[Unit] = []
-
-    def add(files: tuple[str, ...], ranges: tuple[tuple[str, int, int], ...],
-            text: str, fitted: Fitted) -> None:
-        units.append(Unit(f"unit-{len(units) + 1:03d}", files, ranges, text,
-                          fitted.prompt, fitted.depth, fitted.bytes,
-                          fitted.context.digest))
-
-    for section in file_sections(patch):
-        hunks = hunk_sections(section.text)
-        if not hunks:
-            continue
-        ranges = tuple((section.path, *hunk_range(hunk)) for hunk in hunks)
-        fitted = _fit(template, base, section.text, root, request.context_depth,
-                      references, limit)
-        if fitted is not None:
-            add((section.path,), ranges, section.text, fitted)
-            continue
-        for hunk in hunks:
-            fitted = _fit(template, base, hunk, root, request.context_depth,
-                          references, limit)
-            if fitted is None:
-                smallest = _prompt_for(template, base, hunk, root, 0, references)
-                raise PromptTooLarge(smallest.bytes, limit, unit=section.path)
-            add((section.path,), ((section.path, *hunk_range(hunk)),), hunk, fitted)
-    if not units:
-        raise ReviewError("the change has no reviewable file section")
-    return units
-
-
-def _belongs(finding: Finding, unit: Unit) -> bool:
-    try:
-        path, raw = finding.location.rsplit(":", 1)
-        line = int(raw)
-    except ValueError:
-        return False
-    if path not in unit.files:
-        return False
-    if not unit.ranges:
-        return True
-    return any(file == path and start <= line <= end for file, start, end in unit.ranges)
-
-
-def _unit_verdict(findings: Sequence[Finding], ok: bool) -> str:
-    if not ok:
-        return "incomplete"
-    if any(finding.blocks and finding.state is State.PROVEN for finding in findings):
-        return "fail"
-    if any(finding.blocks and finding.state in OPEN_STATES for finding in findings):
-        return "incomplete"
-    return "pass"
-
-
-def _blocking_key(sample: SampleResult) -> frozenset[tuple[str, str, int, str]] | None:
-    """What a sample says would block, independent of wording or proof order."""
-    if sample.output is None:
-        return None
-    return frozenset((item.dimension, item.file, item.line, item.severity)
-                     for item in sample.output.findings
-                     if blocks(item.dimension, item.severity))
-
-
-def _samples(prompt: str, runner: Runner,
-             requested: int | None) -> tuple[tuple[SampleResult, ...], int, bool | None]:
-    """Fixed N, or auto: one clean sample, two to confirm a finding, three to break a tie."""
-    if requested is not None:
-        fixed = tuple(run_sample(prompt, runner, index=index)
-                      for index in range(1, requested + 1))
-        return fixed, requested, None
-
-    first = run_sample(prompt, runner, index=1)
-    if first.output is None:
-        # The retry inside `run_sample` already covered a flaky reviewer; asking
-        # a missing binary two more times only multiplies the same error.
-        return (first,), 1, None
-    if not first.output.findings:
-        return (first,), 1, True
-
-    results = [first, run_sample(prompt, runner, index=2)]
-    agreed: bool | None = (results[1].output is not None
-                           and _blocking_key(first) == _blocking_key(results[1]))
-    if not agreed and len(results) < AUTO_MAX:
-        results.append(run_sample(prompt, runner, index=3))
-        if any(sample.output is None for sample in results):
-            agreed = None
-        else:
-            keys = [_blocking_key(sample) for sample in results]
-            agreed = len(set(keys)) == 1
-    return tuple(results), len(results), agreed
-
-
-def _reader(root: Path) -> Callable[[str], str | None]:
-    """Read a repository-relative file, refusing anything that resolves outside it."""
-    base = root.resolve()
-
-    def read(rel: str) -> str | None:
-        try:
-            target = (base / rel).resolve()
-            if not target.is_relative_to(base):
-                return None
-            return target.read_text(encoding="utf-8")
-        except (OSError, UnicodeDecodeError):
-            return None
-
-    return read
-
-
-def _reference_text(references: tuple[Reference, ...]) -> str:
-    if not references:
-        return ""
-    blocks = ["## Reference (fetched by the caller; context, not evidence)"]
-    blocks.extend(f"### {item.url} ({item.sha256})\n{item.text}" for item in references)
-    return "\n\n".join(blocks)
-
-
-def _write_sample(directory: Path, sample: SampleResult) -> None:
-    try:
-        write_sample(directory, sample)
-    except (OSError, ValueError) as exc:
-        raise ReviewError(f"cannot write a sample under {directory}: {exc}") from exc
-
-
-def _claim(directory: Path, run_id: str) -> None:
-    """Create the run directory exclusively: a second run cannot share it."""
-    try:
-        directory.mkdir(parents=True, exist_ok=False)
-    except FileExistsError as exc:
-        raise ReviewError(f"run {run_id!r} already exists at {directory}") from exc
-    except OSError as exc:
-        raise ReviewError(f"cannot create the run directory {directory}: {exc}") from exc
-
-
-def _discard_empty(directory: Path) -> None:
-    """Remove the claim if the run failed before writing any evidence."""
-    try:
-        if directory.is_dir() and not any(directory.iterdir()):
-            directory.rmdir()
-    except OSError:
-        pass
-
-
-def _write_verdict(run_dir: Path, request: ReviewRequest, base: str, head: str,
-                   digest: str, prompt: Path, ignored: bool,
-                   samples: tuple[SampleResult, ...], result: Result, *,
-                   worktree: bool, diff_sha256: str,
-                   skipped: tuple[Skipped, ...], context: Context,
-                   references: tuple[Reference, ...],
-                   samples_run: int, agreement: bool | None,
-                   prompt_bytes: int, prompt_limit: int,
-                   prompt_acknowledged: bool,
-                   sliced: bool = False,
-                   time_budget: int = 0,
-                   units: Sequence[dict[str, object]] = (),
-                   scope_ignored: tuple[ScopeIgnored, ...] = (),
-                   baseline: Baseline | None = None,
-                   baseline_source: str = "",
-                   gate: GateResult | None = None) -> None:
-    effective = gate or result
-    payload = {
-        "run": run_dir.name,
-        "base": base,
-        "head": head,
-        "worktree": worktree,
-        "staged": request.staged,
-        "scope": {"include": list(request.include), "exclude": list(request.exclude)},
-        "diff_sha256": diff_sha256,
-        "digest": digest,
-        "prompt": str(prompt),
-        "prompt_bytes": prompt_bytes,
-        "prompt_limit": prompt_limit,
-        "prompt_acknowledged": prompt_acknowledged,
-        "sliced": sliced,
-        "time_budget": time_budget,
-        "units": list(units),
-        "state_dir_ignored": ignored,
-        "profile": request.profile,
-        "reasoning": request.reasoning or "profile-default",
-        "transport": "stream" if request.stream else "plain",
-        "idle_timeout": request.idle_timeout,
-        "reviewer_sandbox": request.sandbox,
-        "ephemeral": request.state_dir is not None,
-        "pull_request": None if request.pull_request is None else {
-            "number": request.pull_request.number,
-            "url": request.pull_request.url,
-            "title": request.pull_request.title,
-            "base": request.pull_request.base,
-            "head": request.pull_request.head,
-        },
-        "samples_requested": request.samples if request.samples is not None else "auto",
-        "samples_run": samples_run,
-        "agreement": agreement,
-        "samples": [
-            {"index": sample.index, "ok": sample.ok, "attempts": sample.attempts,
-             "error": sample.error, "findings": len(sample.output.findings)
-             if sample.output is not None else 0}
-            for sample in samples
-        ],
-        "skipped": [{"path": item.path, "reason": item.reason} for item in skipped],
-        "scope_ignored": [
-            {"path": item.path, "reason": item.reason, "pattern": item.pattern}
-            for item in scope_ignored
-        ],
-        "context_digest": context.digest,
-        "context_depth": request.context_depth,
-        "context": [{"file": span.file, "start": span.start, "end": span.end,
-                     "name": span.name, "reason": span.reason} for span in context.spans],
-        "unresolved": list(context.unresolved),
-        "references": [{"url": item.url, "sha256": item.sha256, "bytes": len(item.text.encode("utf-8"))}
-                       for item in references],
-        "verdict": effective.verdict.value,
-        "exit_code": effective.exit_code,
-        "reason": effective.reason,
-        "evidence_verdict": result.verdict.value,
-        "baseline": None if baseline is None else {
-            "source": baseline_source,
-            "entries": len(baseline.entries),
-            "suppressed": list(gate.suppressed) if gate is not None else [],
-            "expired": list(gate.expired) if gate is not None else [],
-            "stale": list(gate.stale) if gate is not None else [],
-        },
-        "findings": [
-            {"id": finding.id, "dimension": finding.dimension,
-             "severity": finding.severity, "state": finding.state.value,
-             "location": finding.location, "claim": finding.claim,
-             "detail": finding.detail, "proof": finding.proof}
-            for finding in result.findings
-        ],
-    }
-    try:
-        run_dir.mkdir(parents=True, exist_ok=True)
-        (run_dir / "verdict.json").write_text(
-            json.dumps(payload, indent=2) + "\n", encoding="utf-8", newline="\n")
-    except (OSError, ValueError) as exc:
-        raise ReviewError(f"cannot write {run_dir / 'verdict.json'}: {exc}") from exc
+    @property
+    def effective(self) -> Result:
+        """The post-gate result: suppressed findings are no longer present."""
+        if self.gate is None or not self.gate.suppressed:
+            return self.result
+        suppressed = set(self.gate.suppressed)
+        return Result(self.gate.verdict, self.gate.reason,
+                      tuple(item for item in self.result.findings
+                            if item.id not in suppressed))
 
 
 def _load_baseline(request: ReviewRequest, root: Path, base: str) -> Baseline | None:
@@ -484,6 +127,10 @@ def _prepare(request: ReviewRequest) -> Prepared:
     network call.
     """
     root = repo_root(request.repo)
+    try:
+        request.validate()
+    except ValueError as exc:
+        raise ReviewError(str(exc)) from exc
     config = load_config(root / CONFIG_NAME)
     try:
         scope = Scope.create(request.include, request.exclude)
@@ -540,16 +187,14 @@ def _prepare(request: ReviewRequest) -> Prepared:
     except FetchError as exc:
         raise ReviewError(str(exc)) from exc
 
-    full_context = build_context(patch, _reader(root), python_files(root),
-                                 max_depth=request.context_depth - 1)
-    prompt_context = full_context.text
-    if references:
-        prompt_context = f"{prompt_context}\n\n{_reference_text(references)}"
     try:
-        prompt = render(template, base=base, diff=patch, context=prompt_context)
+        fitted = _prompt_for(template, base, patch, root, request.context_depth,
+                             references)
     except PromptError as exc:
         raise ReviewError(f"the reviewer prompt is not usable: {exc}") from exc
-    prompt_bytes = len(prompt.encode("utf-8"))
+    full_context = fitted.context
+    prompt = fitted.prompt
+    prompt_bytes = fitted.bytes
     sliced = prompt_bytes > request.max_prompt_bytes and not request.allow_large_prompt
     return Prepared(root, config, baseline, base, head, patch, change.skipped,
                     scope_ignored, references, prompt_file, template, digest, prompt,
@@ -569,15 +214,6 @@ def plan(request: ReviewRequest) -> Plan:
                 request.include, request.exclude)
 
 
-def _integer(label: str, value: object, *, minimum: int | None = None) -> int:
-    """A request integer, rejecting bool (a subclass of int) and non-integers."""
-    if isinstance(value, bool) or not isinstance(value, int):
-        raise ReviewError(f"{label} must be an integer")
-    if minimum is not None and value < minimum:
-        raise ReviewError(f"{label} must be at least {minimum}")
-    return value
-
-
 def review(request: ReviewRequest, runner: Runner) -> Report:
     """Run one review and write every artefact under `.council/runs/<id>/`.
 
@@ -587,31 +223,18 @@ def review(request: ReviewRequest, runner: Runner) -> Report:
     `allow_large_prompt`. The decision belongs to a person (or to an explicit
     flag), never to the tool guessing.
     """
-    if request.samples is not None:
-        _integer("samples", request.samples, minimum=1)
-    _integer("the prompt limit", request.max_prompt_bytes, minimum=1)
-    _integer("context depth", request.context_depth)
-    _integer("the time budget", request.time_budget, minimum=0)
-    _integer("the idle timeout", request.idle_timeout, minimum=1)
-    if request.context_depth not in (0, 1, 2, 3):
-        raise ReviewError("context depth must be 0, 1, 2 or 3")
-    if not isinstance(request.profile, str) or not request.profile.strip():
-        raise ReviewError("--profile must not be empty")
-    if any(ord(ch) < 32 or 0xD800 <= ord(ch) <= 0xDFFF for ch in request.profile):
-        raise ReviewError("--profile must be printable text")
-    if request.base is not None and (not isinstance(request.base, str)
-                                     or not request.base.strip()):
-        raise ReviewError("--base must not be empty")
-    if request.run_id is not None and not isinstance(request.run_id, str):
-        raise ReviewError("run id must be text")
     try:
-        run_id = validate_run_id(
-            request.run_id if request.run_id is not None
-            else datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S"))
+        request.validate()
     except ValueError as exc:
         raise ReviewError(str(exc)) from exc
 
     prepared = _prepare(request)
+    try:
+        run_id = validate_run_id(
+            request.run_id if request.run_id is not None
+            else datetime.now(UTC).strftime("%Y%m%d-%H%M%S"))
+    except ValueError as exc:
+        raise ReviewError(str(exc)) from exc
     root = prepared.root
     base = prepared.base
     head = prepared.head
@@ -621,11 +244,8 @@ def review(request: ReviewRequest, runner: Runner) -> Report:
     prompt_file = prepared.prompt_file
     template = prepared.template
     digest = prepared.digest
-    limit = request.max_prompt_bytes
-    acknowledged = request.allow_large_prompt
     full_context = prepared.full_context
     prompt = prepared.prompt
-    prompt_bytes = prepared.prompt_bytes
     sliced = prepared.sliced
 
     try:
@@ -733,30 +353,33 @@ def review(request: ReviewRequest, runner: Runner) -> Report:
             samples_run = sum(run[2] for run in runs)
             agreement = None
             missing_evidence = any(not run[4] for run in runs)
-            reported_context = Context((), (), "", "")
+            reported_context = full_context
 
         ignored = True if request.state_dir is not None else state_dir_ignored(root)
         gate = None
         if prepared.baseline is not None:
             gate = apply_baseline(result, prepared.baseline,
-                                  today=datetime.now(timezone.utc).date(),
+                                  today=datetime.now(UTC).date(),
                                   strict=request.baseline_strict,
                                   missing_evidence=missing_evidence)
         baseline_source = ""
         if prepared.baseline is not None and request.baseline is not None:
             baseline_source = (f"{base}:{request.baseline}"
                                if request.baseline_from_base else str(request.baseline))
-        _write_verdict(directory, request, base, head, digest, prompt_file, ignored,
-                       samples, result, worktree=not request.staged, diff_sha256=diff_sha256,
-                       skipped=prepared.skipped, context=reported_context,
-                       references=references,
-                       samples_run=samples_run, agreement=agreement,
-                       prompt_bytes=prompt_bytes, prompt_limit=limit,
-                       prompt_acknowledged=acknowledged,
-                       sliced=sliced, time_budget=request.time_budget,
-                       units=units_payload, scope_ignored=prepared.scope_ignored,
-                       baseline=prepared.baseline,
-                       baseline_source=baseline_source, gate=gate)
+        write_verdict(VerdictDocument(
+            run_dir=directory,
+            request=request,
+            prepared=prepared,
+            result=result,
+            samples=samples,
+            samples_run=samples_run,
+            agreement=agreement,
+            units=units_payload,
+            reported_context=reported_context,
+            ignored=ignored,
+            baseline_source=baseline_source,
+            gate=gate,
+        ))
     except BaseException:
         _discard_empty(directory)
         raise

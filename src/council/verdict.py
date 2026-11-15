@@ -3,9 +3,9 @@ A number may sit beside a verdict as a trend; it cannot change it."""
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import Enum
-from typing import Iterable
 
 from .findings import OPEN_STATES, Finding, State
 
@@ -25,6 +25,11 @@ class Verdict(Enum):
     INCOMPLETE = "incomplete"
 
 
+def exit_code(verdict: Verdict) -> int:
+    """One mapping for every gate: 0 pass, 1 fail, 2 incomplete."""
+    return {Verdict.PASS: 0, Verdict.FAIL: 1, Verdict.INCOMPLETE: 2}[verdict]
+
+
 @dataclass(frozen=True, slots=True)
 class Result:
     """A verdict and the evidence it was derived from."""
@@ -36,7 +41,7 @@ class Result:
     @property
     def exit_code(self) -> int:
         """0 pass, 1 fail, 2 incomplete — a caller can gate on the number alone."""
-        return {Verdict.PASS: 0, Verdict.FAIL: 1, Verdict.INCOMPLETE: 2}[self.verdict]
+        return exit_code(self.verdict)
 
 
 def _cite(findings: list[Finding]) -> str:

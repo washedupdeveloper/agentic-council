@@ -6,13 +6,21 @@ The execution of proofs is the effect shell (`council.adjudicate` /
 
 from __future__ import annotations
 
+import json
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Sequence, cast
+from typing import Any, cast
 
 from ..findings import Finding, Severity, State
 from ..merge import MergedFinding
 from ..verdict import Result, Verdict, judge
-from .proof import canonical_proof
+
+
+def canonical_proof(proofs: Sequence[tuple[str, Mapping[str, Any]]]) -> str:
+    """A stable text identity for the proof list, independent of dict order."""
+    items = [[kind, dict(params)] for kind, params in proofs]
+    return json.dumps(items, sort_keys=True, separators=(",", ":"),
+                      ensure_ascii=False, default=str)
 
 
 @dataclass(frozen=True, slots=True)
@@ -57,7 +65,8 @@ def decide(merged: Sequence[MergedFinding],
             dimension=item.dimension,
             severity=cast(Severity, item.severity),
             state=state,
-            location=f"{item.file}:{item.line}",
+            file=item.file,
+            line=item.line,
             claim=item.claims[0] if item.claims else "",
             detail=detail,
             proof=canonical_proof(item.proofs),

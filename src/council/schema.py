@@ -7,6 +7,10 @@ import json
 from dataclasses import dataclass
 from typing import Any
 
+from .findings import (
+    SEVERITIES as SEVERITIES,  # noqa: PLC0414 - re-exported for the schema contract
+)
+
 DIMENSIONS: tuple[str, ...] = (
     "security",
     "correctness",
@@ -14,7 +18,6 @@ DIMENSIONS: tuple[str, ...] = (
     "architecture",
     "performance",
 )
-SEVERITIES: tuple[str, ...] = ("low", "medium", "high", "critical")
 PROOF_KINDS: tuple[str, ...] = ("absent", "present", "command", "json", "diff")
 
 

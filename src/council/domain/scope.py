@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from fnmatch import fnmatchcase
 
 from ..changes import file_sections
+from .text import printable
 
 
 class ScopeError(ValueError):
@@ -47,7 +48,7 @@ def _validate(pattern: str) -> None:
         raise ScopeError(f"scope pattern {pattern!r} must be repository-relative")
     if "\\" in pattern:
         raise ScopeError(f"scope pattern {pattern!r} must use / as the separator")
-    if any(ord(ch) < 32 or ord(ch) == 127 for ch in pattern):
+    if not printable(pattern):
         raise ScopeError(f"scope pattern {pattern!r} contains a control character")
     parts = pattern.split("/")
     if any(part in {"", ".", ".."} for part in parts):

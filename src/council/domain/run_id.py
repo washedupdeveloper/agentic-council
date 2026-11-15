@@ -7,7 +7,7 @@ whether the name is legal.
 
 from __future__ import annotations
 
-import unicodedata
+from .text import printable
 
 MAX_RUN_ID = 128
 #: Characters a run id may not contain: separators, control characters, and the
@@ -23,7 +23,7 @@ def validate_run_id(run_id: str) -> str:
         raise ValueError(f"invalid run id {run_id!r}: expected one path segment")
     if any(ch in _FORBIDDEN for ch in run_id):
         raise ValueError(f"invalid run id {run_id!r}: expected one path segment")
-    if any(unicodedata.category(ch) in {"Cc", "Cf", "Cs", "Zl", "Zp"} for ch in run_id):
+    if not printable(run_id):
         raise ValueError(f"invalid run id {run_id!r}: control or format characters are not allowed")
     if len(run_id) > MAX_RUN_ID:
         raise ValueError(f"invalid run id: longer than {MAX_RUN_ID} characters")

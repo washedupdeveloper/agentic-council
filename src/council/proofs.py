@@ -1,4 +1,4 @@
-"""Six proof kinds returning PROVEN, REFUTED, or UNRUNNABLE when the check
+"""Five proof kinds returning PROVEN, REFUTED, or UNRUNNABLE when the check
 cannot be made here. `command` is an argv list allowlisted by name: no shell."""
 
 from __future__ import annotations
@@ -7,14 +7,16 @@ import fnmatch
 import json as jsonlib
 import re
 import subprocess
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Mapping
+from typing import Any
 
 from .changes import change_lines
 from .domain.adjudication import ProofOutcome
 from .findings import State
 from .sandbox import argv as sandbox_argv
+from .schema import PROOF_KINDS
 
 SKIP_DIRS = frozenset({".git", ".council", ".venv", "__pycache__", "node_modules", ".mypy_cache"})
 
@@ -254,6 +256,9 @@ EXECUTORS: dict[str, Callable[[Mapping[str, Any], ProofContext], ProofOutcome]] 
     "json": proof_json,
     "diff": proof_diff,
 }
+
+#: The parser may accept a kind only if this module can actually execute it.
+assert set(EXECUTORS) == set(PROOF_KINDS), "proof kinds and executors disagree"
 
 
 def run_proof(kind: str, params: Mapping[str, Any], ctx: ProofContext) -> ProofOutcome:

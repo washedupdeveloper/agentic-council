@@ -8,206 +8,37 @@ import os
 import shutil
 import sys
 import tempfile
-import unicodedata
+from collections.abc import Sequence
 from dataclasses import asdict
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import NoReturn, Sequence
 
 from . import baseline as baseline_io
 from . import doctor as diagnostics
+from .cli_output import plan_payload as _plan_payload
+from .cli_output import print_plan as _print_plan
+from .cli_output import print_report as _print_report
+from .cli_output import safe as _safe
+from .cli_output import sarif_result as _sarif_result
+from .cli_parser import EXIT_ERROR, build_parser
 from .config import ConfigError
-from .domain.baseline import Baseline
-from .domain.scope import Scope, ScopeError
-from .paths import validate_run_id
-from .pr import PullRequest, resolve as resolve_pr, verify_checkout
-from .repo import ReviewError, init as init_repo
-from .run import (DEFAULT_PROFILE, PROMPT_LIMIT, Plan, PromptTooLarge, Report,
-                  ReviewRequest, plan, review)
-from .runner import DEFAULT_IDLE_TIMEOUT, hermes_runner
+from .domain.baseline import Baseline, stale_fingerprints
+from .planning import Plan  # noqa: F401 - re-exported for callers and tests
+from .pr import PullRequest, verify_checkout
+from .pr import resolve as resolve_pr
+from .repo import ReviewError
+from .repo import init as init_repo
+from .run import (
+    PromptTooLarge,
+    Report,
+    ReviewRequest,
+    plan,
+    review,
+)
+from .runner import hermes_runner
 from .sarif import render as render_sarif
-from .verdict import Result, Verdict
+from .verdict import Verdict
 from .version import current_version
-
-EXIT_ERROR = 3
-
-
-def _positive(value: str) -> int:
-    try:
-        number = int(value)
-    except ValueError as exc:
-        raise argparse.ArgumentTypeError("expected a positive number") from exc
-    if number < 1:
-        raise argparse.ArgumentTypeError("expected at least 1")
-    return number
-
-
-def _samples(value: str) -> int | None:
-    """`--samples auto` or a positive count."""
-    if value == "auto":
-        return None
-    try:
-        number = int(value)
-    except ValueError as exc:
-        raise argparse.ArgumentTypeError("expected a number or 'auto'") from exc
-    if number < 1:
-        raise argparse.ArgumentTypeError("expected at least 1")
-    return number
-
-
-def _path(value: str) -> Path:
-    if not value.strip():
-        raise argparse.ArgumentTypeError("expected a path, not an empty string")
-    return Path(value)
-
-
-def _non_negative(value: str) -> int:
-    try:
-        number = int(value)
-    except ValueError as exc:
-        raise argparse.ArgumentTypeError("expected a non-negative number") from exc
-    if number < 0:
-        raise argparse.ArgumentTypeError("expected 0 or more")
-    return number
-
-
-class _Parser(argparse.ArgumentParser):
-    """argparse exits 2 on a usage error; 2 already means INCOMPLETE here."""
-
-    def error(self, message: str) -> NoReturn:
-        self.print_usage(sys.stderr)
-        self.exit(EXIT_ERROR, f"council: {message}\n")
-
-
-def _safe(text: object) -> str:
-    """One printable line: model output must not drive the terminal."""
-    return "".join(ch if unicodedata.category(ch) not in {"Cc", "Cf", "Cs", "Zl", "Zp"}
-                   else " " for ch in str(text))
-
-
-def _add_review_arguments(parser: argparse.ArgumentParser, *, advice: bool,
-                          base: bool = True, staged: bool = True) -> None:
-    """The review surface, shared by `review` and `ci`.
-
-    `ci` is the gate without the advice switches: it always prints the verdict
-    as JSON and always exits with it. A CI entry that could be told to exit 0
-    is not a gate.
-    """
-    parser.add_argument("-C", "--repo", type=_path, default=Path("."),
-                        help="repository to review (default: the current directory)")
-    if base:
-        parser.add_argument("--base", help="revision to diff against (default: origin/HEAD, then HEAD~1)")
-    if staged:
-        parser.add_argument("--staged", action="store_true",
-                            help="review the index against the base, not the working tree")
-    parser.add_argument("--include", action="append", default=[], metavar="GLOB",
-                        help="review only paths matching GLOB (repeatable; caller-owned)")
-    parser.add_argument("--exclude", action="append", default=[], metavar="GLOB",
-                        help="never review paths matching GLOB (repeatable; exclude wins)")
-    parser.add_argument("--samples", type=_samples, default=None,
-                        help="samples: N, or auto (default: 1 clean, 2 to confirm, 3 to break a tie); per unit when sliced")
-    parser.add_argument("--profile", default=DEFAULT_PROFILE, help="Hermes profile to ask")
-    parser.add_argument("--reviewer", default="hermes",
-                        help="binary that answers a sample (default: hermes)")
-    parser.add_argument("--sample-timeout", type=_positive, default=900, metavar="SECONDS",
-                        help="give up on one sample after N seconds (default: 900)")
-    parser.add_argument("--time-budget", type=_non_negative, default=0, metavar="SECONDS",
-                        help="stop starting units after N seconds (default: 0, no budget)")
-    parser.add_argument("--reasoning", default=None,
-                        choices=("none", "minimal", "low", "medium", "high",
-                                 "xhigh", "max", "ultra"),
-                        help="reasoning effort for this review (default: the profile's setting)")
-    parser.add_argument("--stream", action=argparse.BooleanOptionalAction, default=True,
-                        help="read the reviewer as JSON events and kill a silent stream (default: on)")
-    parser.add_argument("--idle-timeout", type=_positive, default=DEFAULT_IDLE_TIMEOUT,
-                        metavar="SECONDS",
-                        help="kill a stream with no event for N seconds (default: 120)")
-    parser.add_argument("--sandbox", action=argparse.BooleanOptionalAction, default=None,
-                        help="run the reviewer in a bwrap sandbox (default: on when bwrap is available)")
-    parser.add_argument("--ephemeral", action=argparse.BooleanOptionalAction, default=True,
-                        help="keep run state in a temp tree and remove it (default); "
-                             "--no-ephemeral writes .council/runs")
-    parser.add_argument("--keep", type=_path, default=None, metavar="DIR",
-                        help="copy the run directory here before the ephemeral tree is removed")
-    parser.add_argument("--prompt", type=_path, default=None,
-                        help="reviewer prompt to use instead of the one shipped with council")
-    parser.add_argument("--sarif", type=_path, default=None, metavar="PATH",
-                        help="also write proven findings as a SARIF 2.1.0 log")
-    parser.add_argument("--run-id", default=None,
-                        help="name this run instead of using a timestamp (refused if it exists)")
-    parser.add_argument("--baseline", type=_path, default=None, metavar="PATH",
-                        help="accepted-risk baseline to apply after the evidence verdict")
-    parser.add_argument("--baseline-from-base", action="store_true",
-                        help="read --baseline from the base revision (default: on for ci/pr)")
-    parser.add_argument("--baseline-strict", action="store_true",
-                        help="fail when a baseline entry is expired or stale")
-    parser.add_argument("--allow-baseline-change", action="store_true",
-                        help="allow the reviewed diff to edit the baseline (maintenance only)")
-    parser.add_argument("--context-url", action="append", default=[], metavar="URL",
-                        help="fetch this URL as reference context (repeatable; never a proof)")
-    parser.add_argument("--context-depth", type=int, choices=(0, 1, 2, 3), default=3,
-                        help="0 diff only, 1 enclosing function, 2 +one call level, 3 +two (default)")
-    parser.add_argument("--max-prompt-bytes", type=_positive, default=PROMPT_LIMIT,
-                        metavar="N",
-                        help="refuse a prompt larger than N bytes (default: 32768)")
-    parser.add_argument("--allow-large-prompt", action="store_true",
-                        help="send an oversized prompt without asking (autonomous allow)")
-    if advice:
-        parser.add_argument("--autonomous", action="store_true",
-                            help="never ask: refuse an oversized prompt, exit 3")
-        parser.add_argument("--plan", action="store_true",
-                            help="show units and prompt sizes; call no reviewer and write no run")
-        parser.add_argument("--report", action="store_true",
-                            help="advice only: exit 0 whatever the verdict")
-        parser.add_argument("--json", action="store_true", help="print the run's verdict.json")
-
-
-def build_parser() -> argparse.ArgumentParser:
-    parser = _Parser(prog="council", description="A review is a claim until a check settles it.")
-    parser.add_argument("--version", action="version",
-                        version=f"%(prog)s {current_version()}")
-    sub = parser.add_subparsers(dest="command", required=True)
-
-    run = sub.add_parser("review", help="review a change; exits 0/1/2")
-    _add_review_arguments(run, advice=True)
-
-    ci = sub.add_parser("ci", help="the gate for CI: prints verdict.json, exits 0/1/2")
-    _add_review_arguments(ci, advice=False)
-    ci.set_defaults(report=False, json=True, baseline_from_base=True)
-
-    pr = sub.add_parser("pr", help="review a GitHub pull request by number")
-    pr.add_argument("number", type=int, help="pull request number")
-    _add_review_arguments(pr, advice=True, base=False, staged=False)
-    pr.set_defaults(baseline_from_base=True)
-
-    baseline = sub.add_parser("baseline", help="create or prune an accepted-risk baseline")
-    baseline_sub = baseline.add_subparsers(dest="baseline_action", required=True)
-    create = baseline_sub.add_parser("create", help="snapshot proven blocking findings from a run")
-    create.add_argument("--from", dest="from_run", type=_path, required=True, metavar="DIR",
-                        help="kept run directory containing verdict.json")
-    create.add_argument("--out", type=_path, required=True, metavar="PATH")
-    create.add_argument("--owner", required=True, help="person or team accepting the risk")
-    create.add_argument("--reason", required=True, help="why the accepted risk is tolerated")
-    create.add_argument("--days", type=_positive, default=90, metavar="N",
-                        help="days until the accepted risk expires (default: 90)")
-    prune = baseline_sub.add_parser("prune", help="remove entries no longer found in a run")
-    prune.add_argument("--baseline", type=_path, required=True, metavar="PATH")
-    prune.add_argument("--from", dest="from_run", type=_path, required=True, metavar="DIR")
-    prune.add_argument("--write", action="store_true",
-                       help="write the pruned baseline (default: report only)")
-
-    init = sub.add_parser("init", help="add .council/ to the repository's .gitignore")
-    init.add_argument("-C", "--repo", type=_path, default=Path("."))
-
-    doctor = sub.add_parser("doctor", help="check that this machine can run a review")
-    doctor.add_argument("--profile", default=DEFAULT_PROFILE, help="Hermes profile to ask")
-    doctor.add_argument("--reviewer", default="hermes",
-                        help="binary that answers a sample (default: hermes)")
-    doctor.add_argument("--probe-timeout", type=_positive, default=60, metavar="SECONDS",
-                        help="how long the profile has to answer the probe (default: 60)")
-    doctor.add_argument("--json", action="store_true", help="print the checks as JSON")
-    return parser
-
 
 _OVERSIZE_HELP = """\
 council: why there is a limit
@@ -282,7 +113,7 @@ def _oversize_decision(exc: PromptTooLarge, *, allow_base: bool = True) -> tuple
 def _request(args: argparse.Namespace, *, allow: bool | None = None) -> ReviewRequest:
     """The request the CLI's parsed arguments describe."""
     return ReviewRequest(
-        repo=args.repo, base=args.base, samples=args.samples,
+        repo=args.repo, base=getattr(args, "base", None), samples=args.samples,
         profile=args.profile, prompt=args.prompt, run_id=args.run_id,
         context_urls=tuple(args.context_url),
         allow_large_prompt=args.allow_large_prompt if allow is None else allow,
@@ -340,18 +171,10 @@ def _check_output(path: Path, flag: str, *, directory: bool) -> None:
 
 def _preflight(args: argparse.Namespace) -> None:
     """Everything that can be refused before a run directory or a model call."""
-    if args.run_id is not None:
-        try:
-            validate_run_id(args.run_id)
-        except ValueError as exc:
-            raise ReviewError(str(exc)) from exc
-    if not args.profile.strip():
-        raise ReviewError("--profile must not be empty")
-    if any(ord(ch) < 32 or 0xD800 <= ord(ch) <= 0xDFFF for ch in args.profile):
-        raise ReviewError("--profile must be printable text")
-    base = getattr(args, "base", None)
-    if base is not None and not base.strip():
-        raise ReviewError("--base must not be empty")
+    try:
+        _request(args).validate()
+    except ValueError as exc:
+        raise ReviewError(str(exc)) from exc
     if any(not url.strip() for url in args.context_url):
         raise ReviewError("--context-url must not be empty")
     if args.prompt is not None:
@@ -368,11 +191,6 @@ def _preflight(args: argparse.Namespace) -> None:
         raise ReviewError("--baseline must be repository-relative when read from the base revision")
     if args.baseline_strict and args.baseline is None:
         raise ReviewError("--baseline-strict requires --baseline")
-    try:
-        Scope.create(tuple(getattr(args, "include", ())),
-                     tuple(getattr(args, "exclude", ())))
-    except ScopeError as exc:
-        raise ReviewError(str(exc)) from exc
     if args.sarif is not None:
         _check_output(args.sarif, "--sarif", directory=False)
     if args.keep is not None:
@@ -385,7 +203,6 @@ def _review(args: argparse.Namespace) -> Report:
     The default is to ask. `--autonomous` (or a pipeline without a terminal)
     never asks: it refuses. `--allow-large-prompt` never asks either: it sends.
     """
-    _preflight(args)
     allow = args.allow_large_prompt
     if args.keep is not None:
         args.ephemeral = True
@@ -396,7 +213,7 @@ def _review(args: argparse.Namespace) -> Report:
             except OSError as exc:
                 raise ReviewError(f"cannot create a temporary run directory: {exc}") from exc
         if args.run_id is None:
-            args.run_id = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+            args.run_id = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
         args.state_dir = args.ephemeral_root / args.run_id
     sandbox = args.sandbox
     if sandbox is None:
@@ -462,81 +279,10 @@ def _finish_ephemeral(args: argparse.Namespace, report: Report | None) -> None:
               f"{_safe(exc)}", file=sys.stderr)
 
 
-def _print_report(report: Report) -> None:
-    print(f"{report.verdict.value.upper()}  base {_safe(report.base[:8])} → head {_safe(report.head[:8])}")
-    for finding in report.findings:
-        print(f"  {_safe(finding.id)}  {_safe(finding.severity):<8} {_safe(finding.dimension):<13} "
-              f"{_safe(finding.location)}  {_safe(finding.claim)}")
-        print(f"        {finding.state.value} — {_safe(finding.detail)}")
-    print(f"  reason: {_safe(report.reason)}")
-    if report.gate is not None and report.gate.suppressed:
-        print(f"  baseline: {len(report.gate.suppressed)} accepted finding(s)")
-    print(f"  run:    {_safe(report.run_dir)}")
-
-
-def _sarif_result(report: Report) -> Result:
-    """SARIF is a report of what still blocks, not the accepted-risk evidence."""
-    if report.gate is None or not report.gate.suppressed:
-        return report.result
-    suppressed = set(report.gate.suppressed)
-    return Result(report.gate.verdict, report.gate.reason,
-                  tuple(item for item in report.findings if item.id not in suppressed))
-
-
-def _print_plan(planned: Plan) -> None:
-    print(f"PLAN  base {_safe(planned.base[:8])} → head {_safe(planned.head[:8])}")
-    stance = "sliced" if planned.sliced else "one prompt"
-    print(f"  prompt {planned.prompt_bytes:,} bytes; limit {planned.prompt_limit:,}; {stance}")
-    if not planned.sliced:
-        print(f"  whole change  {planned.prompt_bytes:,} bytes  context depth {planned.depth}")
-    for unit in planned.units:
-        files = ", ".join(_safe(name) for name in unit.files)
-        print(f"  {_safe(unit.id)}  {files}  {unit.bytes:,} bytes  depth {unit.depth}")
-    if planned.skipped:
-        listed = ", ".join(f"{_safe(item.path)} ({_safe(item.reason)})"
-                           for item in planned.skipped[:5])
-        more = f", +{len(planned.skipped) - 5} more" if len(planned.skipped) > 5 else ""
-        print(f"  skipped: {len(planned.skipped)} file(s): {listed}{more}")
-    if planned.scope_ignored:
-        listed = ", ".join(f"{_safe(item.path)} ({_safe(item.reason)})"
-                           for item in planned.scope_ignored[:5])
-        more = (f", +{len(planned.scope_ignored) - 5} more"
-                if len(planned.scope_ignored) > 5 else "")
-        print(f"  outside scope: {len(planned.scope_ignored)} file(s): {listed}{more}")
-
-
-def _plan_payload(planned: Plan) -> dict[str, object]:
-    return {
-        "base": planned.base,
-        "head": planned.head,
-        "scope": {"include": list(planned.scope_include),
-                  "exclude": list(planned.scope_exclude)},
-        "prompt_bytes": planned.prompt_bytes,
-        "prompt_limit": planned.prompt_limit,
-        "sliced": planned.sliced,
-        "units": [
-            {
-                "id": unit.id,
-                "files": list(unit.files),
-                "ranges": [{"file": file, "start": start, "end": end}
-                           for file, start, end in unit.ranges],
-                "prompt_bytes": unit.bytes,
-                "context_depth": unit.depth,
-            }
-            for unit in planned.units
-        ],
-        "skipped": [{"path": item.path, "reason": item.reason} for item in planned.skipped],
-        "scope_ignored": [
-            {"path": item.path, "reason": item.reason, "pattern": item.pattern}
-            for item in planned.scope_ignored
-        ],
-    }
-
-
 def _baseline(args: argparse.Namespace) -> int:
     """Create or prune the accepted-risk file. No reviewer is involved."""
     try:
-        today = datetime.now(timezone.utc).date()
+        today = datetime.now(UTC).date()
         if args.baseline_action == "create":
             expires = today + timedelta(days=args.days)
             baseline = baseline_io.from_run(
@@ -548,18 +294,19 @@ def _baseline(args: argparse.Namespace) -> int:
             return 0
         baseline = baseline_io.load(args.baseline)
         present = baseline_io.run_fingerprints(args.from_run)
-        stale = tuple(entry for entry in baseline.entries
-                      if entry.fingerprint not in present)
+        stale = stale_fingerprints(baseline, present)
+        stale_set = set(stale)
         if not stale:
             print(f"{args.baseline}: no stale entries")
             return 0
         if args.write:
             baseline_io.write(args.baseline,
                               Baseline(tuple(entry for entry in baseline.entries
-                                             if entry.fingerprint in present)))
+                                             if entry.fingerprint not in stale_set)))
         verb = "pruned" if args.write else "would prune"
         print(f"{args.baseline}: {verb} {len(stale)} stale entry/entries")
-        for entry in stale:
+        for entry in (item for item in baseline.entries
+                          if item.fingerprint in stale_set):
             print(f"  {entry.fingerprint[:12]}  {_safe(entry.file)}:{entry.line}  "
                   f"{_safe(entry.claim)}")
         return 0
@@ -594,11 +341,6 @@ def main(argv: Sequence[str] | None = None) -> int:
         if conflicts:
             print(f"council: --plan writes no run; it cannot be combined with "
                   f"{', '.join(conflicts)}", file=sys.stderr)
-            return EXIT_ERROR
-        try:
-            _preflight(args)
-        except ReviewError as exc:
-            print(f"council: {_safe(exc)}", file=sys.stderr)
             return EXIT_ERROR
 
     if args.command == "baseline":

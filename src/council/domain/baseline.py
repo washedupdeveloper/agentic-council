@@ -10,12 +10,13 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import date
-from typing import Iterable
 
 from ..findings import SEVERITIES, Finding, State
 from ..verdict import Result, Verdict, judge
+from ..verdict import exit_code as verdict_exit_code
 
 BASELINE_VERSION = 1
 
@@ -88,7 +89,7 @@ class GateResult:
 
     @property
     def exit_code(self) -> int:
-        return {Verdict.PASS: 0, Verdict.FAIL: 1, Verdict.INCOMPLETE: 2}[self.verdict]
+        return verdict_exit_code(self.verdict)
 
 
 def normalize_claim(claim: str) -> str:
@@ -104,24 +105,18 @@ def fingerprint_for(dimension: str, severity: str, file: str, claim: str, proof:
 
 def fingerprint(finding: Finding) -> str:
     return fingerprint_for(finding.dimension, finding.severity,
-                           finding.location.rsplit(":", 1)[0],
-                           finding.claim, finding.proof)
+                           finding.file, finding.claim, finding.proof)
 
 
 def entry_from_finding(finding: Finding, *, owner: str, reason: str,
                        created: date, expires: date) -> BaselineEntry:
     """Snapshot one proven blocking finding as an accepted risk."""
-    path, _, raw_line = finding.location.rpartition(":")
-    try:
-        line = int(raw_line)
-    except ValueError:
-        line = 1
     return BaselineEntry(
         fingerprint=fingerprint(finding),
         dimension=finding.dimension,
         severity=finding.severity,
-        file=path or finding.location,
-        line=max(1, line),
+        file=finding.file,
+        line=finding.line,
         claim=finding.claim,
         proof=finding.proof,
         owner=owner,
@@ -142,6 +137,13 @@ def from_findings(findings: Iterable[Finding], *, owner: str, reason: str,
                                    created=created, expires=expires)
         entries[entry.fingerprint] = entry
     return Baseline(tuple(sorted(entries.values(), key=lambda item: item.fingerprint)))
+
+
+def stale_fingerprints(baseline: Baseline, present: Iterable[str]) -> tuple[str, ...]:
+    """Baseline entries whose finding is no longer present, sorted."""
+    seen = set(present)
+    return tuple(sorted(entry.fingerprint for entry in baseline.entries
+                        if entry.fingerprint not in seen))
 
 
 def apply_baseline(result: Result, baseline: Baseline, *, today: date,
@@ -171,7 +173,7 @@ def apply_baseline(result: Result, baseline: Baseline, *, today: date,
         else:
             suppressed.append(finding)
 
-    stale = tuple(sorted(key for key in entries if key not in present))
+    stale = stale_fingerprints(baseline, present)
     if not suppressed and not expired:
         reason = result.reason
         if stale:

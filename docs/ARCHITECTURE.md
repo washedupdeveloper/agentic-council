@@ -16,11 +16,12 @@ gate that parses the imported modules, checks method calls, checks import
 direction, and fails when an effectful module is not explicitly named as an
 adapter.
 
-The implementation is not fully DDD or fully SOLID. `run.review` is still a
-765-line application module that validates, prepares, samples, adjudicates and
-serialises in one place; `proofs.py` executes checks in the same module that
-defines proof semantics. Those are recorded below as debt, not relabelled as
-architecture.
+The implementation is not fully DDD or fully SOLID. The orchestration is split
+along change boundaries: `request` owns the caller's value, `planning` owns
+prompt/unit decisions, `sampling` owns the review sample policy, `runstore` owns
+the on-disk contract, and `run` composes them. `proofs.py` still executes checks
+in the same module that defines proof semantics; that remains recorded as debt,
+not relabelled as architecture.
 
 ## Load-bearing claims and evidence
 
@@ -28,7 +29,9 @@ architecture.
 |---|---|---|
 | The domain kernel is pure | No kernel module imports an adapter, and none calls a known effectful method. | `tests/test_architecture.py` parses each imported module; `tests/test_domain_kernel.py` calls the decisions with literals. |
 | Configuration parsing is a decision, not a file read | Text in, `Config` out; the path check lives in the adapter. | `domain.config.parse`; `council.config.load` only reads and delegates. |
-| Adjudication does not execute proofs | Outcomes in, findings and verdict out; the executor is injected at the shell. | `domain.adjudication.decide`; `adjudicate.adjudicate(..., prove=...)`. |
+| Adjudication does not execute proofs | Outcomes in, findings and verdict out; the executor stays in the shell. | `domain.adjudication.decide`; `adjudicate.adjudicate` calls the one executor. |
+| A finding's place has one parser | `Finding.file`/`line` are structured; `location` is the derived wire form. | `domain.location.Location`; `Finding.__post_init__`; `test_location.py`. |
+| A request is validated in one place | Pure request fields are checked by `ReviewRequest.validate`; callers do not repeat the rules. | `request.ReviewRequest.validate`; `cli._preflight`; `run._prepare`. |
 | A caller cannot zip the wrong outcomes onto findings | A count mismatch is refused, not truncated. | `test_adjudication_refuses_a_mismatched_outcome_group`. |
 | Sandbox argv construction does not look up or spawn anything | Resolved `bwrap`, repo and `PATH` are arguments. | `domain.sandbox.command`; `sandbox.argv` resolves and delegates. |
 | Importing the package performs no metadata I/O | Importing `council` is clean; `council.__version__` resolves on access through `version.current_version`. | `test_the_package_import_reads_no_metadata`; `version.current_version`. |
@@ -54,11 +57,13 @@ council.findings, verdict, merge, schema, prompt, changes, context, sarif
                           pure decisions and renderers
         ^
         | imports
-council.adjudicate, run   application/orchestration; effects through calls
+council.adjudicate, run, request, planning, sampling, runstore
+                          application/orchestration; effects through calls
         ^
         | imports
-council.repo, runner, proofs, pr, doctor, config, baseline, paths, sample, sandbox, cli,
-council.version           effect adapters
+council.repo, runner, proofs, pr, doctor, config, baseline, paths, sample, sandbox,
+council.cli, cli_parser, cli_output, version
+                          effect adapters
 ```
 
 The arrow points from the adapter to the decision. The kernel never imports an
@@ -68,11 +73,11 @@ adapter; `tests/test_architecture.py` enforces the direction.
 
 | Principle | What is true | Where it is weaker |
 |---|---|---|
-| **S**ingle responsibility | `config` splits read (`load`) from decision (`parse`); `paths` splits name validation (`domain.run_id`) from the symlink guard; `adjudicate` splits proof execution from `decide`; `baseline` splits file/git access from the pure `domain.baseline`; `scope` is a pure matcher; `sample` splits `payload` from `write_sample`; `sandbox` splits lookup from `command`; `version` is the only metadata reader. | `run.review` still orchestrates preparation, sampling, adjudication, baseline gate, persistence and serialisation. `proofs` still owns both the six executors and their parameter rules. |
-| **O**pen/closed | A proof kind is a row in `EXECUTORS` plus the schema's kind set; a new kind does not add a branch to `run`. | A new **review mode** would still touch `run.review`; there is no separate application service per mode. |
+| **S**ingle responsibility | `config` splits read (`load`) from decision (`parse`); `paths` splits name validation (`domain.run_id`) from the symlink guard; `adjudicate` splits proof execution from `decide`; `baseline` splits file/git access from the pure `domain.baseline`; `scope` is a pure matcher; `sample` splits `payload` from `write_sample`; `sandbox` splits lookup from `command`; `request`, `planning`, `sampling` and `runstore` split the review application; `version` is the only metadata reader. | `proofs` still owns both the five executors and their parameter rules. |
+| **O**pen/closed | A proof kind is a row in `EXECUTORS` plus the schema's kind set; a new kind does not add a branch to `run`. | A new **review mode** would still touch the request builder and CLI; there is no separate application service per mode. |
 | **L**iskov substitution | `ProofOutcome` is one domain value regardless of executor; `ReviewerMissing` is both a `ReviewError` and an `OSError`, so a start failure is not retried as a sample. | No subclass hierarchy beyond this; the test is behavioural, not inheritance-shaped. |
-| **I**nterface segregation | `Runner` is `Callable[[str], str]`; `Prover` is the narrow proof-executor shape; callers do not receive a repository object with unrelated methods. | The CLI parser object is a large mutable namespace; it is a boundary object, not a domain interface. |
-| **D**ependency inversion | `adjudicate` accepts `prove=`; `review` accepts `runner`; the domain imports no executor. | `run` constructs `load_config`, `resolve_base`, `diff` and `fetch` directly. A full port set is not added because each has one implementation and the codebase-design rule says a second implementation is what earns the seam. |
+| **I**nterface segregation | `Runner` is `Callable[[str], str]`; callers do not receive a repository object with unrelated methods. | The CLI parser object is a large mutable namespace; it is a boundary object, not a domain interface. |
+| **D**ependency inversion | `review` accepts `runner`; the domain imports no executor. | `run` constructs `load_config`, `resolve_base`, `diff` and `fetch` directly. A full port set is not added because each has one implementation and the codebase-design rule says a second implementation is what earns the seam. |
 
 ## DDD boundaries
 
@@ -103,32 +108,32 @@ evidence; `INCOMPLETE` is exit 2 and means the review ran with missing evidence.
 
 ## Residual architecture debt
 
-1. **`run.py` is an application god module (765 lines).** It performs request
-   validation, git preparation, prompt construction, sampling, adjudication,
-   payload construction and persistence. Splitting it is a larger change than
-   this pass and would risk the state-machine guarantees; the next safe cut is
-   `verdict_payload()` (pure) plus a `RunStore` adapter, not a speculative port
-   layer.
+1. **Unit attribution is still derived after the merge.** Findings are flattened
+   across units and then matched back by file and line. A reviewer citing a
+   callee outside its unit's ranges is attributed to none; the unit can report
+   `findings: 0`. Keeping `unit.id -> RawFinding[]` as samples arrive is the next
+   cut.
 2. **`proofs.py` mixes execution and semantics.** The `ProofOutcome` value and
-   the decision moved to the kernel; the six executors, file reads and
+   the decision moved to the kernel; the five executors, file reads and
    subprocesses remain. They are correctly an adapter, but the module is not
    shallow.
 3. **`paths.state_root` remains impure on purpose.** It performs the symlink
    guard immediately before a write. Moving that guard to a pure function would
    remove the safety property; the pure part is the run-id name check.
-4. **`adjudicate`'s `prove=` default is a concrete executor.** The seam is used
-   by tests and by `run`; a full dependency-inversion port would be a second
-   implementation with no owner.
+4. **`adjudicate` has one executor, not a port.** The seam was speculative and
+   had no caller; it was removed. A second executor would earn it back.
 5. **`council.__version__` is a lazy view, not a second source of truth.**
    `council.version.current_version()` resolves the installed distribution;
    importing the package reads no metadata.
-6. **`_write_verdict` constructs its payload inline.** It is an adapter concern
-   today; extracting the pure payload is the easiest next SRP improvement.
+6. **`runstore` owns the verdict payload; `run` chooses its inputs.** Writing
+   the document is an adapter concern; the remaining question is whether the
+   payload should be derived from one `Report` value rather than a document
+   value.
 
 ## What would change the verdict
 
-- `run.py` below ~300 lines with `validate_request`, `verdict_payload` and a
-  `RunStore` adapter separated, while the existing state-machine tests stay green.
+- `run.py` below ~300 lines with one unit loop and `unit.id -> RawFinding[]`
+  attribution, while the existing state-machine tests stay green.
 - A second real implementation of a seam (for example a non-git change source)
   would justify a port; until then, adding protocols would be indirection.
 - The purity gate exercised through mutation: a deliberately inserted

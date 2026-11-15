@@ -19,6 +19,7 @@ import time
 from pathlib import Path
 from typing import TextIO
 
+from .domain.sandbox import reviewer as reviewer_argv
 from .repo import ReviewError
 from .sample import ReviewerMissing, Runner
 
@@ -54,15 +55,7 @@ def _sandbox_argv(argv: list[str], prompt_dir: Path) -> list[str]:
         home = str(Path.home())
     except RuntimeError as exc:
         raise ReviewError("HOME is not set: the reviewer sandbox needs a home to overlay") from exc
-    return [
-        bwrap, "--die-with-parent", "--unshare-pid",
-        "--ro-bind", "/", "/",
-        "--dev", "/dev", "--proc", "/proc", "--tmpfs", "/tmp",
-        "--ro-bind", str(prompt_dir), str(prompt_dir),
-        "--ro-bind", binary, binary,
-        "--overlay-src", home, "--tmp-overlay", home,
-        "--chdir", "/", "--", *argv,
-    ]
+    return reviewer_argv(argv, prompt_dir, bwrap=bwrap, binary=binary, home=home)
 
 
 def _terminate(proc: subprocess.Popen[str]) -> None:

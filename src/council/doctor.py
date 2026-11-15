@@ -5,10 +5,10 @@ from __future__ import annotations
 import os
 import shutil
 import time
-import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
 
+from .domain.text import sanitize
 from .sample import Runner
 
 PROBE = "Reply with the single word: ok"
@@ -31,8 +31,7 @@ class Check:
 
 def _safe(text: object) -> str:
     """One printable line: a profile name or an error must not drive the terminal."""
-    return "".join(ch if unicodedata.category(ch) not in {"Cc", "Cf", "Cs", "Zl", "Zp"}
-                   else " " for ch in str(text))
+    return sanitize(text)
 
 
 def check_git() -> Check:

@@ -547,6 +547,7 @@ def test_a_change_too_large_for_one_prompt_is_sliced_by_file(tmp_path: Path) -> 
     assert payload["sliced"] is True
     assert [unit["files"] for unit in payload["units"]] == [["a.py"], ["b.py"]]
     assert [unit["verdict"] for unit in payload["units"]] == ["pass", "pass"]
+    assert len(payload["context_digest"]) == 16
     assert report.verdict is Verdict.PASS
     for unit in ("unit-001", "unit-002"):
         assert (report.run_dir / "units" / unit / "sample-1.json").exists()

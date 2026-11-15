@@ -10,6 +10,8 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Literal
 
+from .domain.location import Location
+
 #: The only severities a finding may carry. Ordered, and `BLOCKING` is derived
 #: from this tuple rather than restated, so a new severity cannot be blocking in
 #: one place and not in another.
@@ -62,6 +64,10 @@ class Finding:
     #: Canonical proof identity, used only by the baseline policy. It is not a
     #: state and cannot change `blocks` or the verdict.
     proof: str = ""
+    #: Structured place derived from `location`; both fields are append-only so
+    #: existing eight-argument constructors keep working.
+    file: str = ""
+    line: int = 1
 
     @property
     def blocks(self) -> bool:
@@ -73,3 +79,11 @@ class Finding:
             raise ValueError("a finding needs an id: the verdict cites it")
         if self.severity not in SEVERITIES:
             raise ValueError(f"unknown severity {self.severity!r}; expected one of {SEVERITIES}")
+        if self.file:
+            if self.line < 1:
+                raise ValueError("a finding needs a positive line")
+            object.__setattr__(self, "location", Location(self.file, self.line).render())
+            return
+        place = Location.parse(self.location)
+        object.__setattr__(self, "file", place.file)
+        object.__setattr__(self, "line", place.line)
