@@ -37,6 +37,7 @@ PURE = (
     "domain.sandbox",
     "domain.location",
     "domain.text",
+    "vocabulary",
 )
 
 #: The effect shell. Each of these may read, write, spawn or wait.
@@ -53,6 +54,7 @@ ADAPTERS = frozenset({
     "doctor",
     "paths",
     "planning",
+    "prepare",
     "pr",
     "proofs",
     "reference",

@@ -9,8 +9,9 @@ edit, in the categories from `untangle-codebase`.
 1. `run.py` was a 765-line god module owning request validation, git
    preparation, prompt fitting, unit slicing, sampling, run storage and the
    verdict document. The frequent co-changes of `run.py` and `cli.py` were the
-   evidence. **Fixed:** `request.py`, `planning.py`, `sampling.py` and
-   `runstore.py` now own those decisions; `run.py` composes them.
+   evidence. **Fixed:** `request.py`, `prepare.py`, `planning.py`,
+   `sampling.py` and `runstore.py` now own those decisions; `run.py` composes
+   them and is under 300 lines.
 2. Request validation was copied in `cli._preflight`, `run.review` and
    `run._prepare`, with already-diverged messages. **Fixed:**
    `ReviewRequest.validate()` is the one pure validator; the shell keeps only
@@ -49,8 +50,9 @@ edit, in the categories from `untangle-codebase`.
    moved to `cli_parser`, renderer to `cli_output`.
 5. Auto-sampling policy lived beside file/run-store code. **Fixed:**
    `sampling.samples`.
-6. `prompt` imported `schema` only for vocabulary. **Left:** schema is the
-   prompt's contract; the direction is stable and there is no cycle.
+6. `prompt` imported `schema` only for vocabulary. **Fixed:** `vocabulary.py`
+   owns `DIMENSIONS`, `SEVERITIES` and `PROOF_KINDS`; the prompt and the parser
+   both depend on it, not on each other.
 7. `tools/differential.py` inserts `src` on `sys.path`. **Left:** maintainer
    script; not a runtime module.
 
@@ -74,15 +76,13 @@ edit, in the categories from `untangle-codebase`.
 
 ## Special cases
 
-1. `run.review` duplicated the sliced and unsliced pipelines; sliced runs lost
-   the context digest. **Left as recorded debt:** unifying “whole change = one
-   unit” changes the on-disk layout contract and needs its own compatibility
-   test. The refactor removed the duplicated prompt assembly and verdict logic,
-   not the layout.
-2. `PromptTooLarge` names CLI flags from the application module. **Left:** the
-   message is asserted by tests and is the operator's recovery path; a future
-   `TooLarge(size, limit, unit)` error can carry the numbers and let the CLI add
-   advice.
+1. `run.review` duplicated the sliced and unsliced pipelines. **Fixed:** the
+   whole change is represented as one degenerate unit and runs through the same
+   evidence loop; only the sample directory and the `units` payload remain
+   layout-specific. The on-disk format is unchanged.
+2. `PromptTooLarge` named CLI flags from the application module. **Fixed:** the
+   error carries `size`/`limit`/`unit`/`declined`; the CLI adds the recovery
+   advice, and the non-interactive path still names the flags.
 3. `reference.fetch` accepts `file:` URLs. **Left:** it is the caller's explicit
    context source; bounding it to a checkout is a security decision, not a
    structural cleanup.

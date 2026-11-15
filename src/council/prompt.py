@@ -6,7 +6,7 @@ from __future__ import annotations
 import hashlib
 from typing import Sequence
 
-from .schema import DIMENSIONS, PROOF_KINDS, SEVERITIES
+from .vocabulary import DIMENSIONS, PROOF_KINDS, SEVERITIES
 
 #: The rule a sample was asked under. A prompt change and a contract change are
 #: both instrument changes, so both break the digest.

@@ -16,7 +16,7 @@ from .changes import change_lines
 from .domain.adjudication import ProofOutcome
 from .findings import State
 from .sandbox import argv as sandbox_argv
-from .schema import PROOF_KINDS
+from .vocabulary import PROOF_KINDS
 
 SKIP_DIRS = frozenset({".git", ".council", ".venv", "__pycache__", "node_modules", ".mypy_cache"})
 

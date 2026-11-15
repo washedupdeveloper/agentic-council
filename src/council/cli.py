@@ -49,6 +49,9 @@ council: why there is a limit
   run, or narrow the change with a base revision.
 """
 
+_OVERSIZE_ADVICE = ("narrow the change with --base, raise the budget with "
+                    "--max-prompt-bytes, or allow it with --allow-large-prompt")
+
 
 def _oversize_decision(exc: PromptTooLarge, *, allow_base: bool = True) -> tuple[str, int | str | None]:
     """Ask a person what to do. Empty input or EOF cancels: silence is not consent."""
@@ -388,6 +391,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     # refuses instead: a pipeline has nobody to read the question.
     try:
         report = _review(args)
+    except PromptTooLarge as exc:
+        _finish_ephemeral(args, None)
+        print(f"council: {_safe(exc)}", file=sys.stderr)
+        if not exc.declined:
+            print(f"council: {_OVERSIZE_ADVICE}", file=sys.stderr)
+        return EXIT_ERROR
     except (ReviewError, ConfigError) as exc:
         _finish_ephemeral(args, None)
         print(f"council: {_safe(exc)}", file=sys.stderr)

@@ -280,11 +280,11 @@ def test_an_explicit_prompt_that_does_not_exist_is_refused(tmp_path: Path) -> No
 def test_a_missing_prompt_is_found_before_a_context_fetch(
         tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """A cheap failure must not pay for the network call that follows it."""
-    import council.run as run_module
+    import council.prepare as prepare_module
 
     repo, _ = make_repo(tmp_path)
     fetched: list[str] = []
-    monkeypatch.setattr(run_module, "fetch", lambda url: fetched.append(url))
+    monkeypatch.setattr(prepare_module, "fetch", lambda url: fetched.append(url))
     with pytest.raises(ReviewError, match="no reviewer prompt"):
         review(ReviewRequest(repo=repo, run_id="r4d", prompt=tmp_path / "absent.md",
                              context_urls=("https://example.invalid/context",)),
@@ -294,12 +294,12 @@ def test_a_missing_prompt_is_found_before_a_context_fetch(
 
 def test_an_empty_change_is_found_before_a_context_fetch(
         tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    import council.run as run_module
+    import council.prepare as prepare_module
 
     repo, _ = make_repo(tmp_path)
     (repo / "a.py").unlink()
     fetched: list[str] = []
-    monkeypatch.setattr(run_module, "fetch", lambda url: fetched.append(url))
+    monkeypatch.setattr(prepare_module, "fetch", lambda url: fetched.append(url))
     with pytest.raises(ReviewError, match="change is empty"):
         review(ReviewRequest(repo=repo, base="HEAD", run_id="r4e",
                              context_urls=("https://example.invalid/context",)),
@@ -498,8 +498,8 @@ def test_an_oversized_prompt_is_refused_before_the_reviewer_is_asked(
 
     assert asked == []
     assert not (repo / ".council" / "runs" / "too-big").exists()
-    assert "allow-large-prompt" in str(raised.value)
-    assert "max-prompt-bytes" in str(raised.value)
+    assert "Nothing was asked" in str(raised.value)
+    assert "the limit is 10" in str(raised.value)
 
 
 def test_an_acknowledged_oversized_prompt_is_sent_and_recorded(tmp_path: Path) -> None:

@@ -7,18 +7,9 @@ import json
 from dataclasses import dataclass
 from typing import Any
 
-from .findings import (
-    SEVERITIES as SEVERITIES,  # noqa: PLC0414 - re-exported for the schema contract
-)
-
-DIMENSIONS: tuple[str, ...] = (
-    "security",
-    "correctness",
-    "readability",
-    "architecture",
-    "performance",
-)
-PROOF_KINDS: tuple[str, ...] = ("absent", "present", "command", "json", "diff")
+from .vocabulary import DIMENSIONS as DIMENSIONS  # noqa: PLC0414 - re-export for the schema contract
+from .vocabulary import PROOF_KINDS as PROOF_KINDS  # noqa: PLC0414 - re-export
+from .vocabulary import SEVERITIES as SEVERITIES  # noqa: PLC0414 - re-export
 
 
 class SchemaError(ValueError):

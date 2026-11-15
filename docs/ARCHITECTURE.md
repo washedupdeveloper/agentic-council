@@ -53,11 +53,11 @@ not relabelled as architecture.
 
 ```
 council.domain.*          pure: no imports from the shell
-council.findings, verdict, merge, schema, prompt, changes, context, sarif
+council.findings, verdict, merge, schema, vocabulary, prompt, changes, context, sarif
                           pure decisions and renderers
         ^
         | imports
-council.adjudicate, run, request, planning, sampling, runstore
+council.adjudicate, run, request, planning, prepare, sampling, runstore
                           application/orchestration; effects through calls
         ^
         | imports
@@ -73,7 +73,7 @@ adapter; `tests/test_architecture.py` enforces the direction.
 
 | Principle | What is true | Where it is weaker |
 |---|---|---|
-| **S**ingle responsibility | `config` splits read (`load`) from decision (`parse`); `paths` splits name validation (`domain.run_id`) from the symlink guard; `adjudicate` splits proof execution from `decide`; `baseline` splits file/git access from the pure `domain.baseline`; `scope` is a pure matcher; `sample` splits `payload` from `write_sample`; `sandbox` splits lookup from `command`; `request`, `planning`, `sampling` and `runstore` split the review application; `version` is the only metadata reader. | `proofs` still owns both the five executors and their parameter rules. |
+| **S**ingle responsibility | `config` splits read (`load`) from decision (`parse`); `paths` splits name validation (`domain.run_id`) from the symlink guard; `adjudicate` splits proof execution from `decide`; `baseline` splits file/git access from the pure `domain.baseline`; `scope` is a pure matcher; `sample` splits `payload` from `write_sample`; `sandbox` splits lookup from `command`; `request`, `prepare`, `planning`, `sampling` and `runstore` split the review application; `version` is the only metadata reader. | `proofs` still owns both the five executors and their parameter rules. |
 | **O**pen/closed | A proof kind is a row in `EXECUTORS` plus the schema's kind set; a new kind does not add a branch to `run`. | A new **review mode** would still touch the request builder and CLI; there is no separate application service per mode. |
 | **L**iskov substitution | `ProofOutcome` is one domain value regardless of executor; `ReviewerMissing` is both a `ReviewError` and an `OSError`, so a start failure is not retried as a sample. | No subclass hierarchy beyond this; the test is behavioural, not inheritance-shaped. |
 | **I**nterface segregation | `Runner` is `Callable[[str], str]`; callers do not receive a repository object with unrelated methods. | The CLI parser object is a large mutable namespace; it is a boundary object, not a domain interface. |
@@ -108,32 +108,28 @@ evidence; `INCOMPLETE` is exit 2 and means the review ran with missing evidence.
 
 ## Residual architecture debt
 
-1. **Unit attribution is now collected as evidence arrives.** The sliced loop
-   keeps `unit.id -> RawFinding[]`; `units[].findings` counts a finding reported
-   by that unit even when the finding cites a callee outside the unit's ranges.
-   The remaining layout difference (sliced `units/<id>` versus the whole-change
-   root) is recorded below.
-2. **`proofs.py` mixes execution and semantics.** The `ProofOutcome` value and
+1. **`proofs.py` mixes execution and semantics.** The `ProofOutcome` value and
    the decision moved to the kernel; the five executors, file reads and
    subprocesses remain. They are correctly an adapter, but the module is not
    shallow.
-3. **`paths.state_root` remains impure on purpose.** It performs the symlink
+2. **`paths.state_root` remains impure on purpose.** It performs the symlink
    guard immediately before a write. Moving that guard to a pure function would
    remove the safety property; the pure part is the run-id name check.
-4. **`adjudicate` has one executor, not a port.** The seam was speculative and
+3. **`adjudicate` has one executor, not a port.** The seam was speculative and
    had no caller; it was removed. A second executor would earn it back.
-5. **`council.__version__` is a lazy view, not a second source of truth.**
+4. **`council.__version__` is a lazy view, not a second source of truth.**
    `council.version.current_version()` resolves the installed distribution;
    importing the package reads no metadata.
-6. **`runstore` owns the verdict payload; `run` chooses its inputs.** Writing
+5. **`runstore` owns the verdict payload; `run` chooses its inputs.** Writing
    the document is an adapter concern; the remaining question is whether the
    payload should be derived from one `Report` value rather than a document
    value.
+6. **`prepare` reads git/config/prompt/references in one adapter.** That is the
+   intended effect boundary; splitting it further would create pass-through
+   ports. It remains the one module to inspect when changing what is reviewed.
 
 ## What would change the verdict
 
-- `run.py` below ~300 lines with one unit loop for the whole change and the
-  sliced change, while the existing state-machine tests stay green.
 - A second real implementation of a seam (for example a non-git change source)
   would justify a port; until then, adding protocols would be indirection.
 - The purity gate exercised through mutation: a deliberately inserted

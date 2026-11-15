@@ -31,12 +31,8 @@ class PromptTooLarge(ReviewError):
         self.size = size
         self.limit = limit
         self.unit = unit
-        if declined:
-            tail = "Nothing was asked: proceeding was declined."
-        else:
-            tail = ("Nothing was asked. Narrow the change with --base, raise the "
-                    "budget with --max-prompt-bytes, or allow it with "
-                    "--allow-large-prompt.")
+        self.declined = declined
+        tail = "Nothing was asked: proceeding was declined." if declined else "Nothing was asked."
         where = f" for {unit}" if unit else ""
         super().__init__(
             f"the prompt{where} is {size:,} bytes; the limit is {limit:,}. {tail}")
