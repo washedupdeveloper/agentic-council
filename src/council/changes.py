@@ -1,7 +1,7 @@
-"""Read a unified diff: which lines a change adds or removes, per file.
+"""One parser for the unified-diff format.
 
-Pure: a string in, line numbers out. Both the `diff` proof and the context
-builder read the change through this one parser, so they cannot disagree about
+Every line number, hunk body and window in this package comes from here, so the
+context builder, the `diff` proof and the window slicer cannot disagree about
 which lines moved.
 """
 
@@ -10,194 +10,180 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-
-@dataclass(frozen=True, slots=True)
-class FileSection:
-    """One file's part of a unified diff, header included."""
-
-    path: str
-    text: str
+#: `@@ -old,count +new,count @@`; either count is omitted for a single line.
+_HUNK = re.compile(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@")
+_HEADER = re.compile(r"^(?:diff --git |--- |\+\+\+ )")
+_A_PREFIX = ("a/", "b/")
 
 
-def change_lines(diff: str) -> dict[str, tuple[set[int], set[int]]]:
-    """path -> (line numbers added in the new file, line numbers removed from the old).
-
-    Line numbers come from each hunk header, so a change with several hunks is
-    read hunk by hunk rather than only where the last one ended. Inside a hunk
-    every line is content, however much it looks like a file header: the hunk's
-    own line counts decide when the hunk ends.
-    """
-    changes: dict[str, tuple[set[int], set[int]]] = {}
-    path: str | None = None
-    old_path: str | None = None
-    old_line = new_line = 0
-    old_left = new_left = 0
-    for raw in diff.splitlines():
-        if old_left > 0 or new_left > 0:
-            prefix = raw[:1]
-            if prefix == "\\":
-                continue  # "\ No newline at end of file" carries no line
-            added, removed = changes.setdefault(path, (set(), set())) if path else (set(), set())
-            if prefix == " ":
-                old_line += 1
-                new_line += 1
-                old_left -= 1
-                new_left -= 1
-            elif prefix == "-":
-                if path is not None:
-                    removed.add(old_line)
-                old_line += 1
-                old_left -= 1
-            elif prefix == "+":
-                if path is not None:
-                    added.add(new_line)
-                new_line += 1
-                new_left -= 1
-            continue
-        if raw.startswith("--- "):
-            target = raw[4:].strip()
-            old_path = None if target == "/dev/null" else (target[2:] if target.startswith("a/") else target)
-            continue
-        if raw.startswith("+++ "):
-            target = raw[4:].strip()
-            if target == "/dev/null":
-                path = old_path
-            else:
-                path = target[2:] if target.startswith("b/") else target
-            continue
-        header = re.match(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@", raw)
-        if header is not None:
-            old_line, new_line = int(header.group(1)), int(header.group(3))
-            old_left = int(header.group(2)) if header.group(2) is not None else 1
-            new_left = int(header.group(4)) if header.group(4) is not None else 1
-            continue
-    return changes
+def _strip(line: str) -> str | None:
+    """The path a `---`/`+++` header names, or None for `/dev/null`."""
+    target = line[4:].strip()
+    if target == "/dev/null":
+        return None
+    return target[2:] if target[:2] in _A_PREFIX else target
 
 
-def _section_path(text: str) -> str | None:
-    """The path a file section is about, from the header rather than a hunk."""
-    for line in text.splitlines():
-        if line.startswith("+++ "):
-            target = line[4:].strip()
-            if target != "/dev/null":
-                return target[2:] if target.startswith("b/") else target
-        if line.startswith("--- "):
-            target = line[4:].strip()
-            if target != "/dev/null":
-                return target[2:] if target.startswith("a/") else target
-    for line in text.splitlines():
+def _path(lines: list[str]) -> str | None:
+    """The path a file section is about, preferring the new side."""
+    for line in lines:
+        if line.startswith("+++ ") and _strip(line) is not None:
+            return _strip(line)
+    for line in lines:
+        if line.startswith("--- ") and _strip(line) is not None:
+            return _strip(line)
+    for line in lines:
         if line.startswith("diff --git "):
             parts = line.split()
             if len(parts) >= 4:
-                return parts[2][2:] if parts[2].startswith("a/") else parts[2]
+                return parts[3][2:] if parts[3].startswith("b/") else parts[3]
     return None
 
 
-def file_sections(patch: str) -> list[FileSection]:
-    """Split a git diff into one section per file, in the order it appears.
+@dataclass(frozen=True, slots=True)
+class Hunk:
+    """One hunk: the file header above it, its `@@` line, and its body lines.
 
-    A section carries its own header, so rendering it alone is still a valid
-    diff for the reviewer and for the `diff` proof.
+    `header_line` is kept verbatim instead of rebuilt because git appends the
+    enclosing scope to it (`@@ -1,3 +1,4 @@ def f():`), and a rebuilt header
+    would silently strip that from every prompt.
     """
-    sections: list[FileSection] = []
+
+    file_header: str
+    header_line: str
+    start_old: int
+    old_count: int
+    start_new: int
+    new_count: int
+    body: tuple[str, ...]
+
+    @property
+    def text(self) -> str:
+        return self.file_header + self.header_line + "".join(self.body)
+
+    @property
+    def new_range(self) -> tuple[int, int]:
+        """The new-side lines this hunk covers, 1-based and inclusive."""
+        return self.start_new, self.start_new + max(self.new_count, 1) - 1
+
+    def slice(self, start: int, end: int) -> tuple[str, tuple[int, int]]:
+        """The part of the hunk covering body lines [start, end), and its new range.
+
+        Splitting an added file means splitting the one hunk that carries every
+        line, so the slice must still be a diff that `change_lines` reads the way
+        the whole hunk did. The old side is wherever walking the lines before the
+        slice left the old counter: a hunk with context or removals advances both
+        counters, so the offset cannot be assumed from the index.
+        """
+        if not 0 <= start < end <= len(self.body):
+            raise ValueError(f"window {start}:{end} is outside a {len(self.body)}-line hunk")
+        old_line, new_line = self.start_old, self.start_new
+        for line in self.body[:start]:
+            prefix = line[:1]
+            if prefix == " ":
+                old_line += 1
+                new_line += 1
+            elif prefix == "-":
+                old_line += 1
+            elif prefix == "+":
+                new_line += 1
+        window = self.body[start:end]
+        old_count = sum(1 for line in window if line[:1] in (" ", "-"))
+        new_count = sum(1 for line in window if line[:1] in (" ", "+"))
+        header = f"@@ -{old_line},{old_count} +{new_line},{new_count} @@\n"
+        return (self.file_header + header + "".join(window),
+                (new_line, new_line + max(new_count, 1) - 1))
+
+
+@dataclass(frozen=True, slots=True)
+class FileSection:
+    """One file's part of a unified diff, header included, parsed into hunks."""
+
+    path: str
+    text: str
+    hunks: tuple[Hunk, ...]
+
+
+def _hunks(lines: list[str]) -> list[Hunk]:
+    """Parse one section's lines into hunks, or nothing when there is no hunk."""
+    header: list[str] = []
+    index = 0
+    while index < len(lines) and not lines[index].startswith("@@ "):
+        header.append(lines[index])
+        index += 1
+    file_header = "".join(header)
+    hunks: list[Hunk] = []
     current: list[str] = []
+    starts: tuple[int, int, int, int] | None = None
+    for line in lines[index:]:
+        match = _HUNK.match(line)
+        if match is not None:
+            if starts is not None:
+                hunks.append(Hunk(file_header, current[0], *starts, tuple(current[1:])))
+            starts = (int(match.group(1)),
+                      int(match.group(2)) if match.group(2) is not None else 1,
+                      int(match.group(3)),
+                      int(match.group(4)) if match.group(4) is not None else 1)
+            current = [line]
+        elif starts is not None:
+            current.append(line)
+    if starts is not None:
+        hunks.append(Hunk(file_header, current[0], *starts, tuple(current[1:])))
+    return hunks
 
-    def flush() -> None:
-        if not current:
-            return
-        text = "".join(current)
-        parsed = change_lines(text)
-        path = next(iter(parsed)) if len(parsed) == 1 else _section_path(text)
-        if path is not None:
-            sections.append(FileSection(path, text))
 
+def parse_hunk(text: str) -> Hunk:
+    """The first hunk of `text`; a section with no hunk is a caller error."""
+    hunks = _hunks(text.splitlines(keepends=True))
+    if not hunks:
+        raise ValueError("the text carries no @@ hunk")
+    return hunks[0]
+
+
+def file_sections(patch: str) -> tuple[FileSection, ...]:
+    """A git diff split per file, in order, each still a valid diff on its own."""
+    blocks: list[list[str]] = []
+    current: list[str] = []
     for line in patch.splitlines(keepends=True):
         if line.startswith("diff --git ") and current:
-            flush()
-            current = [line]
-        else:
-            current.append(line)
-    flush()
-    return sections
-
-
-def hunk_sections(section: str) -> list[str]:
-    """One diff per hunk, each keeping the file header so the path survives."""
-    lines = section.splitlines(keepends=True)
-    start = next((index for index, line in enumerate(lines) if line.startswith("@@ ")), None)
-    if start is None:
-        return []
-    header = "".join(lines[:start])
-    hunks: list[str] = []
-    current: list[str] = []
-    for line in lines[start:]:
-        if line.startswith("@@ ") and current:
-            hunks.append(header + "".join(current))
+            blocks.append(current)
             current = [line]
         else:
             current.append(line)
     if current:
-        hunks.append(header + "".join(current))
-    return hunks
+        blocks.append(current)
 
-
-def hunk_range(hunk: str) -> tuple[int, int]:
-    """The new-side line range a hunk covers, 1-based and inclusive."""
-    for line in hunk.splitlines():
-        match = re.match(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@", line)
-        if match is not None:
-            start = int(match.group(1))
-            count = int(match.group(2)) if match.group(2) is not None else 1
-            return start, start + max(count, 1) - 1
-    return 1, 1
-
-
-@dataclass(frozen=True, slots=True)
-class HunkParts:
-    """A hunk split into its file header, its counters and its body lines."""
-
-    header: str
-    start_old: int
-    start_new: int
-    body: tuple[str, ...]
-
-
-def hunk_parts(hunk: str) -> HunkParts:
-    """Split a hunk into the parts a window needs; refuse one with no header."""
-    lines = hunk.splitlines(keepends=True)
-    for index, line in enumerate(lines):
-        match = re.match(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@", line)
-        if match is None:
+    sections: list[FileSection] = []
+    for block in blocks:
+        path = _path(block)
+        if path is None:
             continue
-        return HunkParts("".join(lines[:index]), int(match.group(1)),
-                         int(match.group(3)), tuple(lines[index + 1:]))
-    raise ValueError("the hunk has no @@ header")
+        sections.append(FileSection(path, "".join(block), tuple(_hunks(block))))
+    return tuple(sections)
 
 
-def slice_hunk(hunk: str, start: int, end: int) -> str:
-    """Re-emit the part of a hunk covering body lines [start, end).
+def change_lines(diff: str) -> dict[str, tuple[set[int], set[int]]]:
+    """path -> (lines added in the new file, lines removed from the old).
 
-    Splitting an added file means splitting the one hunk that carries every line,
-    so the slice must still be a diff a reader and `change_lines` agree about.
-    The new side is the slice's own range; the old side is wherever walking the
-    lines before it left the old counter, because a hunk with context or removals
-    advances both counters and the offset cannot be assumed from the index.
+    A hunk's own counters decide where it ends, so a removed line that looks
+    like a file header is still a removal.
     """
-    parts = hunk_parts(hunk)
-    if not 0 <= start < end <= len(parts.body):
-        raise ValueError(f"window {start}:{end} is outside a {len(parts.body)}-line hunk")
-    old_line, new_line = parts.start_old, parts.start_new
-    for line in parts.body[:start]:
-        prefix = line[:1]
-        if prefix == " ":
-            old_line += 1
-            new_line += 1
-        elif prefix == "-":
-            old_line += 1
-        elif prefix == "+":
-            new_line += 1
-    window = parts.body[start:end]
-    old_count = sum(1 for line in window if line[:1] in (" ", "-"))
-    new_count = sum(1 for line in window if line[:1] in (" ", "+"))
-    header = f"@@ -{old_line},{old_count} +{new_line},{new_count} @@\n"
-    return parts.header + header + "".join(window)
+    changes: dict[str, tuple[set[int], set[int]]] = {}
+    for section in file_sections(diff):
+        if not section.hunks:
+            continue
+        added, removed = changes.setdefault(section.path, (set(), set()))
+        for hunk in section.hunks:
+            old_line, new_line = hunk.start_old, hunk.start_new
+            for line in hunk.body:
+                prefix = line[:1]
+                if prefix == " ":
+                    old_line += 1
+                    new_line += 1
+                elif prefix == "-":
+                    removed.add(old_line)
+                    old_line += 1
+                elif prefix == "+":
+                    added.add(new_line)
+                    new_line += 1
+    return changes

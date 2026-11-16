@@ -641,6 +641,21 @@ def test_an_unreviewed_unit_makes_the_run_incomplete(tmp_path: Path) -> None:
     assert "unit-002" in payload["reason"]
 
 
+def test_a_unit_row_has_the_documented_keys(tmp_path: Path) -> None:
+    """`verdict.json`'s unit row is a contract; this is the list of its keys."""
+    repo, prompt = make_two_changes(tmp_path)
+    report = review(
+        ReviewRequest(repo=repo, base="HEAD", samples=1, run_id="row-keys", prompt=prompt,
+                      max_prompt_bytes=200),
+        lambda _: body())
+    payload = json.loads((report.run_dir / "verdict.json").read_text(encoding="utf-8"))
+    assert set(payload["units"][0]) == {
+        "id", "files", "ranges", "diff_sha256", "context_digest", "context_depth",
+        "prompt_bytes", "window", "samples_run", "agreement", "ok", "error",
+        "findings", "verdict",
+    }
+
+
 def test_a_file_too_large_is_split_by_hunk_and_keeps_its_name(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
     repo.mkdir()

@@ -4,13 +4,13 @@
 
 from __future__ import annotations
 
-import hashlib
 import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
 from .adjudicate import adjudicate, verdict
+from .domain.adjudication import missing_evidence
 from .domain.baseline import GateResult, apply_baseline
 from .domain.scope import ScopeIgnored
 from .findings import Finding
@@ -23,8 +23,8 @@ from .prepare import default_prompt as default_prompt, prepare as _prepare
 from .request import (DEFAULT_PROFILE as DEFAULT_PROFILE,
                       PROMPT_LIMIT as PROMPT_LIMIT,
                       ReviewRequest as ReviewRequest)
-from .runstore import (VerdictDocument, claim as _claim,
-                       discard_empty as _discard_empty,
+from .runstore import (UnitRun, VerdictDocument, claim as _claim,
+                       discard_empty as _discard_empty, unit_payload,
                        write_sample as _write_sample, write_verdict)
 from .sampling import (samples as _samples, unit_verdict as _unit_verdict)
 from .proofs import ProofContext
@@ -164,7 +164,7 @@ def review(request: ReviewRequest, runner: Runner) -> Report:
     units_payload: list[dict[str, object]] = []
 
     try:
-        runs: list[tuple[Unit, tuple[SampleResult, ...], int, bool | None, bool]] = []
+        runs: list[UnitRun] = []
         samples: tuple[SampleResult, ...] = ()
         raw: list[RawFinding] = []
         raw_by_unit: dict[str, list[RawFinding]] = {}
@@ -172,14 +172,12 @@ def review(request: ReviewRequest, runner: Runner) -> Report:
         #: The merge keeps the trail so a finding can name its own evidence.
         per_sample: list[list[RawFinding]] = []
         evidence_labels: list[str] = []
-        skipped_by_budget: set[str] = set()
         started = time.monotonic()
         for unit in run_units:
             if sliced and request.time_budget and time.monotonic() - started >= request.time_budget:
                 # The budget stops starting units; the one in flight was allowed
                 # to finish. A unit never asked is unreviewed, not clean.
-                skipped_by_budget.add(unit.id)
-                runs.append((unit, (), 0, None, False))
+                runs.append(UnitRun(unit, error="time budget exhausted"))
                 continue
             unit_samples, unit_run, unit_agreement = _samples(
                 unit.prompt, runner, request.samples)
@@ -187,7 +185,7 @@ def review(request: ReviewRequest, runner: Runner) -> Report:
             for sample in unit_samples:
                 _write_sample(sample_dir, sample)
             ok = all(sample.ok for sample in unit_samples)
-            runs.append((unit, unit_samples, unit_run, unit_agreement, ok))
+            runs.append(UnitRun(unit, unit_samples, unit_run, unit_agreement, ok))
             for sample in unit_samples:
                 per_sample.append(list(sample.output.findings)
                                   if sample.output is not None else [])
@@ -203,60 +201,28 @@ def review(request: ReviewRequest, runner: Runner) -> Report:
         else:
             adjudication = adjudicate(
                 merged, proofs,
-                failed_samples=[sample.index for sample in runs[0][1] if not sample.ok])
+                failed_samples=[sample.index for sample in runs[0].samples if not sample.ok])
         result = verdict(adjudication,
                         executed_only=request.require_executed_proofs)
         if sliced:
-            unreviewed = [unit.id for unit, _, _, _, ok in runs if not ok]
-            if unreviewed:
-                silent = [unit_id for unit_id in unreviewed if unit_id not in skipped_by_budget]
-                late = [unit_id for unit_id in unreviewed if unit_id in skipped_by_budget]
-                reasons = []
-                if silent:
-                    reasons.append(f"unit(s) {', '.join(silent)} returned nothing usable")
-                if late:
-                    reasons.append(f"unit(s) {', '.join(late)} were not reviewed within "
-                                   f"the {request.time_budget}s time budget")
-                note = "; ".join(reasons)
-                if result.verdict is Verdict.PASS:
-                    result = Result(
-                        Verdict.INCOMPLETE,
-                        note + ": the review is missing evidence",
-                        result.findings,
-                    )
-                else:
-                    # FAIL and INCOMPLETE both outrank a missing unit, but the reason
-                    # must still say what was never looked at.
-                    result = Result(result.verdict, f"{result.reason}; {note}", result.findings)
-            for unit, unit_samples, unit_run, unit_agreement, ok in runs:
+            unreviewed = [run for run in runs if not run.ok]
+            silent = [run.unit.id for run in unreviewed if run.error is None]
+            late = [run.unit.id for run in unreviewed if run.error is not None]
+            result = missing_evidence(result, silent=silent, late=late,
+                                      budget=request.time_budget)
+            for run in runs:
                 places = {(item.dimension, item.file, item.line)
-                          for item in raw_by_unit.get(unit.id, ())}
+                          for item in raw_by_unit.get(run.unit.id, ())}
                 mine = [finding for finding in result.findings
                         if (finding.dimension, finding.file, finding.line) in places]
-                units_payload.append({
-                    "id": unit.id,
-                    "files": list(unit.files),
-                    "ranges": [{"file": file, "start": start, "end": end}
-                               for file, start, end in unit.ranges],
-                    "diff_sha256": hashlib.sha256(unit.patch.encode("utf-8")).hexdigest(),
-                    "context_digest": unit.context_digest,
-                    "context_depth": unit.depth,
-                    "prompt_bytes": unit.bytes,
-                    "window": unit.window,
-                    "samples_run": unit_run,
-                    "agreement": unit_agreement,
-                    "ok": ok,
-                    "error": ("time budget exhausted"
-                              if unit.id in skipped_by_budget else None),
-                    "findings": len(mine),
-                    "verdict": _unit_verdict(mine, ok),
-                })
+                units_payload.append(
+                    unit_payload(run, mine, _unit_verdict(mine, run.ok)))
             samples = ()
-            samples_run = sum(run[2] for run in runs)
+            samples_run = sum(run.samples_run for run in runs)
             agreement = None
         else:
-            _, samples, samples_run, agreement, _ = runs[0]
-        missing_evidence = any(not run[4] for run in runs)
+            samples, samples_run, agreement = runs[0].samples, runs[0].samples_run, runs[0].agreement
+        incomplete = any(not run.ok for run in runs)
         reported_context = full_context
 
         ignored = True if request.state_dir is not None else state_dir_ignored(root)
@@ -265,7 +231,7 @@ def review(request: ReviewRequest, runner: Runner) -> Report:
             gate = apply_baseline(result, prepared.baseline,
                                   today=datetime.now(UTC).date(),
                                   strict=request.baseline_strict,
-                                  missing_evidence=missing_evidence)
+                                  missing_evidence=incomplete)
         baseline_source = ""
         if prepared.baseline is not None and request.baseline is not None:
             baseline_source = (f"{base}:{request.baseline}"

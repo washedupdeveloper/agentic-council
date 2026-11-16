@@ -97,6 +97,18 @@ text = "Merging is the same whatever order the samples arrive in."
 check = "python3 -m pytest tests/test_merge.py::test_the_highest_severity_wins_whatever_the_order -q"
 
 [[claim]]
+id = "the-unit-row-is-one-record"
+text = "A unit's row is built from its own record and its findings, and the row states exactly the documented keys."
+check = "python3 -m pytest tests/test_run.py::test_a_unit_row_has_the_documented_keys -q"
+falsifier = "a-unit-row-loses-a-key"
+
+[[claim]]
+id = "a-unit-that-never-ran-cannot-pass"
+text = "A unit that returned nothing, or was never asked inside the budget, makes the run INCOMPLETE; a FAIL keeps its verdict and gains the note."
+check = "python3 -m pytest tests/test_adjudicate.py::test_a_unit_that_never_ran_is_incomplete_and_a_failure_stays_a_failure -q"
+falsifier = "units-that-never-ran-pass"
+
+[[claim]]
 id = "a-missing-sample-cannot-pass"
 text = "A run missing a sample is incomplete, never a pass."
 check = "python3 -m pytest tests/test_adjudicate.py::test_a_missing_sample_makes_an_otherwise_clean_run_incomplete -q"

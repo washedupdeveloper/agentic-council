@@ -79,6 +79,31 @@ def decide(merged: Sequence[MergedFinding],
     return Adjudication(tuple(findings), tuple(sorted(failed_samples)))
 
 
+def _masked(result: Result, note: str) -> Result:
+    """Record missing evidence without ever softening it.
+
+    `PASS` cannot survive a unit or a sample that was never reviewed, so it
+    becomes `INCOMPLETE`; `FAIL` and `INCOMPLETE` keep their verdict and gain
+    the note, because the reason must still say what was not looked at.
+    """
+    if result.verdict is Verdict.PASS:
+        return Result(Verdict.INCOMPLETE,
+                      f"{note}: the review is missing evidence", result.findings)
+    return Result(result.verdict, f"{result.reason}; {note}", result.findings)
+
+
+def missing_evidence(result: Result, *, silent: Sequence[str] = (),
+                     late: Sequence[str] = (), budget: int = 0) -> Result:
+    """Units that returned nothing usable, or were never asked inside the budget."""
+    notes: list[str] = []
+    if silent:
+        notes.append(f"unit(s) {', '.join(silent)} returned nothing usable")
+    if late:
+        notes.append(f"unit(s) {', '.join(late)} were not reviewed within "
+                     f"the {budget}s time budget")
+    return _masked(result, "; ".join(notes)) if notes else result
+
+
 def verdict(adjudication: Adjudication, *,
             executed_only: bool = False) -> Result:
     """The verdict, with one addition the findings cannot express.
@@ -94,15 +119,5 @@ def verdict(adjudication: Adjudication, *,
     result = judge(adjudication.findings, executed_only=executed_only)
     if adjudication.failed_samples:
         listed = ", ".join(str(index) for index in adjudication.failed_samples)
-        if result.verdict is Verdict.PASS:
-            return Result(
-                Verdict.INCOMPLETE,
-                f"sample(s) {listed} returned nothing usable: the review is missing evidence",
-                adjudication.findings,
-            )
-        return Result(
-            result.verdict,
-            f"{result.reason}; sample(s) {listed} returned nothing usable",
-            adjudication.findings,
-        )
+        return _masked(result, f"sample(s) {listed} returned nothing usable")
     return result

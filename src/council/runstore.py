@@ -7,6 +7,7 @@ the orchestration.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 from collections.abc import Sequence
@@ -16,7 +17,8 @@ from pathlib import Path
 
 from .context import Context
 from .domain.baseline import GateResult
-from .planning import Prepared
+from .findings import Finding
+from .planning import Prepared, Unit
 from .repo import ReviewError
 from .request import ReviewRequest
 from .sample import SampleResult
@@ -40,6 +42,45 @@ def bounded(items: Sequence[T], limit: int = SCOPE_REPORT_LIMIT) -> tuple[list[T
     """The first `limit` items, and how many were left out."""
     listed = list(items)
     return listed[:limit], max(0, len(listed) - limit)
+
+
+@dataclass(frozen=True, slots=True)
+class UnitRun:
+    """One unit's turn through the loop: what was asked, and what came back.
+
+    `error` is the reason a unit was not asked at all. It is distinct from a
+    failed sample: one never reached a reviewer, the other reached one and got
+    nothing usable, and the reason a run is INCOMPLETE has to say which.
+    """
+
+    unit: Unit
+    samples: tuple[SampleResult, ...] = ()
+    samples_run: int = 0
+    agreement: bool | None = None
+    ok: bool = False
+    error: str | None = None
+
+
+def unit_payload(run: UnitRun, findings: Sequence[Finding], verdict: str) -> dict[str, object]:
+    """One `units[]` row. The document shape is decided here, not in the loop."""
+    unit = run.unit
+    return {
+        "id": unit.id,
+        "files": list(unit.files),
+        "ranges": [{"file": file, "start": start, "end": end}
+                   for file, start, end in unit.ranges],
+        "diff_sha256": hashlib.sha256(unit.patch.encode("utf-8")).hexdigest(),
+        "context_digest": unit.context_digest,
+        "context_depth": unit.depth,
+        "prompt_bytes": unit.bytes,
+        "window": unit.window,
+        "samples_run": run.samples_run,
+        "agreement": run.agreement,
+        "ok": run.ok,
+        "error": run.error,
+        "findings": len(findings),
+        "verdict": verdict,
+    }
 
 
 @dataclass(frozen=True, slots=True)

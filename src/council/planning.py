@@ -12,7 +12,7 @@ import fnmatch
 from dataclasses import dataclass
 from pathlib import Path
 
-from .changes import file_sections, hunk_parts, hunk_range, hunk_sections, slice_hunk
+from .changes import Hunk, file_sections
 from .config import RULE_BYTES, Config, Rule
 from .context import Context
 from .context import build as build_context
@@ -278,7 +278,7 @@ def window_bounds(body: tuple[str, ...], room: int) -> list[tuple[int, int]]:
     return bounds
 
 
-def _windowed(hunk: str, path: str, template: str, base: str, root: Path,
+def _windowed(hunk: Hunk, path: str, template: str, base: str, root: Path,
               request: ReviewRequest, references: tuple[Reference, ...],
               limit: int, rules: str = "") -> list[tuple[str, tuple[int, int], Fitted]]:
     """Split one oversized hunk into windows, or refuse and say what it would cost.
@@ -288,14 +288,13 @@ def _windowed(hunk: str, path: str, template: str, base: str, root: Path,
     already past the context builder's span limit — and depth 0 is also what
     makes the byte accounting exact instead of an estimate.
     """
-    parts = hunk_parts(hunk)
     overhead = prompt_overhead(template, base, references, rules)
     # What a refusal quotes is the prompt it would have sent, not the diff: the
     # template is 2.6 KB before the first line of the file, so a warning that
     # counts only the diff understates a small file by half.
-    size = overhead + len(hunk.encode("utf-8"))
-    room = limit - overhead - len(parts.header.encode("utf-8")) - HUNK_HEADER_ROOM
-    bounds = window_bounds(parts.body, room)
+    size = overhead + len(hunk.text.encode("utf-8"))
+    room = limit - overhead - len(hunk.file_header.encode("utf-8")) - HUNK_HEADER_ROOM
+    bounds = window_bounds(hunk.body, room)
     if not bounds:
         # Not even one line fits beside the template: no windowing can help.
         raise PromptTooLarge(size, limit, unit=path)
@@ -308,12 +307,12 @@ def _windowed(hunk: str, path: str, template: str, base: str, root: Path,
             "raise --max-prompt-bytes so each window carries more lines")
     windows: list[tuple[str, tuple[int, int], Fitted]] = []
     for start, end in bounds:
-        text = slice_hunk(hunk, start, end)
+        text, span = hunk.slice(start, end)
         fitted = fit(template, base, text, root, 0, references, limit, rules)
         if fitted is None:
             raise PromptTooLarge(overhead + len(text.encode("utf-8")), limit,
                                  unit=path, windows=len(bounds))
-        windows.append((text, hunk_range(text), fitted))
+        windows.append((text, span, fitted))
     return windows
 
 
@@ -338,20 +337,20 @@ def build_units(template: str, base: str, patch: str, root: Path,
                           fitted.context.digest, window))
 
     for section in file_sections(patch):
-        hunks = hunk_sections(section.text)
+        hunks = section.hunks
         if not hunks:
             continue
-        ranges = tuple((section.path, *hunk_range(hunk)) for hunk in hunks)
+        ranges = tuple((section.path, *hunk.new_range) for hunk in hunks)
         fitted = fit(template, base, section.text, root, request.context_depth,
                      references, limit, rules)
         if fitted is not None:
             add((section.path,), ranges, section.text, fitted)
             continue
         for hunk in hunks:
-            fitted = fit(template, base, hunk, root, request.context_depth,
+            fitted = fit(template, base, hunk.text, root, request.context_depth,
                          references, limit, rules)
             if fitted is not None:
-                add((section.path,), ((section.path, *hunk_range(hunk)),), hunk, fitted)
+                add((section.path,), ((section.path, *hunk.new_range),), hunk.text, fitted)
                 continue
             for text, span, piece in _windowed(hunk, section.path, template, base, root,
                                                request, references, limit, rules):

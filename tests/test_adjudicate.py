@@ -9,7 +9,8 @@ from council.adjudicate import adjudicate, verdict
 from council.findings import State
 from council.merge import MergedFinding
 from council.proofs import ProofContext
-from council.verdict import Verdict
+from council.domain.adjudication import missing_evidence
+from council.verdict import Result, Verdict
 
 ALLOW = frozenset({"true"})
 
@@ -99,6 +100,25 @@ def test_a_missing_sample_does_not_soften_a_real_failure(tmp_path: Path) -> None
     result = verdict(adj)
     assert result.verdict is Verdict.FAIL
     assert "sample(s) 2" in result.reason
+
+
+def test_a_unit_that_never_ran_is_incomplete_and_a_failure_stays_a_failure() -> None:
+    """The unit rule is the sample rule: missing evidence can never soften a run."""
+    clean = Result(Verdict.PASS, "no proven blocking findings", ())
+    assert missing_evidence(clean, silent=["unit-002"]).verdict is Verdict.INCOMPLETE
+    assert "unit-002" in missing_evidence(clean, silent=["unit-002"]).reason
+
+    late = missing_evidence(clean, late=["unit-003"], budget=60)
+    assert late.verdict is Verdict.INCOMPLETE
+    assert "60s" in late.reason
+
+    failing = Result(Verdict.FAIL, "1 proven blocking finding(s): F-01", ())
+    kept = missing_evidence(failing, silent=["unit-002"])
+    assert kept.verdict is Verdict.FAIL
+    assert kept.reason.startswith("1 proven blocking finding(s)")
+    assert "unit-002" in kept.reason
+
+    assert missing_evidence(clean).verdict is Verdict.PASS
 
 
 def test_a_clean_run_with_no_findings_passes(tmp_path: Path) -> None:
