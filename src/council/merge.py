@@ -45,13 +45,23 @@ class MergedFinding:
     claims: tuple[str, ...]
     samples: tuple[int, ...]
     proofs: tuple[tuple[str, dict[str, Any]], ...]
+    #: The evidence files those samples were written to, in the same order. This
+    #: is the trail from a finding back to the answer that asserted it. Last and
+    #: defaulted, so a seven-argument constructor still describes a finding
+    #: whose evidence the caller did not keep.
+    evidence: tuple[str, ...] = ()
 
 
-def merge(samples: Sequence[Sequence[RawFinding]]) -> tuple[MergedFinding, ...]:
+def merge(samples: Sequence[Sequence[RawFinding]], *,
+          labels: Sequence[str] = ()) -> tuple[MergedFinding, ...]:
     """Merge findings per sample, deterministically.
 
     A failed sample is an empty list, and the sample number is its position, so
     a failure stays a hole instead of renumbering the samples after it.
+
+    `labels[i]` names where sample `i+1` was written. The merged finding carries
+    the labels it came from, so nothing in the verdict has to be taken on trust:
+    every finding points at the file that asserted it.
     """
     buckets: dict[tuple[str, int], list[tuple[int, RawFinding]]] = {}
     for number, findings in enumerate(samples, start=1):
@@ -71,13 +81,16 @@ def merge(samples: Sequence[Sequence[RawFinding]]) -> tuple[MergedFinding, ...]:
             proof = (finding.proof_kind, finding.proof_params)
             if proof not in proofs:
                 proofs.append(proof)
+        numbers = tuple(sorted(index for index, _ in entries))
         merged.append(MergedFinding(
             dimension=dimension,
             file=key[0],
             line=key[1],
             severity=highest[1].severity,
             claims=claims,
-            samples=tuple(sorted(index for index, _ in entries)),
+            samples=numbers,
             proofs=tuple(proofs),
+            evidence=tuple(labels[number - 1] for number in numbers
+                           if 0 < number <= len(labels)),
         ))
     return tuple(merged)

@@ -115,6 +115,20 @@ def test_two_samples_that_disagree_about_the_dimension_are_one_finding(tmp_path:
     assert payload["findings"][0]["state"] == "proven"
 
 
+def test_every_finding_points_at_the_sample_that_asserted_it(tmp_path: Path) -> None:
+    """No finding in the verdict is asserted without a file to open."""
+    repo, _ = make_repo(tmp_path)
+    report = review(ReviewRequest(repo=repo, samples=2, run_id="trail"),
+                    lambda _: body({"security": [secret()]}))
+    payload = json.loads((report.run_dir / "verdict.json").read_text(encoding="utf-8"))
+    finding = payload["findings"][0]
+    assert finding["evidence"] == ["sample-1.json", "sample-2.json"]
+    for name in finding["evidence"]:
+        path = report.run_dir / name
+        assert path.is_file(), name
+        assert finding["claim"] in path.read_text(encoding="utf-8"), name
+
+
 def test_a_baseline_suppresses_an_accepted_finding(tmp_path: Path) -> None:
     repo, _ = make_repo(tmp_path)
     first = review(ReviewRequest(repo=repo, samples=1, run_id="before"),

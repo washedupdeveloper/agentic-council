@@ -1,6 +1,9 @@
 ---
 name: council
 description: Use when a change needs a blocking-defect verdict. Runs `council review` and reports the states behind the verdict.
+commands: [review, ci, pr, baseline, init, doctor]
+flags: [--plan, --include, --exclude, --samples, --report, --json, --sarif, --no-ephemeral, --keep, --require-executed-proofs, --base]
+artefacts: [verdict.json, sample-N.json]
 ---
 
 # council
@@ -32,13 +35,24 @@ and do not re-derive them from `findings`.
 - `format` — a consumer must refuse a format it does not know.
 - `findings[]` — `id`, `dimension`, `severity`, `state`, `proof_strength`,
   `location`, `claim`, `detail` (what the proof actually found), `proof`
-  (the canonical proof that was run).
+  (the canonical proof that was run), and `evidence` (the sample files whose
+  answer produced it — open one and the claim is there).
 - `units[]` — one row per reviewed slice, with ranges, prompt bytes, depth,
   samples and its own verdict. A windowed file appears as several units.
 - `rules[]` — the repository documents that governed this change.
 - `digest`, `profile_config_sha256` — the instrument. Two runs with different
   digests are not the same evidence.
 - `scope_ignored[]` and `scope_ignored_omitted` — what was **not** looked at.
+
+## The trail
+
+Every claim in the verdict resolves to a file you can open:
+
+    finding → findings[].evidence → sample-N.json (or units/<id>/sample-N.json)
+            → the raw answer → prompt.md → digest (prompt + profile + diff)
+
+Nothing in the verdict is asserted without that chain. If an `evidence` path
+does not exist, the run is broken, not merely incomplete.
 
 ## Decide
 

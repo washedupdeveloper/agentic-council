@@ -88,6 +88,20 @@ def test_different_files_at_one_line_stay_separate() -> None:
     assert [(item.file, item.line) for item in merged] == [("a.py", 3), ("b.py", 3)]
 
 
+def test_a_merged_finding_names_the_samples_it_came_from() -> None:
+    """The trail: a finding points at the files whose answers asserted it."""
+    merged = merge([sample(raw(claim="First.")), sample(raw(claim="Second."))],
+                   labels=["sample-1.json", "sample-2.json"])
+    assert merged[0].evidence == ("sample-1.json", "sample-2.json")
+
+
+def test_a_failed_sample_leaves_a_hole_in_the_labels() -> None:
+    merged = merge([sample(raw()), failed(), sample(raw(claim="Third."))],
+                   labels=["sample-1.json", "sample-2.json", "sample-3.json"])
+    assert merged[0].samples == (1, 3)
+    assert merged[0].evidence == ("sample-1.json", "sample-3.json")
+
+
 def test_a_failed_sample_contributes_nothing() -> None:
     merged = merge([sample(raw()), failed()])
     assert len(merged) == 1

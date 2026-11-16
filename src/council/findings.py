@@ -77,6 +77,9 @@ class Finding:
     #: Whether the proof that held ran something (`command`, `repro`) rather
     #: than quoting the code. Append-only, so older constructors keep working.
     executed: bool = False
+    #: The sample files that asserted this finding, relative to the run directory.
+    #: Empty only when a caller built the finding by hand.
+    evidence: tuple[str, ...] = ()
 
     @property
     def blocks(self) -> bool:

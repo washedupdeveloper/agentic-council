@@ -124,6 +124,11 @@ is deliberately excluded and recorded separately.
 **Where.** `prompt.py:instrument_digest`, `runner.py:profile_fingerprint`,
 `prepare.py`, `verdict.json:digest`, `profile_config_sha256`.
 
+**The trail, per finding.** `findings[].evidence` names the sample files whose
+answers asserted the finding; open one and the claim is there. That chain —
+finding → evidence file → raw answer → prompt → digest — is why `verdict.json` has
+no sentence in it that a reader has to take on trust (M30).
+
 ---
 
 ## 6. Refuse rather than degrade

@@ -123,6 +123,30 @@ def test_a_finding_inside_a_window_fails_the_run(tmp_path: Path) -> None:
     assert report.verdict is Verdict.FAIL
 
 
+def test_a_windowed_finding_names_its_sample_file(tmp_path: Path) -> None:
+    """A sliced run's evidence path is the unit layout, and it resolves."""
+    repo, prompt = big_repo(tmp_path)
+    line = 150
+
+    def runner(_: str) -> str:
+        sections: dict[str, list[dict[str, Any]]] = {name: [] for name in DIMENSIONS}
+        sections["correctness"] = [{
+            "severity": "high", "file": "big.py", "line": line, "claim": "It is wrong.",
+            "proof": {"kind": "present",
+                      "params": {"path": "big.py", "line": line,
+                                 "text": f"v{line - 1} = {line - 1}"}},
+        }]
+        return json.dumps({"sections": sections})
+
+    report = review(wanted(repo, prompt, "window-trail", window_large_files=True), runner)
+    payload = json.loads((report.run_dir / "verdict.json").read_text(encoding="utf-8"))
+    evidence = payload["findings"][0]["evidence"]
+    assert evidence, "a windowed finding has no evidence"
+    assert all(name.startswith("units/unit-") for name in evidence)
+    for name in evidence:
+        assert (report.run_dir / name).is_file(), name
+
+
 def test_the_plan_states_the_windows_and_their_samples(tmp_path: Path) -> None:
     repo, prompt = big_repo(tmp_path)
     planned = plan(wanted(repo, prompt, "planned", window_large_files=True, samples=None))

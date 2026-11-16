@@ -685,6 +685,24 @@ text = "Importing the package performs no installed-version lookup."
 check = "python3 -m pytest tests/test_architecture.py::test_the_package_import_reads_no_metadata -q"
 
 [[claim]]
+id = "a-finding-names-the-sample-that-asserted-it"
+text = "Every finding in verdict.json names the sample files that asserted it, and each named file exists and contains the claim."
+check = "python3 -m pytest tests/test_run.py::test_every_finding_points_at_the_sample_that_asserted_it -q"
+falsifier = "findings-lose-their-evidence"
+
+[[claim]]
+id = "a-windowed-finding-names-its-sample-file"
+text = "A finding from a sliced run points at the unit's sample file, and the path resolves."
+check = "python3 -m pytest tests/test_windows.py::test_a_windowed_finding_names_its_sample_file -q"
+falsifier = "findings-lose-their-evidence"
+
+[[claim]]
+id = "the-skill-declares-what-the-cli-accepts"
+text = "Every flag the skill declares exists in the CLI, so a declared surface cannot outlive a removed flag."
+check = "python3 -m pytest tests/test_skill.py::test_every_declared_flag_exists -q"
+falsifier = "skill-declares-a-flag-the-cli-lacks"
+
+[[claim]]
 id = "merging-never-weakens-a-finding"
 text = "When samples disagree about a finding's dimension, the merged finding takes the most blocking dimension and the highest severity, so it blocks if any input did."
 check = "python3 -m pytest tests/test_merge.py::test_merging_never_weakens_a_finding -q"

@@ -169,7 +169,8 @@ def write_verdict(document: VerdictDocument) -> None:
              "severity": finding.severity, "state": finding.state.value,
              "location": finding.location, "claim": finding.claim,
              "detail": finding.detail, "proof": finding.proof,
-             "proof_strength": "executed" if finding.executed else "static"}
+             "proof_strength": "executed" if finding.executed else "static",
+             "evidence": list(finding.evidence)}
             for finding in result.findings
         ],
     }

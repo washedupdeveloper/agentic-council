@@ -74,6 +74,7 @@ def decide(merged: Sequence[MergedFinding],
             detail=detail,
             proof=canonical_proof(item.proofs),
             executed=any(o.kind in EXECUTED_PROOF_KINDS for o in proven),
+            evidence=item.evidence,
         ))
     return Adjudication(tuple(findings), tuple(sorted(failed_samples)))
 

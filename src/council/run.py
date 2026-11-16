@@ -168,6 +168,10 @@ def review(request: ReviewRequest, runner: Runner) -> Report:
         samples: tuple[SampleResult, ...] = ()
         raw: list[RawFinding] = []
         raw_by_unit: dict[str, list[RawFinding]] = {}
+        #: One list per sample, in run order, and the file each was written to.
+        #: The merge keeps the trail so a finding can name its own evidence.
+        per_sample: list[list[RawFinding]] = []
+        evidence_labels: list[str] = []
         skipped_by_budget: set[str] = set()
         started = time.monotonic()
         for unit in run_units:
@@ -185,10 +189,15 @@ def review(request: ReviewRequest, runner: Runner) -> Report:
             ok = all(sample.ok for sample in unit_samples)
             runs.append((unit, unit_samples, unit_run, unit_agreement, ok))
             for sample in unit_samples:
+                per_sample.append(list(sample.output.findings)
+                                  if sample.output is not None else [])
+                evidence_labels.append(
+                    f"units/{unit.id}/sample-{sample.index}.json" if sliced
+                    else f"sample-{sample.index}.json")
                 if sample.output is not None:
                     raw.extend(sample.output.findings)
                     raw_by_unit.setdefault(unit.id, []).extend(sample.output.findings)
-        merged = merge([raw])
+        merged = merge(per_sample, labels=evidence_labels)
         if sliced:
             adjudication = adjudicate(merged, proofs)
         else:
