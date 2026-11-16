@@ -92,9 +92,16 @@ def test_a_dirty_worktree_is_refused(monkeypatch: pytest.MonkeyPatch,
 
 def test_a_clean_checkout_at_the_head_is_accepted(monkeypatch: pytest.MonkeyPatch,
                                                   tmp_path: Path) -> None:
-    monkeypatch.setattr(pr_module, "output",
-                        lambda repo, *args: HEAD if args[0] == "rev-parse" else "")
+    """Accepted means both questions were asked: the head, then the dirty tree."""
+    asked: list[str] = []
+
+    def output(repo: Path, *args: str) -> str:
+        asked.append(args[0])
+        return HEAD if args[0] == "rev-parse" else ""
+
+    monkeypatch.setattr(pr_module, "output", output)
     verify_checkout(pull(), tmp_path)
+    assert asked == ["rev-parse", "status"]
 
 
 def test_a_gh_that_cannot_run_is_a_review_error(monkeypatch: pytest.MonkeyPatch,

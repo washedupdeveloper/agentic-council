@@ -1,10 +1,10 @@
 """Merge by place: one line is one finding, and the most blocking dimension wins.
 
-The key used to be `(dimension, file, line)`, which let a label decide the gate:
-two samples that agreed a line was defective but disagreed about its category
-produced two findings, and the run failed only if one of them happened to be
-filed under a blocking dimension. A model that calls a defect `readability` could
-therefore launder it past the gate.
+The key used to be `(dimension, file, line)`. Two samples that agreed a line was
+defective but disagreed about its category produced two findings: two rows, two
+SARIF results, and two answers to "is this blocking?". A label could not hide a
+defect — `high` blocks on severity, `low` `correctness` blocks on dimension — but
+it could split one defect in two.
 
 The key is the place. The dimension is adjudicated from what the samples said —
 the most blocking one wins — and severity is the highest any of them claimed, so

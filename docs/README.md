@@ -27,7 +27,8 @@ fails the gate when one exists.
 | [`../src/council/prompts/reviewer.md`](../src/council/prompts/reviewer.md) | the reviewer prompt: what the model is asked, the six proof kinds, and the shape of the answer it must return |
 | [`../CHANGELOG.md`](../CHANGELOG.md) | what changed, by release |
 | [`ADOPTION.md`](ADOPTION.md) | the `pypa/sampleproject` adoption run: the evidence that the tool works on a repository that is not this one |
-| [`UNTANGLE.md`](UNTANGLE.md) | the decision log of the completed refactor: problems found, what moved, what is still owed |
+| [`UNTANGLE.md`](UNTANGLE.md) | the decision log of the first refactor: problems found, what moved, what is still owed |
+| [`UNTANGLE2.md`](UNTANGLE2.md) | the second pass: the five-parser diff grammar, the run ledger, the comment ruling, and the two moves it left |
 
 ## Decision records
 

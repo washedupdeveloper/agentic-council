@@ -16,7 +16,7 @@ from council.prompt import instrument_digest
 from council.runner import profile_fingerprint
 from council.repo import init
 from council.run import (DEFAULT_PROFILE, PromptTooLarge, ReviewError, ReviewRequest,
-                         _claim, default_prompt, plan, review)
+                         default_prompt, plan, review)
 from council.sample import ReviewerMissing
 from council.schema import DIMENSIONS
 from council.verdict import Verdict
@@ -423,12 +423,6 @@ def test_a_run_id_is_never_overwritten(tmp_path: Path) -> None:
     (repo / ".council" / "runs" / "r6").mkdir(parents=True)
     with pytest.raises(ReviewError, match="already exists"):
         review(ReviewRequest(repo=repo, run_id="r6"), lambda _: body())
-
-
-def test_a_claimed_run_directory_is_exclusive(tmp_path: Path) -> None:
-    _claim(tmp_path / "run", "run")
-    with pytest.raises(ReviewError, match="already exists"):
-        _claim(tmp_path / "run", "run")
 
 
 def test_a_missing_reviewer_leaves_no_run_directory(tmp_path: Path) -> None:

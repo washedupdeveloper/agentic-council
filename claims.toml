@@ -103,10 +103,9 @@ check = "python3 -m pytest tests/test_run.py::test_a_unit_row_has_the_documented
 falsifier = "a-unit-row-loses-a-key"
 
 [[claim]]
-id = "a-unit-that-never-ran-cannot-pass"
-text = "A unit that returned nothing, or was never asked inside the budget, makes the run INCOMPLETE; a FAIL keeps its verdict and gains the note."
+id = "missing-evidence-adds-a-note-to-a-failure"
+text = "A unit that never ran makes a passing run INCOMPLETE, and adds its note to a failing one without softening it."
 check = "python3 -m pytest tests/test_adjudicate.py::test_a_unit_that_never_ran_is_incomplete_and_a_failure_stays_a_failure -q"
-falsifier = "units-that-never-ran-pass"
 
 [[claim]]
 id = "a-missing-sample-cannot-pass"
@@ -420,6 +419,7 @@ falsifier = "slicing-disabled"
 id = "an-unreviewed-unit-cannot-pass"
 text = "A unit whose samples did not answer makes the run INCOMPLETE, never PASS."
 check = "python3 -m pytest tests/test_run.py::test_an_unreviewed_unit_makes_the_run_incomplete -q"
+falsifier = "units-that-never-ran-pass"
 
 [[claim]]
 id = "every-text-file-ends-with-a-newline"
@@ -630,11 +630,6 @@ check = "python3 -m pytest tests/test_reference.py::test_a_file_url_that_is_a_di
 id = "a-proof-that-crashes-is-unrunnable"
 text = "A proof that raises is UNRUNNABLE, not a crashed run."
 check = "python3 -m pytest tests/test_proofs.py::test_a_proof_that_crashes_is_unrunnable -q"
-
-[[claim]]
-id = "a-run-directory-is-claimed-exclusively"
-text = "A second run cannot claim an existing run directory."
-check = "python3 -m pytest tests/test_run.py::test_a_claimed_run_directory_is_exclusive -q"
 
 [[claim]]
 id = "a-missing-reviewer-leaves-no-run-directory"

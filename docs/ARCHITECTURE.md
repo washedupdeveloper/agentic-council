@@ -19,7 +19,8 @@ adapter.
 The implementation is not fully DDD or fully SOLID. The orchestration is split
 along change boundaries: `request` owns the caller's value, `planning` owns
 prompt/unit decisions, `sampling` owns the review sample policy, `runstore` owns
-the on-disk contract, and `run` composes them. `proofs.py` still executes checks
+the on-disk contract and the unit record, `changes` owns the one diff grammar,
+and `run` composes them. `proofs.py` still executes checks
 in the same module that defines proof semantics; that remains recorded as debt,
 not relabelled as architecture.
 
@@ -39,7 +40,7 @@ not relabelled as architecture.
 | A new impure module cannot join silently | The gate classifies every effectful module as an adapter. | `test_every_module_that_acts_is_named_as_an_adapter`. |
 | A rule cannot silently disappear | A rule that matches is in the prompt and in the verdict; one whose document cannot be read stops the run; one that matches nothing is in neither. | `planning.rules_block`; `tests/test_rules.py`; claims `a-rule-document-reaches-the-prompt`, `a-rule-document-that-cannot-be-read-is-a-start-failure`. |
 | A rule cannot silently disappear | A rule that matches is in the prompt and in the verdict; one whose document cannot be read stops the run; one that matches nothing is in neither. | `planning.rules_block`; `tests/test_rules.py`; claims `a-rule-document-reaches-the-prompt`, `a-rule-document-that-cannot-be-read-is-a-start-failure`. |
-| Unit granularity is a ladder, not a guess | A change too large for one prompt is split at the finest boundary that exists — file, then hunk, then line window — and every unit produced fits the budget. | `planning.build_units`; `changes.slice_hunk`; `tests/test_windows.py`; claim `windowing-splits-a-file-into-units-that-fit`. |
+| Unit granularity is a ladder, not a guess | A change too large for one prompt is split at the finest boundary that exists — file, then hunk, then line window — and every unit produced fits the budget. | `planning.build_units`; `changes.Hunk.slice`; `tests/test_windows.py`; claim `windowing-splits-a-file-into-units-that-fit`. |
 | A cheap failure precedes an expensive one | Config, empty-change and prompt checks run before any context fetch; the reviewer is not called. | `test_malformed_config_is_found_before_the_reviewer`, `test_a_missing_prompt_is_found_before_a_context_fetch`, `test_an_empty_change_is_found_before_a_context_fetch`. |
 | A boolean is not a quantity | `bool` is refused for samples, prompt budget, context depth, time budget and idle timeout. | `test_a_boolean_request_number_is_refused`. |
 | A repository config cannot redirect through a link | A symlinked `council.toml` is refused before it is read. | `test_a_symlinked_config_is_refused`. |

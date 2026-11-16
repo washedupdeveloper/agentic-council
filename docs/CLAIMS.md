@@ -25,6 +25,8 @@ registry, so it cannot describe a claim that has no check.
 | `a-misspelt-config-key-is-refused` | A misspelt allowlist key is an error, not a silent fall back to the default. | `python3 -m pytest tests/test_config.py::test_a_misspelt_allow_is_an_error_not_a_default -q` |
 | `the-highest-severity-wins` | When samples disagree on severity, the highest one is kept. | `python3 -m pytest tests/test_merge.py::test_the_highest_severity_wins -q` |
 | `the-merge-is-order-independent` | Merging is the same whatever order the samples arrive in. | `python3 -m pytest tests/test_merge.py::test_the_highest_severity_wins_whatever_the_order -q` |
+| `the-unit-row-is-one-record` | A unit's row is built from its own record and its findings, and the row states exactly the documented keys. | `python3 -m pytest tests/test_run.py::test_a_unit_row_has_the_documented_keys -q` |
+| `missing-evidence-adds-a-note-to-a-failure` | A unit that never ran makes a passing run INCOMPLETE, and adds its note to a failing one without softening it. | `python3 -m pytest tests/test_adjudicate.py::test_a_unit_that_never_ran_is_incomplete_and_a_failure_stays_a_failure -q` |
 | `a-missing-sample-cannot-pass` | A run missing a sample is incomplete, never a pass. | `python3 -m pytest tests/test_adjudicate.py::test_a_missing_sample_makes_an_otherwise_clean_run_incomplete -q` |
 | `a-missing-sample-cannot-soften-a-failure` | A run missing a sample still fails when the evidence that arrived proves a defect. | `python3 -m pytest tests/test_adjudicate.py::test_a_missing_sample_does_not_soften_a_real_failure -q` |
 | `a-committed-secret-fails-end-to-end` | A sample reporting a committed secret that the diff confirms produces FAIL and exit 1. | `python3 -m pytest tests/test_pipeline.py::test_a_committed_secret_the_diff_confirms_fails -q` |
@@ -127,7 +129,6 @@ registry, so it cannot describe a claim that has no check.
 | `human-output-has-no-terminal-controls` | Human output replaces control characters from model output. | `python3 -m pytest tests/test_cli.py::test_the_human_report_does_not_emit_terminal_controls -q` |
 | `a-file-url-that-is-not-a-file-is-refused` | A file URL that is not a regular file is refused. | `python3 -m pytest tests/test_reference.py::test_a_file_url_that_is_a_directory_is_refused -q` |
 | `a-proof-that-crashes-is-unrunnable` | A proof that raises is UNRUNNABLE, not a crashed run. | `python3 -m pytest tests/test_proofs.py::test_a_proof_that_crashes_is_unrunnable -q` |
-| `a-run-directory-is-claimed-exclusively` | A second run cannot claim an existing run directory. | `python3 -m pytest tests/test_run.py::test_a_claimed_run_directory_is_exclusive -q` |
 | `a-missing-reviewer-leaves-no-run-directory` | A start failure before evidence removes the empty run directory. | `python3 -m pytest tests/test_run.py::test_a_missing_reviewer_leaves_no_run_directory -q` |
 | `keep-refuses-an-existing-target` | --keep refuses to merge into an existing run directory. | `python3 -m pytest tests/test_cli.py::test_keep_refuses_an_existing_target -q` |
 | `a-non-utf8-answer-is-a-failed-sample` | A reviewer answer that is not UTF-8 is replaced, not a crash. | `python3 -m pytest tests/test_runner.py::test_a_non_utf8_answer_is_replaced_not_a_crash -q` |

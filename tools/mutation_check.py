@@ -113,8 +113,8 @@ MUTATIONS: tuple[Mutation, ...] = (
              "*dimensions):"),
     Mutation("diff-context-not-counted",
              "changes.py",
-             'if prefix == " ":\n                old_line += 1\n                new_line += 1',
-             'if prefix == " ":\n                old_line += 1'),
+             'for line in hunk.body:\n                prefix = line[:1]\n                if prefix == " ":\n                    old_line += 1\n                    new_line += 1',
+             'for line in hunk.body:\n                prefix = line[:1]\n                if prefix == " ":\n                    old_line += 1'),
     Mutation("config-ignores-unknown-keys",
              "domain/config.py", "if unknown:", "if False:"),
     Mutation("merge-takes-the-lowest-severity",
@@ -226,7 +226,11 @@ def run_suite(src: Path) -> tuple[int, set[str]]:
 
 def main() -> int:
     claims = load_claims(ROOT / "claims.toml")
-    by_node = {claim_node(claim.check): claim for claim in claims if claim_node(claim.check)}
+    by_node: dict[str, list[str]] = {}
+    for claim in claims:
+        node = claim_node(claim.check)
+        if node is not None:
+            by_node.setdefault(node, []).append(claim.id)
 
     survivors: list[str] = []
     falsified: dict[str, set[str]] = {}
@@ -251,7 +255,7 @@ def main() -> int:
             print(f"  {'caught' if caught else 'SURVIVED'}  {mutation.name}")
             if not caught:
                 survivors.append(mutation.name)
-            hit = {by_node[node].id for node in broken if node in by_node}
+            hit = {claim_id for node in broken for claim_id in by_node.get(node, [])}
             falsified[mutation.name] = hit
             if hit:
                 print(f"            falsifies {', '.join(sorted(hit))}")

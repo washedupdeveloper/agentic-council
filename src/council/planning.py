@@ -1,8 +1,9 @@
 """Turn a prepared change into prompt-sized review units.
 
-Pure decisions except for the injected file reader: this module chooses which
-files and hunks are grouped, how deep the context may be, and whether a unit
-fits the caller's byte limit. It never asks a model and never writes a run.
+This chooses which files and hunks are grouped, how deep the context may be, and
+whether a unit fits the caller's byte limit. It reads the repository through
+`reader`, so it is an adapter; the decisions it makes take only their arguments.
+It never asks a model and never writes a run.
 """
 
 from __future__ import annotations

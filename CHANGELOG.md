@@ -86,6 +86,15 @@ public surface, the definitions, and the release procedure — is
 
 ### Changed
 
+- The diff is parsed once. `changes.Hunk` carries the header line verbatim, the
+  new-side range and `slice()`; `change_lines`, `file_sections` and the window
+  slicer read the same parse, so a header edge case has one place to be fixed and
+  a window's line numbers come from the code that wrote them. `hunk_range`,
+  `hunk_parts`, `hunk_sections` and `slice_hunk` are gone.
+- A run keeps a record per unit. `runstore.UnitRun` replaces the 5-tuple the
+  loop read by position, `runstore.unit_payload` is the only place the
+  `units[]` row is built, and `domain.adjudication.missing_evidence` is the only
+  place a unit that never ran turns `PASS` into `INCOMPLETE`.
 - `config.load` now only reads and delegates to the pure `domain.config.parse`.
   `version.current_version()` is the only package-metadata reader; importing
   `council` no longer performs I/O. SARIF renderers take the tool version as an
@@ -97,6 +106,10 @@ public surface, the definitions, and the release procedure — is
 
 ### Removed
 
+- `doctor._safe`, a second copy of `cli_output.safe`; the comments that restated
+  a machine-checked list, repeated an exit-code rule, or repeated the retracted
+  `merge` laundering claim; and one unit test whose claim `review` already covers
+  end to end.
 - `scripts/verify.sh`, `HANDOFF.md` and `docs/GRILL.md`. The script was a weaker
   copy of the gate that omitted `mypy`, `pyright`, `ruff` and the wheel build
   while the README called it "the full gate"; the handoff note duplicated a

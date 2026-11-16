@@ -26,12 +26,7 @@ class Check:
     detail: str
 
     def line(self) -> str:
-        return f"{self.status:<4}  {self.name:<8}  {_safe(self.detail)}"
-
-
-def _safe(text: object) -> str:
-    """One printable line: a profile name or an error must not drive the terminal."""
-    return sanitize(text)
+        return f"{self.status:<4}  {self.name:<8}  {sanitize(self.detail)}"
 
 
 def check_git() -> Check:
