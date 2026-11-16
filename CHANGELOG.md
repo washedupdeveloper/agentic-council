@@ -95,6 +95,19 @@ public surface, the definitions, and the release procedure — is
 - `sample.payload` is the pure serialisation decision; `write_sample` is the
   adapter.
 
+### Removed
+
+- `scripts/verify.sh`, `HANDOFF.md` and `docs/GRILL.md`. The script was a weaker
+  copy of the gate that omitted `mypy`, `pyright`, `ruff` and the wheel build
+  while the README called it "the full gate"; the handoff note duplicated a
+  verified state that had already drifted (203 claims against a registry of
+  211); the grill page was an opinion measured at `18b7043` whose five points
+  are closed in `M29` and `M30`. A document that restates the tree is a second
+  place for it to be wrong.
+- The documentation index `docs/README.md` replaces the handoff note as the way
+  in. It is bound: `tests/test_docs_index.py` fails when a Markdown file is not
+  linked from it, or when a link on it does not resolve.
+
 ### Fixed
 
 - A malformed `council.toml` is refused before git, context fetches, prompt

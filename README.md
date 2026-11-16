@@ -2,9 +2,10 @@
 
 A review is a claim until a check settles it.
 
-> **Continuing on another machine?** Read [`HANDOFF.md`](HANDOFF.md) first. It
-> records the verified commit, the gate commands, the known limits and the next
-> work item. The full gate is `./scripts/verify.sh`.
+> **Where to go next:** [`docs/README.md`](docs/README.md) indexes every document
+> in this repository. The gate is `nix flake check` — tests, types, pyright, lint,
+> claims, mutations and the wheel — and it is the only thing that decides whether
+> a checkout is green.
 
 ## The rule
 

@@ -1,0 +1,76 @@
+# Documents
+
+Every document in this repository, what it is for, and which record decides what.
+A file that is not linked from here is an orphan, and `tests/test_docs_index.py`
+fails the gate when one exists.
+
+## Start here
+
+| document | what it is |
+|---|---|
+| [`../README.md`](../README.md) | the tool: the rule, the commands, the flags, the exit codes |
+| [`FOUNDATIONS.md`](FOUNDATIONS.md) | the seven decisions the tool rests on, each with its rejected alternative and what would make it wrong |
+| [`ARCHITECTURE.md`](ARCHITECTURE.md) | the module map, the dependency rule, the run pipeline, the remaining debt |
+| [`STATE-MACHINES.md`](STATE-MACHINES.md) | every state the CLI and the run engine can occupy, the invariants, the exit codes |
+| [`../GLOSSARY.md`](../GLOSSARY.md) | the vocabulary, fixed: finding, proof, unit, window, sample, verdict, digest |
+| [`CLAIMS.md`](CLAIMS.md) | generated: every claim this project makes and the command that would falsify it |
+
+## Reference
+
+| document | what it is |
+|---|---|
+| [`SCOPE.md`](SCOPE.md) | what a review looks at, and that only the caller can change it |
+| [`PORTABILITY.md`](PORTABILITY.md) | ephemeral execution beyond NixOS, host by host |
+| [`BASELINE.md`](BASELINE.md) | accepting a proven blocking finding without hiding the evidence |
+| [`VERSIONING.md`](VERSIONING.md) | the public surface, the semantic-version policy, the release procedure |
+| [`../skills/council/SKILL.md`](../skills/council/SKILL.md) | the skill an agent follows: how to run a review, read the verdict, and what not to do |
+| [`../src/council/prompts/reviewer.md`](../src/council/prompts/reviewer.md) | the reviewer prompt: what the model is asked, the six proof kinds, and the shape of the answer it must return |
+| [`../CHANGELOG.md`](../CHANGELOG.md) | what changed, by release |
+| [`ADOPTION.md`](ADOPTION.md) | the `pypa/sampleproject` adoption run: the evidence that the tool works on a repository that is not this one |
+| [`UNTANGLE.md`](UNTANGLE.md) | the decision log of the completed refactor: problems found, what moved, what is still owed |
+
+## Decision records
+
+Each milestone records the decision, the alternative it rejected, and an
+acceptance table whose rows are commands. They are the history of why the tree
+looks the way it does.
+
+| record | decision |
+|---|---|
+| [`M11.md`](M11.md) | the rebuild beside v1.9.0: a verdict derived from evidence states, and the parity corpus |
+| [`M12.md`](M12.md) | review any change: slice by file then hunk, and refuse rather than truncate |
+| [`M13.md`](M13.md) | bounded runs: a deadline a person chose, and the measurement that makes it honest |
+| [`M14.md`](M14.md) | release and adopt: wheel, image, action, and a real external repository |
+| [`M15.md`](M15.md) | transport guard: a silent reviewer costs the idle timeout, not the sample |
+| [`M16.md`](M16.md) | launch readiness: install, version, types, configuration, CI output, licence |
+| [`M17.md`](M17.md) | pull-request entry, and a plan that states the cost before it is paid |
+| [`M18.md`](M18.md) | sandboxed, ephemeral execution for the reviewer |
+| [`M19.md`](M19.md) | ephemeral by default, and what a host without NixOS can do |
+| [`M20.md`](M20.md) | error-driven CLI hardening: every flag, path, base and proof parameter |
+| [`M25.md`](M25.md) | evidence that can fail: the proof kinds that a real review exposed as missing |
+| [`M26.md`](M26.md) | the third rung: line windows, so an added file is reviewable |
+| [`M28.md`](M28.md) | rules, proof strength, atomic publication, a bounded report |
+| [`M29.md`](M29.md) | one place is one finding: the merge keys on `(file, line)` |
+| [`M30.md`](M30.md) | every assertion carries its source: findings name their evidence, the skill declares the CLI |
+
+The series has gaps — `M21`–`M24` and `M27` have no record here. Those changes
+went in without a decision record; this page does not invent one after the fact.
+
+## Retired
+
+Two documents were removed rather than left to drift. Both are in the history
+(`git log --diff-filter=D -- docs/GRILL.md HANDOFF.md`):
+
+- `GRILL.md` — an opinion page measured at `18b7043`. Its five points were audited
+  and closed in `M29` and `M30`; keeping it meant keeping a second, stale account
+  of the same tree.
+- `HANDOFF.md` — a "verified state" note. It said 203 claims when the registry
+  held 211, which is exactly the drift this repository refuses everywhere else.
+  The state is not a document; it is `nix flake check`.
+
+## How this page stays true
+
+`tests/test_docs_index.py` checks both directions: every Markdown file outside
+`fixtures/` is linked from this page, and every link on it resolves. Adding a
+document without indexing it fails the gate, and so does deleting one and leaving
+the link behind.
