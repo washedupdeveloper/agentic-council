@@ -970,6 +970,17 @@ text = "Slicing a hunk into windows preserves the added and removed line numbers
 check = "python3 -m pytest tests/test_changes.py::test_a_window_keeps_the_line_numbers_of_the_whole_hunk -q"
 
 [[claim]]
+id = "a-present-quote-may-omit-its-indentation"
+text = "A present proof holds when the quoted line matches the file's text with its leading indentation stripped."
+check = "python3 -m pytest tests/test_proofs.py::test_present_accepts_a_quote_that_omits_its_indentation -q"
+
+[[claim]]
+id = "a-present-quote-that-differs-is-refused"
+text = "A present proof refuses a line that differs by more than indentation, and names both the actual and the expected text."
+check = "python3 -m pytest tests/test_proofs.py::test_present_refuses_more_than_indentation -q"
+falsifier = "present-ignores-the-quote"
+
+[[claim]]
 id = "the-prompt-offers-windowing-and-honours-the-answer"
 text = "At the interactive prompt `window` allows windowing for the retry, and is refused when the prompt carries no window count."
 check = "python3 -m pytest tests/test_cli.py::test_review_asks_and_window_splits_it tests/test_cli.py::test_the_window_answer_is_refused_when_nothing_can_be_split -q"

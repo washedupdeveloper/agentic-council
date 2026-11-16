@@ -31,7 +31,7 @@ Each finding is:
 | kind | params |
 |---|---|
 | `absent` | `{"pattern": "regex", "within": ["src/**"], "exclude": ["file"]}` — the pattern appears in no file in scope |
-| `present` | `{"path": "a.py", "line": 3, "text": "exact line"}` — that line says this |
+| `present` | `{"path": "a.py", "line": 3, "text": "exact line"}` — that line says this; the quote may omit its leading indentation, nothing else may differ |
 | `command` | `{"argv": ["tool", "arg"], "expect": {"exit": "zero"}}` |
 | `repro` | `{"argv": ["tool", "arg"], "contains": "text"}` — the command fails, so the defect reproduces |
 | `json` | `{"path": "data.json", "pointer": "/a/b", "equals": 3}` |

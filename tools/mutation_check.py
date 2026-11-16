@@ -64,6 +64,8 @@ MUTATIONS: tuple[Mutation, ...] = (
     Mutation("schema-accepts-a-missing-proof",
              "schema.py", 'proof = _field(entry, "proof", where, kind=dict)',
              'proof = entry.get("proof", {"kind": "absent", "params": {}})'),
+    Mutation("present-ignores-the-quote",
+             "proofs.py", "if actual.strip() == expected.strip():", "if True:"),
     Mutation("sample-never-retries",
              "sample.py", "for attempt in range(1, attempts + 1):",
              "for attempt in range(1, 2):"),

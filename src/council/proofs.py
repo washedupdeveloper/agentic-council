@@ -161,9 +161,14 @@ def proof_present(params: Mapping[str, Any], ctx: ProofContext) -> ProofOutcome:
     if not 1 <= line <= len(lines):
         return _cannot(f"{path.name} has no line {line}")
     actual = lines[line - 1]
-    if actual == expected:
-        return _held(f"{path.name}:{line} says {expected!r}")
-    return _failed(f"{path.name}:{line} says {actual!r}")
+    # A reviewer quoting a line omits the column it starts in: the indentation is
+    # the file's layout, not part of what the line says. Nothing else is
+    # normalised — case, internal spacing and trailing text must still match,
+    # because the proof is about the text, and a looser rule would prove claims
+    # the line does not support.
+    if actual.strip() == expected.strip():
+        return _held(f"{path.name}:{line} says {actual.strip()!r}")
+    return _failed(f"{path.name}:{line} says {actual.strip()!r}, not {expected.strip()!r}")
 
 
 def _argv_param(params: Mapping[str, Any]) -> list[str]:

@@ -114,6 +114,22 @@ def test_present_fails_on_another_line_text(tmp_path: Path) -> None:
     assert outcome.state is State.REFUTED
 
 
+def test_present_accepts_a_quote_that_omits_its_indentation(tmp_path: Path) -> None:
+    """A diff quote starts at the code, not at the column: indentation is layout."""
+    write(tmp_path, "a.py", "def f():\n    return 1\n")
+    outcome = run_proof("present", {"path": "a.py", "line": 2, "text": "return 1"},
+                        ctx(tmp_path))
+    assert outcome.state is State.PROVEN
+
+
+def test_present_refuses_more_than_indentation(tmp_path: Path) -> None:
+    write(tmp_path, "a.py", "def f():\n    return 1\n")
+    outcome = run_proof("present", {"path": "a.py", "line": 2, "text": "return 2"},
+                        ctx(tmp_path))
+    assert outcome.state is State.REFUTED
+    assert "return 1" in outcome.detail and "return 2" in outcome.detail
+
+
 def test_present_cannot_read_a_missing_file(tmp_path: Path) -> None:
     outcome = run_proof("present", {"path": "gone.py", "line": 1, "text": "x"}, ctx(tmp_path))
     assert outcome.state is State.UNRUNNABLE
