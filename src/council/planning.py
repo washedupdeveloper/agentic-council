@@ -215,14 +215,17 @@ def _windowed(hunk: str, path: str, template: str, base: str, root: Path,
     """
     parts = hunk_parts(hunk)
     overhead = len(render(template, base=base, diff="").encode("utf-8"))
+    # What a refusal quotes is the prompt it would have sent, not the diff: the
+    # template is 2.6 KB before the first line of the file, so a warning that
+    # counts only the diff understates a small file by half.
+    size = overhead + len(hunk.encode("utf-8"))
     room = limit - overhead - len(parts.header.encode("utf-8")) - HUNK_HEADER_ROOM
     bounds = window_bounds(parts.body, room)
     if not bounds:
         # Not even one line fits beside the template: no windowing can help.
-        raise PromptTooLarge(len(hunk.encode("utf-8")), limit, unit=path)
+        raise PromptTooLarge(size, limit, unit=path)
     if not request.window_large_files:
-        raise PromptTooLarge(len(hunk.encode("utf-8")), limit, unit=path,
-                             windows=len(bounds))
+        raise PromptTooLarge(size, limit, unit=path, windows=len(bounds))
     if len(bounds) > request.max_windows:
         raise ReviewError(
             f"{path} needs {len(bounds):,} windows at {limit:,} bytes and --max-windows is "
@@ -233,8 +236,8 @@ def _windowed(hunk: str, path: str, template: str, base: str, root: Path,
         text = slice_hunk(hunk, start, end)
         fitted = fit(template, base, text, root, 0, references, limit)
         if fitted is None:
-            raise PromptTooLarge(len(text.encode("utf-8")), limit, unit=path,
-                                 windows=len(bounds))
+            raise PromptTooLarge(overhead + len(text.encode("utf-8")), limit,
+                                 unit=path, windows=len(bounds))
         windows.append((text, hunk_range(text), fitted))
     return windows
 

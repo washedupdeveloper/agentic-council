@@ -949,8 +949,8 @@ falsifier = "digest-ignores-the-profile-config"
 
 [[claim]]
 id = "a-file-too-large-for-one-prompt-states-its-window-cost"
-text = "Refusing a file that needs windows names the window count and the flag that splits it."
-check = "python3 -m pytest tests/test_windows.py::test_a_file_too_large_for_one_prompt_states_its_window_cost -q"
+text = "Refusing a file that needs windows names the window count and the flag that splits it, and quotes the prompt it would have sent."
+check = "python3 -m pytest tests/test_windows.py::test_a_file_too_large_for_one_prompt_states_its_window_cost tests/test_windows.py::test_the_refusal_quotes_the_prompt_size_and_not_the_diff -q"
 falsifier = "windows-never-refused"
 
 [[claim]]

@@ -72,6 +72,15 @@ def test_a_file_too_large_for_one_prompt_states_its_window_cost(tmp_path: Path) 
     assert raised.value.windows is not None and raised.value.windows > 1
 
 
+def test_the_refusal_quotes_the_prompt_size_and_not_the_diff(tmp_path: Path) -> None:
+    """The number in the warning has to be the prompt: the template alone is 2.6 KB."""
+    repo, prompt = big_repo(tmp_path)
+    planned = plan(wanted(repo, prompt, "size", allow_large_prompt=True))
+    with pytest.raises(PromptTooLarge) as raised:
+        review(wanted(repo, prompt, "size-refused"), lambda _: body())
+    assert raised.value.size == planned.prompt_bytes
+
+
 def test_windowing_splits_a_file_into_units_that_fit(tmp_path: Path) -> None:
     repo, prompt = big_repo(tmp_path)
     report = review(wanted(repo, prompt, "windowed", window_large_files=True),
