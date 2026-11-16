@@ -75,7 +75,7 @@ adapter; `tests/test_architecture.py` enforces the direction.
 
 | Principle | What is true | Where it is weaker |
 |---|---|---|
-| **S**ingle responsibility | `config` splits read (`load`) from decision (`parse`); `paths` splits name validation (`domain.run_id`) from the symlink guard; `adjudicate` splits proof execution from `decide`; `baseline` splits file/git access from the pure `domain.baseline`; `scope` is a pure matcher; `sample` splits `payload` from `write_sample`; `sandbox` splits lookup from `command`; `request`, `prepare`, `planning`, `sampling` and `runstore` split the review application; `version` is the only metadata reader. | `proofs` still owns both the five executors and their parameter rules. |
+| **S**ingle responsibility | `config` splits read (`load`) from decision (`parse`); `paths` splits name validation (`domain.run_id`) from the symlink guard; `adjudicate` splits proof execution from `decide`; `baseline` splits file/git access from the pure `domain.baseline`; `scope` is a pure matcher; `sample` splits `payload` from `write_sample`; `sandbox` splits lookup from `command`; `request`, `prepare`, `planning`, `sampling` and `runstore` split the review application; `version` is the only metadata reader. | `proofs` still owns both the six executors and their parameter rules. |
 | **O**pen/closed | A proof kind is a row in `EXECUTORS` plus the schema's kind set; a new kind does not add a branch to `run`. | A new **review mode** would still touch the request builder and CLI; there is no separate application service per mode. |
 | **L**iskov substitution | `ProofOutcome` is one domain value regardless of executor; `ReviewerMissing` is both a `ReviewError` and an `OSError`, so a start failure is not retried as a sample. | No subclass hierarchy beyond this; the test is behavioural, not inheritance-shaped. |
 | **I**nterface segregation | `Runner` is `Callable[[str], str]`; callers do not receive a repository object with unrelated methods. | The CLI parser object is a large mutable namespace; it is a boundary object, not a domain interface. |
@@ -111,7 +111,7 @@ evidence; `INCOMPLETE` is exit 2 and means the review ran with missing evidence.
 ## Residual architecture debt
 
 1. **`proofs.py` mixes execution and semantics.** The `ProofOutcome` value and
-   the decision moved to the kernel; the five executors, file reads and
+   the decision moved to the kernel; the six executors, file reads and
    subprocesses remain. They are correctly an adapter, but the module is not
    shallow.
 2. **`paths.state_root` remains impure on purpose.** It performs the symlink

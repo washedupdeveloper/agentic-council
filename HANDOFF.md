@@ -4,13 +4,14 @@
 state, and the shortest path to a green run. The repository's own documentation
 is authoritative for design; this file is the index and resume note.
 
-- **Project:** `reviewc/council`, the v2 review engine
+- **Project:** `council`, the v2 review engine (`agentic-council`)
 - **Branch:** `v2`
-- **Last verified code commit:** `ba9ef80` (`M24.2: close the scope proof gaps`)
-- **Handoff commit:** documentation-only, published on `v2`; run the gate after cloning
-- **Published at:** `https://github.com/washedupdeveloper/agentic-council/tree/v2`
-- **Tag:** `v2.0.0` is at `4247078`; it does **not** point at this handoff's
-  commit. Do not move it without following `docs/VERSIONING.md`.
+- **Last verified code commit:** `d2e53ac` (`windows: quote the prompt size in a refusal, not the diff`)
+- **Remote:** `git@github.com:washedupdeveloper/agentic-council.git`
+- **Local state:** check `git rev-list --count origin/v2..v2` before treating a
+  fresh clone as current; this checkout may be ahead until the owner pushes.
+- **Tag:** `v2.0.0` is at `4247078`; it is an older release, not the branch head.
+  Do not move it without following `docs/VERSIONING.md`.
 
 ## What this is
 
@@ -25,9 +26,8 @@ only `PROVEN` blocks. The exit codes are:
 | 2 | the review ran but evidence is missing |
 | 3 | the review could not start; no run and no model call |
 
-The v1 implementation remains a frozen differential reference at
-`~/projects/review-council` on the original machine; it is not part of this
-repository.
+The v1 behavior is preserved by the fixtures and the differential check in this
+repository. No live v1 checkout is required to build, test, or review.
 
 ## Start here
 
@@ -42,32 +42,35 @@ nix flake check
 ```
 
 `nix develop -c ./scripts/verify.sh` runs the same gate in one command. It is
-slow by design: the test suite, 175 claims, 30 mutations and the flake check
-are separate checks.
+slow by design: the test suite, 188 claims, 35 mutations and the flake check are
+separate checks.
 
 Do not use a system `python3`: this machine and NixOS generally have none.
 Use `nix develop -c …`. `council doctor` is the right first runtime probe on a
 new host; it checks git, the reviewer binary, `bwrap` and the Hermes profile.
 Hermes itself must already exist; this project does not install it.
 
-## Verified state at `ba9ef80`
+## Verified state at `d2e53ac`
 
-- **556 tests** collected and passing
-- **175/175 claims** hold; `docs/CLAIMS.md` is generated from `claims.toml`
-- **30/30 mutations** caught; **36** claims declare a mutation falsifier
-- `mypy src`: 35 files clean
-- `ruff check --select F,E9`: clean
-- `nix flake check`: all checks passed on **x86_64-linux**
+- Full pytest suite passes.
+- **188/188 claims** hold; `docs/CLAIMS.md` is generated from `claims.toml`.
+- **35/35 mutations** caught; **41** claims declare a mutation falsifier.
+- `mypy src`: 44 files clean.
+- `pyright`: 0 errors, 0 warnings.
+- `ruff check --select F,E9`: clean.
+- `nix flake check --no-build`: all checks evaluated; run the full check before
+  a release.
 
-The last three milestones were:
+Recent work on this branch:
 
-1. `e512ce5` — accepted-risk baselines with owner, reason, expiry,
-   fingerprint tamper protection and base-revision loading for `ci`/`pr`.
-2. `b76b50e` — caller-owned `--include`/`--exclude` scope and `--staged`
-   review.
-3. `ba9ef80` — focused tests closing the proof gaps: `?` matching, scope
-   before slicing, config negative, plan text/JSON, and real CLI scope/staged
-   paths through `review` and `ci`.
+1. **Untangle.** `run.py` was split into `prepare.py`, `planning.py`,
+   `sampling.py` and `runstore.py`; the old `domain/proof.py` is gone.
+2. **Pyright gate.** `pyrightconfig.json` covers `src` and `tools`; the devshell
+   and `council-pyright` check keep the editor diagnostics from drifting.
+3. **M25 proofs.** `repro`, scoped `absent.within`, and the reviewer-profile
+   fingerprint.
+4. **M26 windows.** `--window-large-files` and `--max-windows` make a single
+   oversized hunk reviewable; the refusal states the window and sample cost.
 
 ## Read next (in this order)
 
@@ -78,7 +81,7 @@ The last three milestones were:
 4. [`docs/STATE-MACHINES.md`](docs/STATE-MACHINES.md) — M1–M14 transitions and
    the SM issue register.
 5. [`docs/BASELINE.md`](docs/BASELINE.md) and [`docs/SCOPE.md`](docs/SCOPE.md)
-   — the two most recent behaviours.
+   — the accepted-risk and scope behaviours.
 6. [`docs/CLAIMS.md`](docs/CLAIMS.md) — the executable claim registry.
 7. [`docs/VERSIONING.md`](docs/VERSIONING.md) — release procedure and tag
    rules.
@@ -92,21 +95,9 @@ The last three milestones were:
   end-to-end tests. The parser, request, prompt and verdict path is proven; a
   provider's live answer is not. Run `council doctor` and one small real review
   when the new host's Hermes profile is available.
-- **Architecture debt:** `src/council/run.py` is 765 lines and still owns
-  validation, preparation, sampling, adjudication, payload construction and
-  persistence. The next safe cut is `validate_request`, `verdict_payload` and a
-  `RunStore` adapter, preserving the existing state-machine tests.
-
-## Next work
-
-1. Split `run.py` along the three boundaries above; keep `docs/STATE-MACHINES.md`
-   and the 556-test gate green.
-2. Then continue the feature roadmap from the reasons recorded in
-   `CHANGELOG.md` and `docs/ARCHITECTURE.md` — do not invent a new direction
-   without reading those first.
-3. Re-run the full gate before calling any later milestone complete. A green
-   suite alone is not a live review; `council doctor` plus a small review is
-   the runtime check.
+- **Architecture debt:** `proofs.py` still mixes execution with proof semantics;
+  the decision is in the kernel. See the residual debt list in
+  `docs/ARCHITECTURE.md`.
 
 ## Operating rules
 

@@ -61,9 +61,6 @@ public surface, the definitions, and the release procedure — is
   method calls and import direction, and fails when a new module that acts is
   not named as an adapter. The previous gate listed `paths` as pure even though
   it called `is_symlink()`.
-- `adjudicate(..., prove=...)` injects the proof executor; the decision itself
-  is `council.domain.adjudication.decide` and refuses an outcome/finding count
-  mismatch.
 
 ### Changed
 

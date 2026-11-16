@@ -58,8 +58,9 @@ edit, in the categories from `untangle-codebase`.
 
 ## Surplus (pieces with no reason of their own to change)
 
-1. `proofs.py` said “six” kinds; there are five. **Fixed** in the docstring and
-   guarded by the registry assertion.
+1. `proofs.py`'s docstring and `PROOF_KINDS` had drifted before `repro`; M25
+   made the set six, and the registry assertion keeps the executor names and
+   the vocabulary aligned.
 2. `_belongs` re-derived unit attribution after the merge. **Fixed:** the
    sliced loop keeps `unit.id -> RawFinding[]` while samples arrive, and builds
    each unit's findings from that evidence instead of re-parsing locations.
@@ -110,6 +111,6 @@ edit, in the categories from `untangle-codebase`.
 
 - `python -m pytest` — all tests pass.
 - `mypy src` — clean.
-- `./bin/council-verify` — 175/175 claims.
-- `python tools/mutation_check.py` — 30/30 mutations caught; every declared
+- `./bin/council-verify` — 188/188 claims.
+- `python tools/mutation_check.py` — 35/35 mutations caught; every declared
   falsifier breaks its claim.

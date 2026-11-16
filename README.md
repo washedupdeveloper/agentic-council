@@ -354,9 +354,9 @@ as objects.
 
 A pure kernel and an enumerated effect shell. The kernel is `findings`, `verdict`,
 `merge`, `schema`, `prompt`, `changes`, `context`, `sarif` and
-`council.domain` (`run_id`, `config`, `adjudication`, `baseline`, `proof`,
-`sandbox`). A kernel module may not import an adapter, spawn a process, read or
-write a path, read the environment or wait; a test parses the module that is
+`council.domain` (`run_id`, `config`, `adjudication`, `baseline`, `sandbox`,
+`location`, `text`, `scope`). A kernel module may not import an adapter, spawn a
+process, read or write a path, read the environment or wait; a test parses the module that is
 actually imported and enforces it (`tests/test_architecture.py`), including
 method calls and import direction. The earlier version of that gate listed
 `paths` as pure even though it called `is_symlink()`; it was replaced rather than
@@ -518,4 +518,5 @@ pass.
 - A browser. A DOM claim is a `command` proof: the repository runs its own
   browser test, and the tool only records whether it passed.
 - Calibration: there is no score, so there is nothing to calibrate.
-- A replacement for v1: 1.9.0 is untouched; this is a separate checkout.
+- A second live v1 checkout. v2 is the successor; v1.9.0 behavior is pinned by
+  the fixtures and the differential check in this repository.

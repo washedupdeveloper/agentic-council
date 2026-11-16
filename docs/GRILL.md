@@ -6,7 +6,7 @@ from `18b7043`: 1,572 lines of source, 1,675 of tests, 0 runtime dependencies,
 
 ## Verdict
 
-The core is sound and small: one pure `judge()`, five proof kinds asserted equal
+The core is sound and small: one pure `judge()`, six proof kinds asserted equal
 to their executors, samples merged by place, a registry that generates its own
 document, and a mutation check that proves the suite can fail. That is the part
 that answers the "verified, then gotcha" cycle, and it should not be touched.
