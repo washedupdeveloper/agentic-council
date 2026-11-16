@@ -3,9 +3,26 @@
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/151fa4e8ddfdd8dd25d945ad94ed54a13de9f6e4";
 
-  outputs = { self, nixpkgs }:
+  # What nixfmt cannot see: twenty rules over the flake, the scripts and the
+  # documents, each resting on the parse tree, the lock file or an evaluated
+  # value rather than on taste. It arrives as an input, so the rules are versioned
+  # with this flake and a rule change is a `nix flake update` to review.
+  inputs.nix-best-practices.url = "github:rokokol/nix-best-practices-skill";
+  inputs.nix-best-practices.inputs.nixpkgs.follows = "nixpkgs";
+
+  outputs =
+    {
+      self,
+      nixpkgs,
+      nix-best-practices,
+    }:
     let
-      systems = [ "x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin" ];
+      systems = [
+        "x86_64-linux"
+        "aarch64-linux"
+        "x86_64-darwin"
+        "aarch64-darwin"
+      ];
       each = f: nixpkgs.lib.genAttrs systems (system: f nixpkgs.legacyPackages.${system});
 
       # The version is written once, in pyproject.toml; the package, the image
@@ -13,92 +30,134 @@
       version = (builtins.fromTOML (builtins.readFile ./pyproject.toml)).project.version;
 
       # Defined once: the package and the image ship the same application.
-      base = pkgs: pkgs.python3Packages.buildPythonApplication {
-        pname = "council";
-        version = version;
-        format = "pyproject";
-        src = self;
-        nativeBuildInputs = [ pkgs.python3Packages.setuptools ];
-        doCheck = false;
-        meta = {
-          description = "A review is a claim until a check settles it.";
-          mainProgram = "council";
+      base =
+        pkgs:
+        pkgs.python3Packages.buildPythonApplication {
+          pname = "council";
+          inherit version;
+          format = "pyproject";
+          src = self;
+          nativeBuildInputs = with pkgs; [ python3Packages.setuptools ];
+          doCheck = false;
+          meta = {
+            description = "A review is a claim until a check settles it.";
+            mainProgram = "council";
+          };
         };
-      };
 
       # bwrap is on the binary's own PATH: a sandboxed proof must not depend on
       # whatever the caller's environment happens to contain.
-      app = pkgs: pkgs.runCommand "council-${version}" { nativeBuildInputs = [ pkgs.makeWrapper ]; } ''
-        mkdir -p $out/bin
-        makeWrapper ${base pkgs}/bin/council $out/bin/council \
-          --prefix PATH : ${pkgs.bubblewrap}/bin
-        ln -s ${base pkgs}/bin/council-verify $out/bin/council-verify
-      '';
+      app =
+        pkgs:
+        pkgs.runCommand "council-${version}" { nativeBuildInputs = with pkgs; [ makeWrapper ]; } ''
+          mkdir -p $out/bin
+          makeWrapper ${base pkgs}/bin/council $out/bin/council \
+            --prefix PATH : ${pkgs.bubblewrap}/bin
+          ln -s ${base pkgs}/bin/council-verify $out/bin/council-verify
+        '';
 
       # One interpreter with the two tools the checks need, so `nix develop`,
       # `nix build` and `nix flake check` agree on the versions.
-      pythonEnv = pkgs: pkgs.python3.withPackages (ps: [
-        ps.pytest ps.hypothesis ps.mypy ps.setuptools ps.pip ps.wheel
-      ]);
+      pythonEnv =
+        pkgs:
+        pkgs.python3.withPackages (ps: [
+          ps.pytest
+          ps.hypothesis
+          ps.mypy
+          ps.setuptools
+          ps.pip
+          ps.wheel
+        ]);
 
       # A writable copy of the tree: the flake source is read-only, and pytest,
       # mypy and the mutation check all write caches.
-      workTree = pkgs: pkgs.runCommandLocal "council-src" { } ''
-        cp -r ${self} $out
-        chmod -R u+w $out
-      '';
+      workTree =
+        pkgs:
+        pkgs.runCommandLocal "council-src" { } ''
+          cp -r ${self} $out
+          chmod -R u+w $out
+        '';
     in
     {
       packages = each (pkgs: {
         default = app pkgs;
 
+        # The full checker: the rules `--static` inside `mkCheck` leaves out,
+        # because a build sandbox has neither the network nor a daemon.
+        nix-lint = nix-best-practices.packages.${pkgs.stdenv.hostPlatform.system}.check-nix;
+
         # The builder is nix; the user gets a wheel with no dependencies.
-        wheel = pkgs.runCommandLocal "council-wheel" {
-          nativeBuildInputs = [ (pythonEnv pkgs) ];
-        } ''
-          cp -r ${self} src
-          chmod -R u+w src
-          cd src
-          python -m pip wheel --no-deps --no-build-isolation --wheel-dir dist .
-          mkdir -p $out
-          cp dist/*.whl $out/
-        '';
+        wheel =
+          pkgs.runCommandLocal "council-wheel"
+            {
+              nativeBuildInputs = [ (pythonEnv pkgs) ];
+            }
+            ''
+              cp -r ${self} src
+              chmod -R u+w src
+              cd src
+              python -m pip wheel --no-deps --no-build-isolation --wheel-dir dist .
+              mkdir -p $out
+              cp dist/*.whl $out/
+            '';
 
         # The tool, not the reviewer: mount a hermes binary and a repository.
         image = pkgs.dockerTools.buildLayeredImage {
           name = "council";
           tag = version;
-          contents = [ pkgs.bash pkgs.coreutils pkgs.git pkgs.cacert pkgs.bubblewrap (app pkgs) ];
+          contents = with pkgs; [
+            bash
+            coreutils
+            git
+            cacert
+            bubblewrap
+            (app pkgs)
+          ];
           config = {
             Entrypoint = [ "/bin/council" ];
-            Env = [ "PATH=/bin" "HOME=/tmp" "GIT_SSL_CAINFO=/etc/ssl/certs/ca-bundle.crt" ];
+            Env = [
+              "PATH=/bin"
+              "HOME=/tmp"
+              "GIT_SSL_CAINFO=/etc/ssl/certs/ca-bundle.crt"
+            ];
             WorkingDir = "/repo";
           };
         };
       });
 
-      checks = each (pkgs:
+      checks = each (
+        pkgs:
         let
           py = pythonEnv pkgs;
           src = workTree pkgs;
 
           # Each check runs in a writable copy: the flake source in the store is
           # read-only, and pytest, mypy and the mutation check all write.
-          mkCheck = name: command: pkgs.runCommand name {
-            nativeBuildInputs = [ py pkgs.git pkgs.bubblewrap pkgs.ruff pkgs.pyright ];
-          } ''
-            cp -r ${src} work
-            chmod -R u+w work
-            cd work
-            set -e
-            export HOME=$TMPDIR
-            # The subshell matters: `set -e` does not fire for the left side of
-            # a `&&` list, so a failing check joined with `&&` would fall through
-            # to `touch $out` and report success. In a subshell the list's
-            # failure is the subshell's status, and `set -e` sees it.
-            ( ${command} )
-            touch $out
-          '';
+          mkCheck =
+            name: command:
+            pkgs.runCommand name
+              {
+                nativeBuildInputs = [
+                  py
+                  pkgs.git
+                  pkgs.bubblewrap
+                  pkgs.ruff
+                  pkgs.pyright
+                ];
+              }
+              ''
+                cp -r ${src} work
+                chmod -R u+w work
+                cd work
+                set -e
+                export HOME=$TMPDIR
+                # The subshell matters: `set -e` does not fire for the left side of
+                # a `&&` list, so a failing check joined with `&&` would fall through
+                # to `touch $out` and report success. In a subshell the list's
+                # failure is the subshell's status, and `set -e` sees it.
+                ( ${command} )
+                touch $out
+              '';
         in
         {
           tests = mkCheck "council-tests" "python -m pytest -q -p no:cacheprovider";
@@ -115,14 +174,23 @@
           # The registry, executed: every sentence in claims.toml is a command
           # that must exit 0, so the documentation cannot outrun the code.
           # Invoked through bash because the sandbox has no /usr/bin/env.
-          claims = mkCheck "council-claims"
-            "bash ./bin/council-verify && bash ./bin/council-verify --check docs/CLAIMS.md";
+          claims = mkCheck "council-claims" "bash ./bin/council-verify && bash ./bin/council-verify --check docs/CLAIMS.md";
 
           # The suite, broken on purpose eighteen ways. It must notice each one.
           mutations = mkCheck "council-mutations" "python tools/mutation_check.py";
 
           # v1.9.0's pinned verdicts beside this rule, on the same fixtures.
           differential = mkCheck "council-differential" "python tools/differential.py";
+
+          # The flake and the scripts, held to what the formatter cannot check.
+          # `--static` inside mkCheck: the sandbox has no network, so the rules
+          # that need the flake's inputs are the half a contributor runs with
+          # `nix run .#nix-lint` (the package exposes the same checker).
+          nix-lint = nix-best-practices.lib.mkCheck {
+            inherit pkgs;
+            root = ./.;
+            namespaces = [ ];
+          };
 
           # The version, the changelog and every prose claim agree, and the
           # changelog is ordered. Maintainer tool: it is not a shipped verb.
@@ -135,17 +203,27 @@
             PYTHONPATH=dist/site python -m council --help > /dev/null
             PYTHONPATH=dist/site python -c "import council, pathlib; assert council.__version__ == '${version}'; assert (pathlib.Path(council.__file__).parent / 'py.typed').is_file()"
           '';
-        });
+        }
+      );
 
       devShells = each (pkgs: {
         default = pkgs.mkShell {
-          packages = [ (pythonEnv pkgs) pkgs.git pkgs.ruff pkgs.jq pkgs.bubblewrap pkgs.pyright ];
+          packages = [
+            (pythonEnv pkgs)
+            pkgs.git
+            pkgs.ruff
+            pkgs.jq
+            pkgs.bubblewrap
+            pkgs.pyright
+            nix-best-practices.packages.${pkgs.stdenv.hostPlatform.system}.check-nix
+          ];
           shellHook = ''
             echo "council devshell — $(python --version 2>&1)"
             echo "  python -m pytest     the suite"
             echo "  mypy src             strict types"
             echo "  pyright               LSP diagnostics"
             echo "  ./bin/council-verify every claim"
+            echo "  nix flake check       every check, including the Nix sources"
           '';
         };
       });

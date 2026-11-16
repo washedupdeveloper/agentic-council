@@ -3,9 +3,9 @@
 A review is a claim until a check settles it.
 
 > **Where to go next:** [`docs/README.md`](docs/README.md) indexes every document
-> in this repository. The gate is `nix flake check` — tests, types, pyright, lint,
-> claims, mutations and the wheel — and it is the only thing that decides whether
-> a checkout is green.
+> in this repository. The gate is `nix flake check`: the suite, the types, the
+> claims, the mutations, the Nix sources and the wheel — and it is the only thing
+> that decides whether a checkout is green.
 
 ## The rule
 

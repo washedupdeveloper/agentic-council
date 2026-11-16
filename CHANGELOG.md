@@ -11,6 +11,16 @@ public surface, the definitions, and the release procedure — is
 
 ### Added
 
+- The Nix side is checked by a standard rather than by eye. `flake.nix` takes
+  `rokokol/nix-best-practices-skill` as an input and exposes
+  `checks.nix-lint`, which holds the flake and the scripts to twenty rules that
+  rest on the parse tree, the lock file or an evaluated value. It found four
+  things on adoption: the flake was not nixfmt-formatted, two assignments wanted
+  `inherit`/`with pkgs`, and one list of `pkgs.*` wanted the same. The one file
+  it may not touch is `fixtures/golden/target/modules/base.nix`, whose hash and
+  kloc are pinned by `expect.json`; `check-nix.allow` says so in writing, which
+  is the tool's own mechanism for what a repository knows and a checker cannot.
+  `nix run .#nix-lint` runs the half that `--static` leaves out.
 - `council.toml` can map changed paths to the documents that govern them
   (`[[rules]] glob/doc`). Each matching document reaches the prompt once, capped
   at 20,000 bytes and marked when cut, under a heading that frames it as context

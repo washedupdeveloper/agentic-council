@@ -1,0 +1,7 @@
+# What this repository knows and the checker cannot.
+#
+# The golden target is a fixture, not source: expect.json pins its file hash and
+# its kloc, and both rounds of the differential check are measured against that
+# fixed number. Reformatting it would move the target, not tidy it.
+nixfmt-formatted  fixtures/golden/target/modules/base.nix  fixture: expect.json pins this file's hash and kloc
+list-with-pkgs    fixtures/golden/target/modules/base.nix  fixture: kept byte-stable so the golden round stays fixed

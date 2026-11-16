@@ -28,6 +28,7 @@ not relabelled as architecture.
 
 | Claim | What would make it true | Evidence |
 |---|---|---|
+| The Nix sources hold to a standard, not to taste | `nix flake check` runs the checker, and every excused finding is written down with its reason. | `checks.nix-lint` (input `nix-best-practices`); `check-nix.allow`. |
 | The domain kernel is pure | No kernel module imports an adapter, and none calls a known effectful method. | `tests/test_architecture.py` parses each imported module; `tests/test_domain_kernel.py` calls the decisions with literals. |
 | A sample from another model is a different instrument | The digest covers the profile's configuration bytes, not only its name. | `prompt.instrument_digest`; `runner.profile_fingerprint`; `tests/test_profile.py`; claim `the-digest-covers-the-profile-configuration`. |
 | Configuration parsing is a decision, not a file read | Text in, `Config` out; the path check lives in the adapter. | `domain.config.parse`; `council.config.load` only reads and delegates. |
