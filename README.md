@@ -95,8 +95,9 @@ a branch out and never reviews local edits: a PR review is a review of a commit.
 
 It needs `gh` on `PATH` and an authenticated GitHub CLI. If the checkout is at a
 different commit, it says so and asks for `gh pr checkout 123`; if the worktree
-is dirty, it refuses. `--plan`, `--sarif`, `--json`, `--report` and the review
-flags all work; `--base` is not accepted because GitHub owns the base.
+is dirty, it refuses. `--plan`, `--sarif`, `--json` and `--report` all work, and
+so does every review flag except `--staged` and `--base` — the base belongs to
+GitHub, and the index is not what a pull request is.
 `verdict.json` records the PR's number, URL, title and both SHAs.
 
 `council review --plan` (and `council pr N --plan`) resolves the change, builds
@@ -111,9 +112,11 @@ spending a model call.
 The caller owns the scope. `--include` and `--exclude` are repeated
 repository-relative globs: `*` stays in one path segment, `**` recurses, an
 exclude wins, and an include list that matches nothing is a start failure rather
-than an empty review. Every path the scope drops is named in
-`verdict.json.scope_ignored` and in `--plan`; nothing disappears silently. A
-repository cannot set a scope in `council.toml`.
+rather than an empty review. Every path the scope drops is counted: the first
+200 are named in `verdict.json.scope_ignored` and the rest in
+`scope_ignored_omitted`, so nothing disappears silently and no report becomes
+unreadable. `--plan` prints the count and the first few. A repository cannot set
+a scope in `council.toml`.
 
 ```sh
 council review --include 'src/**' --exclude 'src/generated/**'
@@ -259,9 +262,13 @@ Every flag the tool accepts, what it changes, and why it exists. `council <comma
 | `--context-depth N` | `3` | `0` diff only, `1` enclosing function, `2` +one call level, `3` +two | the context is what makes a prompt large; the caller can trade depth for size |
 | `--max-prompt-bytes N` | `32768` | refuse a prompt larger than N bytes | a prompt past the model's practical envelope is a hang, not a review; refusal is immediate |
 | `--allow-large-prompt` | off | send an oversized prompt without asking | an autonomous caller that has measured the cost can say yes in advance |
-| `--window-large-files` | off | split a file too large for one prompt into line windows, one sample each | the default refuses: windowing is the only way to review a 38,000-line addition, and it costs one sample per few hundred lines |
+| `--window-large-files` | off | split a file too large for one prompt into line windows, one unit each | the default refuses: windowing is the only way to review a 38,000-line addition, and it costs one sample per few hundred lines |
 | `--max-windows N` | `200` | refuse a change that would need more than N windows | a run of thousands of samples is a crawl, not a review; the limit is stated before anything is asked |
 | `--require-executed-proofs` | off | a finding proven only by quotation cannot block the run | a quotation shows a line exists, not that the code misbehaves; the default still blocks and says so in the reason |
+| `--baseline PATH` | none | accept the findings recorded in PATH | an accepted risk belongs in a reviewed file, not in a silence |
+| `--baseline-from-base` | off | read the baseline from the base revision | a change cannot edit the policy it is judged by |
+| `--baseline-strict` | off | an expired or stale entry fails the gate | an acceptance that outlives its expiry should be seen |
+| `--allow-baseline-change` | off | permit a diff that edits the baseline | maintenance is explicit, not inferred |
 | `--autonomous` | off | never ask: refuse an oversized prompt, exit 3 | a script running in a terminal must not block on a question |
 | `-h, --help` | — | usage | — |
 
@@ -280,7 +287,7 @@ asks the person at the terminal what should happen:
 | answer | effect |
 |---|---|
 | `allow` | send this prompt anyway; the verdict records `prompt_acknowledged: true` |
-| `window` | split the file into line windows and review each, one sample per window; the count and the samples it implies are printed first |
+| `window` | split the file into line windows and review each as its own unit; the count and the samples it implies are printed first, and `--samples N` asks N times per window |
 | `budget N` | change the limit to N bytes for this run and retry |
 | `base REV` | review a narrower change and retry |
 | `context N` | keep the diff, change the context depth to N (0–3) and retry |
@@ -308,8 +315,8 @@ at all, and it is recorded in `units[].ranges` rather than hidden.
 
 ### `council ci`
 
-Takes every flag in the `council review` table except `--report`, `--json` and
-`--autonomous`: it prints `verdict.json` unconditionally and always exits with
+Takes every flag in the `council review` table except `--report`, `--json`,
+`--plan` and `--autonomous`: it prints `verdict.json` unconditionally and always exits with
 the verdict (0 pass, 1 fail, 2 incomplete, 3 could not start). It exists so a
 pipeline names one stable entry point instead of remembering the flags. It
 refuses an oversized prompt rather than asking; `--allow-large-prompt` is the
@@ -363,11 +370,11 @@ method calls and import direction. The earlier version of that gate listed
 `paths` as pure even though it called `is_symlink()`; it was replaced rather than
 patched around.
 
-Everything that acts is in a module a reader can name: `repo` (git), `proofs` and
-`sandbox` (commands), `sample` and `runner` (the model), `config`, `baseline`
-and `version` (the environment, policy file and package metadata), `paths` (the
-state-directory guard), `run` (writes the run), `cli` (stdout), `claims` (runs
-the registry). That is the whole of the side effects. The boundary, the SOLID
+Everything that acts is in a module a reader can name — git in `repo`, commands
+in `proofs` and `sandbox`, the model in `sample` and `runner`, the environment
+and policy in `config` and `baseline`, the run directory in `runstore`, the
+network in `reference`, stdout in `cli`. The exhaustive list is `ADAPTERS` in
+`tests/test_architecture.py`, and the test refuses an unlisted module that acts. The boundary, the SOLID
 scorecard and the remaining debt are in
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md); the domain vocabulary is in
 [`GLOSSARY.md`](GLOSSARY.md).
@@ -433,8 +440,9 @@ reported and never blocks.
 
 ## What a verdict is
 
-One call, five sections (`security`, `correctness`, `readability`,
-`architecture`, `performance`), one JSON object. A finding without a proof from
+One call per unit — the whole change, a file, a hunk, or a line window — and
+five sections per answer (`security`, `correctness`, `readability`,
+`architecture`, `performance`) in one JSON object. A finding without a proof from
 the closed set (`absent`, `present`, `command`, `repro`, `json`, `diff`)
 is refused by the parser, not by the prompt alone.
 

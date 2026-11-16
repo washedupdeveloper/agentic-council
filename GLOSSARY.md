@@ -11,7 +11,7 @@ code changes; a second name for the same thing is a defect.
 | **Unit** | One prompt-sized slice of a change. A unit exists only when the full prompt exceeds the budget; every unit is either reviewed or named as unreviewed. |
 | **Rule** | A `council.toml` entry naming a path glob and the document that governs it; the document reaches the prompt once, capped, and is recorded in the verdict. |
 | **Quotation** | A proof that establishes something by matching text (`present`, `absent`, `json`, `diff`) rather than by running a command. It proves the line, not the behaviour; `executed` proofs are `command` and `repro`. |
-| **Window** | A unit that is a line range of one hunk rather than a whole file: the only way to review a file too large to send. Windows are disjoint, taken at depth 0, and cost one sample each. |
+| **Window** | A unit that is a line range of one hunk rather than a whole file: the only way to review a file too large to send. Windows are disjoint, taken at depth 0, and are one unit each — so `--samples N` asks N times per window. |
 | **Sample** | One reviewer answer to one prompt. A sample can fail; a failed sample is evidence of missing evidence, never a silent omission. |
 | **Attempt** | One try inside a sample. A sample records every attempt's failure and the last raw answer. |
 | **Finding** | A claim about the change, paired with the state its proof reached. A finding is the domain's atom; it is not a model opinion once adjudicated. |
@@ -29,10 +29,10 @@ code changes; a second name for the same thing is a defect.
 | **Accepted risk** | One baseline entry: a fingerprint, owner, reason and expiry for a finding the team chooses not to block on. |
 | **Scope** | The caller-owned include/exclude globs applied to changed paths before the prompt is built. It is not repository configuration. |
 | **Staged** | A review of the index against the base, not the working tree. Untracked and unstaged edits are deliberately not in the change. |
-| **Scope ignored** | A changed path the scope removed, recorded with its reason and matching pattern. It is not a skipped file and not a finding. |
+| **Scope ignored** | A changed path the scope removed. The first 200 are recorded with reason and matching pattern, the rest counted in `scope_ignored_omitted`. It is not a skipped file and not a finding. |
 | **Gate result** | The verdict after baseline policy: `verdict` in `verdict.json` may differ from `evidence_verdict`. A gate result is not a finding state. |
 | **Fingerprint** | The stable identity of a finding for baseline matching: dimension, severity, file, normalized claim and canonical proof. A changed severity or proof is a new identity. |
 | **Domain kernel** | The pure decision modules: run-id validation, configuration parsing, adjudication, baseline policy, scope matching, proof identity and sandbox argv construction. They take literals and return values; they do not read, write, spawn or wait. |
 | **Effect shell** | The adapters that read git, files, the environment and child processes, and write runs. Effects are allowed here, named in one list, and never imported by the kernel. |
-| **Adapter** | A concrete module at an effect seam: `repo`, `runner`, `proofs`, `pr`, `doctor`, `config`, `baseline`, `paths`, `sample`, `sandbox`, `cli`, `version`. An adapter may import the kernel; the kernel may not import an adapter. |
+| **Adapter** | A concrete module at an effect seam — git, commands, the model, the run directory, the network, stdout. The list is `ADAPTERS` in `tests/test_architecture.py` and the gate refuses an unlisted module that acts. An adapter may import the kernel; the kernel may not import an adapter. |
 | **Start failure** | The review could not begin: exit 3, no run directory, no model call. A review that ran and is missing evidence is `INCOMPLETE` (exit 2), not a start failure. |

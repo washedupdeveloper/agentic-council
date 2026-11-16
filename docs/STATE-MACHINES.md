@@ -6,8 +6,9 @@ transitions between them, and the invalid states/transitions that the code can
 reach. It is deliberately one file: a transition that is not here is either
 impossible or undocumented.
 
-The audit was done against commit **`e567008`** plus the state-machine fixes
-below. Evidence is a test path or a named code path; “live” means a real CLI
+The audit was done against commit **`e567008`**, corrected against `dda59bc`
+when M25–M28 changed the proof set, the unit ladder and the verdict rule; rows
+those milestones changed are marked *(M28)*. Evidence is a test path or a named code path; “live” means a real CLI
 process, not a monkeypatched function.
 
 ## Method
@@ -47,8 +48,10 @@ process, not a monkeypatched function.
 - Parse and preflight happen before a run directory or a model call.
 - `--plan` writes no run and refuses `--sarif`, `--keep`, `--report`.
 - Exit 3 means “nothing was reviewed”; 2 means a review ran and is incomplete.
-- `--report` is advice-only and exits 0, but a failed SARIF/cleanup still
-  reports exit 3 because the requested output was not produced.
+- `--report` is advice-only and exits 0. A failed SARIF or `--json` write is
+  exit 3 because the requested output was not produced; a failed `--keep` copy is
+  not — the evidence is left in place, its path printed, and the run keeps the
+  verdict's exit code.
 - `doctor` is the only command whose failed check is exit 1 by design.
 
 **Transitions**
@@ -65,7 +68,8 @@ process, not a monkeypatched function.
 | BOUND | review/plan | — | REVIEWING/PLANNED | base is GitHub’s |
 | REVIEWING | review returns | — | OUTPUT | verdict printed/written |
 | REVIEWING | start failure | — | EXIT 3 | empty run dir removed |
-| OUTPUT | SARIF/JSON/keep failure | — | EXIT 3 | ephemeral cleaned |
+| OUTPUT | SARIF/JSON failure | — | EXIT 3 | nothing written |
+| OUTPUT | `--keep` copy fails | — | CLEANUP → verdict exit | evidence left, path printed |
 | OUTPUT | normal | — | CLEANUP → EXIT 0/1/2 | evidence kept if asked |
 
 **Invalid transitions found**
@@ -134,14 +138,17 @@ process, not a monkeypatched function.
 
 ## M3 — Slicing and units
 
-**States:** `UNSLICED`, `SLICED`, `UNIT_FITS`, `HUNK_FITS`, `UNIT_TOO_LARGE`,
-`PLANNED`.
+**States:** `UNSLICED`, `SLICED`, `UNIT_FITS`, `HUNK_FITS`, `WINDOW`,
+`UNIT_TOO_LARGE`, `PLANNED`.
 
 **Invariants**
 
 - No unit prompt exceeds `max_prompt_bytes`; if even depth 0 does not fit, the
-  unit is refused with its name, never sent.
-- Each unit gets the deepest context depth that fits.
+  unit is refused with its name and its window cost, never sent — unless
+  `--window-large-files` splits the hunk into line windows (M26), of which at
+  most `--max-windows` are built.
+- Each unit gets the deepest context depth that fits, except a line window, which
+  is always built at depth 0.
 - Plan and review share `_prepare` and `_build_units`, so a plan’s byte counts
   are the bytes a review would send.
 - A unit that was never asked (failure or time budget) cannot produce `PASS`.
@@ -155,7 +162,8 @@ process, not a monkeypatched function.
 | UNSLICED | prompt <= limit | — | UNIT_FITS | one prompt |
 | SLICED | file fits | depth 3..0 | UNIT_FITS | unit added |
 | SLICED | file too large | a hunk fits | HUNK_FITS | unit per hunk |
-| SLICED | hunk too large | depth 0 still too large | UNIT_TOO_LARGE | `PromptTooLarge` |
+| SLICED | hunk too large | depth 0 fits nothing | WINDOW | one unit per line window |
+| SLICED | hunk too large | windows off or over `--max-windows` | UNIT_TOO_LARGE | `PromptTooLarge(windows=N)` |
 | SLICED | no sections | — | REFUSED | “no reviewable file section” |
 
 **Invalid transitions found**
@@ -164,9 +172,10 @@ process, not a monkeypatched function.
   no longer changed behaviour. Retargeted (M17).
 - A change with only a mode/rename/binary section can produce no units; now a
   named refusal rather than an empty review.
-- A finding reported outside its unit’s ranges is absent from `units[]` while
-  present in the global verdict. This is deliberate evidence of a model
-  hallucination, not attributed to a unit; it is still visible in `findings[]`.
+- A finding reported outside its unit’s ranges is attributed to the unit that
+  reported it, not to a unit whose ranges happen to contain the line: `units[]`
+  counts what each unit said, and the merge keeps the finding under
+  `(dimension, file, line)`. It stays visible in `findings[]` either way.
 
 **Evidence:** `tests/test_run.py::test_a_plan_is_one_prompt_when_it_fits`,
 `test_a_plan_names_the_units_and_writes_nothing`,
@@ -231,7 +240,7 @@ process, not a monkeypatched function.
 
 - CLI default is streaming; `--no-stream` is the fallback.
 - No event for `idle_timeout` seconds kills the **process group**, not just the
-  parent.
+  parent (POSIX; on Windows there is no process group and the process is killed).
 - A stream with no answer or a non-zero finish is an `OSError`; the sample
   retries once.
 - The prompt is written to a temp file and passed with `--query-file`; no diff
@@ -275,7 +284,9 @@ failure. The race is narrow and recorded rather than hidden.
 
 - `PROVEN` is the only state that can fail a run.
 - Any proven blocking finding → `FAIL`; otherwise any open blocking finding →
-  `INCOMPLETE`; otherwise `PASS`.
+  `INCOMPLETE`; otherwise `PASS`. With `--require-executed-proofs` (M28) a
+  blocking finding proven only by quotation is removed from the failing set and
+  named in `reason`; it cannot turn a run `PASS` into `FAIL`.
 - A `FAIL` outranks missing evidence, but missing evidence is named in
   `reason`.
 - A failed sample or unreviewed unit cannot produce `PASS`.
@@ -599,8 +610,9 @@ the decision to the parsed diff before any prompt or context work.
 - An exclude wins over an include. An empty include list means every path.
 - A pattern that is empty, absolute, backslash-separated or contains `.`, `..`
   or an empty segment is a start failure (exit 3).
-- Every path removed by the scope is named in `scope_ignored` with its reason
-  and, for an exclude, the matching pattern.
+- Every path removed by the scope is recorded: the first 200 are named in
+  `scope_ignored` with their reason and, for an exclude, the matching pattern,
+  and the rest are counted in `scope_ignored_omitted` (M28).
 - A scope that removes every changed file is a start failure before the
   reviewer is called; it is never an empty PASS.
 - `--staged` reads `git diff --cached` against the base. Untracked and unstaged
@@ -615,7 +627,7 @@ the decision to the parsed diff before any prompt or context work.
 |---|---|---|---|---|
 | UNSCOPED | no include/exclude | — | UNSCOPED | patch unchanged |
 | UNSCOPED | valid patterns | every pattern valid | SCOPED | filter sections; name drops |
-| UNSCOPED | invalid pattern | — | REFUSED | exit 3 before git work |
+| UNSCOPED | invalid pattern | — | REFUSED | exit 3 after `repo_root`, before a prompt |
 | STAGED | `--staged` | review/ci only | STAGED | `git diff --cached` |
 | STAGED | `--staged` on pr | — | REFUSED | parser usage error, exit 3 |
 | SCOPED | no kept section | included paths empty | EMPTY_SCOPE | exit 3; names ignored files |
@@ -657,7 +669,7 @@ silently accepted.
 | SM-16 | P3 | `--keep` inside run recurses | runaway copy | inside-run refusal; CLI test | fixed (prior) |
 | SM-17 | P4 | TOCTOU: `.council`, `--sarif`, `--keep`, untracked file swapped to symlink between check and use | writes/reads outside intended path under an active local attacker | documented in M7/M8/M9; needs `openat`/`O_NOFOLLOW` | residual |
 | SM-18 | P4 | PR verify → review race: worktree changes after verify | reviewed tree is not the PR head | evidence has `worktree: true`; a commit worktree snapshot would fix | residual |
-| SM-19 | P4 | verdict/sample/SARIF writes are not atomic | kill mid-write leaves partial JSON | single writer per run; use temp+rename/fsync to fix | residual |
+| SM-19 | P4 | sample and SARIF writes are not atomic | kill mid-write leaves partial JSON | the verdict is staged, fsynced and renamed (M28); sample and SARIF still write in place | partly fixed |
 | SM-20 | P4 | partial `--keep` copy on disk-full/kill | target incomplete, source intact | error names both; no rollback | residual |
 | SM-21 | P4 | concurrent `init` appends `.council/` twice | duplicate ignore line | idempotent afterwards; lock would fix | residual |
 | SM-22 | P4 | catastrophic regex in `absent`; huge file/JSON | CPU/memory denial of service from model params | bounded input/timeout would fix | residual |
@@ -669,7 +681,7 @@ silently accepted.
 | SM-28 | P2 | baseline could suppress `UNRUNNABLE`/`UNSETTLED` evidence | missing evidence converted to a pass | only `PROVEN` blocking findings; open-evidence tests | fixed |
 | SM-29 | P2 | expired baseline entry still suppressed | accepted risk outlives its stated expiry | `today > expires`; `test_an_expired_entry_does_not_suppress` | fixed |
 | SM-30 | P2 | severity escalation reused an old fingerprint | high waiver hid a critical finding | severity in fingerprint; escalation test | fixed |
-| SM-31 | P2 | scope dropped paths without recording them | a review could look narrower than it was | `scope_ignored` names every path; `test_filter_names_every_dropped_path` | fixed |
+| SM-31 | P2 | scope dropped paths without recording them | a review could look narrower than it was | `scope_ignored` names 200 and counts the rest; `test_filter_names_every_dropped_path` | fixed |
 | SM-32 | P2 | an include matching nothing could become an empty pass | a typo silently reviewed nothing | start failure before the reviewer; `test_a_scope_that_removes_everything_is_a_start_failure` | fixed |
 | SM-33 | P2 | staged review could read unstaged edits | reviewed content differed from the commit under review | `git diff --cached`; `test_staged_diff_reads_only_the_index` | fixed |
 

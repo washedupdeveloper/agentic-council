@@ -17,8 +17,9 @@ edit, in the categories from `untangle-codebase`.
    `ReviewRequest.validate()` is the one pure validator; the shell keeps only
    file/output checks.
 3. `.council` / `runs` names were repeated in `repo`, `paths` and `run`.
-   **Fixed:** `paths` remains the single owner; `runstore` receives the
-   resolved directory.
+   **Partly fixed:** `paths` owns run and state resolution and `runstore`
+   receives the resolved directory, but `repo` still builds the `.gitignore`
+   line and the untracked-file exclusion by hand (`repo.py:16,75,164`).
 4. Severity and proof vocabularies were duplicated in `findings` / `schema` and
    `schema` / `proofs`. **Fixed:** `schema` re-exports `findings.SEVERITIES`;
    `proofs` asserts `EXECUTORS` and `PROOF_KINDS` are the same set at import.
@@ -82,8 +83,9 @@ edit, in the categories from `untangle-codebase`.
    evidence loop; only the sample directory and the `units` payload remain
    layout-specific. The on-disk format is unchanged.
 2. `PromptTooLarge` named CLI flags from the application module. **Fixed:** the
-   error carries `size`/`limit`/`unit`/`declined`; the CLI adds the recovery
-   advice, and the non-interactive path still names the flags.
+   error carries `size`/`limit`/`unit`/`declined`/`windows`, and its own message
+   names the ways out; the interactive path adds the dialogue and prints the
+   window count before it takes an answer.
 3. `reference.fetch` accepts `file:` URLs. **Left:** it is the caller's explicit
    context source; bounding it to a checkout is a security decision, not a
    structural cleanup.
@@ -111,6 +113,7 @@ edit, in the categories from `untangle-codebase`.
 
 - `python -m pytest` — all tests pass.
 - `mypy src` — clean.
-- `./bin/council-verify` — 188/188 claims.
-- `python tools/mutation_check.py` — 35/35 mutations caught; every declared
-  falsifier breaks its claim.
+- `./bin/council-verify` — 203/203 claims at `dda59bc` (188 when this page was
+  written).
+- `python tools/mutation_check.py` — 43/43 mutations caught at `dda59bc` (35
+  when this page was written); every declared falsifier breaks its claim.

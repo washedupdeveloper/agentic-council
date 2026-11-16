@@ -56,8 +56,10 @@ council pr 123 --baseline council-baseline.json
   finding introduced by the same PR.
 - `--baseline-from-base` makes `review` use the base revision too.
 - `--allow-baseline-change` is the explicit maintenance bypass for a diff that
-  intentionally edits the baseline. Without it, a changed baseline is a start
-  failure (exit 3).
+  intentionally edits the baseline. Without it, a changed *base-revision*
+  baseline is a start failure (exit 3) — the path `ci`, `pr` and
+  `--baseline-from-base` take. A plain `review --baseline PATH` reads the file the
+  caller named and is trusted as the caller's own input.
 - `--baseline-strict` makes any expired or stale entry fail the gate. Without
   strict, stale entries are reported and can be pruned; expired entries never
   suppress anything.
@@ -128,8 +130,8 @@ not automatically pruned; expiry is a gate decision, not a cleanup.
 1. A baseline is a policy file, not evidence. It is reviewed and committed.
 2. In CI, it is read from the base revision. A contribution cannot edit its own
    baseline in the same change.
-3. A baseline that is itself changed in the reviewed diff is refused unless the
-   maintainer passes `--allow-baseline-change`.
+3. A baseline read from the base revision that is itself changed in the reviewed
+   diff is refused unless the maintainer passes `--allow-baseline-change`.
 4. A missing, symlinked, non-regular, non-UTF-8 or oversized baseline is a start
    failure, before a reviewer is called.
 5. The baseline can suppress only `PROVEN` blocking findings. It cannot suppress

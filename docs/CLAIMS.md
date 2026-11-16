@@ -140,6 +140,8 @@ registry, so it cannot describe a claim that has no check.
 | `the-domain-kernel-does-not-act` | No domain-kernel module imports or calls an effect. | `python3 -m pytest tests/test_architecture.py::test_a_pure_module_calls_nothing_that_acts -q` |
 | `an-effectful-module-must-be-a-named-adapter` | A new module that acts must be named as an adapter. | `python3 -m pytest tests/test_architecture.py::test_every_module_that_acts_is_named_as_an_adapter -q` |
 | `the-package-import-reads-no-metadata` | Importing the package performs no installed-version lookup. | `python3 -m pytest tests/test_architecture.py::test_the_package_import_reads_no_metadata -q` |
+| `the-source-stays-under-the-line-ratchet` | The reviewed package stays under 6,000 physical source lines. | `python3 -m pytest tests/test_size.py::test_the_source_stays_under_the_line_ratchet -q` |
+| `the-module-count-stays-under-the-ratchet` | The reviewed package stays at or under 50 modules. | `python3 -m pytest tests/test_size.py::test_the_module_count_stays_under_the_ratchet -q` |
 | `config-parsing-is-pure` | Configuration parsing takes text and returns a value without touching a file. | `python3 -m pytest tests/test_domain_kernel.py::test_config_parse_reads_text_not_a_file -q` |
 | `adjudication-is-a-pure-decision` | Adjudication decides findings from proof outcomes without executing a proof. | `python3 -m pytest tests/test_domain_kernel.py::test_adjudication_is_reproducible_from_outcomes -q` |
 | `adjudication-refuses-mismatched-outcomes` | Adjudication refuses a different number of outcome groups and findings. | `python3 -m pytest tests/test_domain_kernel.py::test_adjudication_refuses_a_mismatched_outcome_group -q` |

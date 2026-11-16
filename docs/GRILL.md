@@ -38,6 +38,9 @@ The remaining defects are seams, not logic.
 
 ## Creep
 
+*Every item below was removed or declined in M11; the list is kept as the
+reasoning, not as a to-do. `http` and `dom` did not survive into v2.*
+
 1. **`http` proof.** It is the only kind that leaves the process for the network
    (`proofs.py:223`) — the thing the sandbox otherwise removes — and it makes the
    tool a client of arbitrary URLs. "The endpoint says X" is not evidence about a

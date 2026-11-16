@@ -42,7 +42,7 @@ nix flake check
 ```
 
 `nix develop -c ./scripts/verify.sh` runs the same gate in one command. It is
-slow by design: the test suite, 188 claims, 35 mutations and the flake check are
+slow by design: the test suite, 203 claims, 43 mutations and the flake check are
 separate checks.
 
 Do not use a system `python3`: this machine and NixOS generally have none.
@@ -53,7 +53,7 @@ Hermes itself must already exist; this project does not install it.
 ## Verified state at `d2e53ac`
 
 - Full pytest suite passes.
-- **188/188 claims** hold; `docs/CLAIMS.md` is generated from `claims.toml`.
+- **203/203 claims** hold; `docs/CLAIMS.md` is generated from `claims.toml`.
 - **35/35 mutations** caught; **41** claims declare a mutation falsifier.
 - `mypy src`: 44 files clean.
 - `pyright`: 0 errors, 0 warnings.

@@ -685,6 +685,16 @@ text = "Importing the package performs no installed-version lookup."
 check = "python3 -m pytest tests/test_architecture.py::test_the_package_import_reads_no_metadata -q"
 
 [[claim]]
+id = "the-source-stays-under-the-line-ratchet"
+text = "The reviewed package stays under 6,000 physical source lines."
+check = "python3 -m pytest tests/test_size.py::test_the_source_stays_under_the_line_ratchet -q"
+
+[[claim]]
+id = "the-module-count-stays-under-the-ratchet"
+text = "The reviewed package stays at or under 50 modules."
+check = "python3 -m pytest tests/test_size.py::test_the_module_count_stays_under_the_ratchet -q"
+
+[[claim]]
 id = "config-parsing-is-pure"
 text = "Configuration parsing takes text and returns a value without touching a file."
 check = "python3 -m pytest tests/test_domain_kernel.py::test_config_parse_reads_text_not_a_file -q"
