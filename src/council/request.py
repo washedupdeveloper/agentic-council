@@ -45,6 +45,7 @@ class ReviewRequest:
     max_prompt_bytes: int = PROMPT_LIMIT
     window_large_files: bool = False
     max_windows: int = WINDOW_LIMIT
+    require_executed_proofs: bool = False
     context_depth: int = 3
     time_budget: int = 0
     reasoning: str | None = None

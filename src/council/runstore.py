@@ -8,7 +8,9 @@ the orchestration.
 from __future__ import annotations
 
 import json
+import os
 from collections.abc import Sequence
+from typing import TypeVar
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -20,6 +22,24 @@ from .request import ReviewRequest
 from .sample import SampleResult
 from .sample import write_sample as _write_sample_file
 from .verdict import Result
+
+
+#: The `verdict.json` format. A consumer must refuse a format it does not know
+#: rather than guess: the document is a contract, and a field added later is not
+#: a field that was always absent.
+VERDICT_FORMAT = 1
+
+#: How many dropped paths the report names. The rest are counted, not hidden:
+#: a review that lists ten thousand paths is a review nobody reads the end of.
+SCOPE_REPORT_LIMIT = 200
+
+T = TypeVar("T")
+
+
+def bounded(items: Sequence[T], limit: int = SCOPE_REPORT_LIMIT) -> tuple[list[T], int]:
+    """The first `limit` items, and how many were left out."""
+    listed = list(items)
+    return listed[:limit], max(0, len(listed) - limit)
 
 
 @dataclass(frozen=True, slots=True)
@@ -71,7 +91,9 @@ def write_verdict(document: VerdictDocument) -> None:
     result = document.result
     effective = document.gate or result
     context = document.reported_context
+    ignored, ignored_omitted = bounded(prepared.scope_ignored)
     payload = {
+        "format": VERDICT_FORMAT,
         "run": document.run_dir.name,
         "base": prepared.base,
         "head": prepared.head,
@@ -86,6 +108,7 @@ def write_verdict(document: VerdictDocument) -> None:
         "prompt_acknowledged": request.allow_large_prompt,
         "window_large_files": request.window_large_files,
         "max_windows": request.max_windows,
+        "require_executed_proofs": request.require_executed_proofs,
         "sliced": prepared.sliced,
         "time_budget": request.time_budget,
         "units": list(document.units),
@@ -117,13 +140,16 @@ def write_verdict(document: VerdictDocument) -> None:
         "skipped": [{"path": item.path, "reason": item.reason} for item in prepared.skipped],
         "scope_ignored": [
             {"path": item.path, "reason": item.reason, "pattern": item.pattern}
-            for item in prepared.scope_ignored
+            for item in ignored
         ],
+        "scope_ignored_omitted": ignored_omitted,
         "context_digest": context.digest,
         "context_depth": request.context_depth,
         "context": [{"file": span.file, "start": span.start, "end": span.end,
                      "name": span.name, "reason": span.reason} for span in context.spans],
         "unresolved": list(context.unresolved),
+        "rules": [{"glob": hit.glob, "doc": hit.doc, "paths": list(hit.paths),
+                   "truncated": hit.truncated} for hit in prepared.rules],
         "references": [{"url": item.url, "sha256": item.sha256,
                         "bytes": len(item.text.encode("utf-8"))}
                        for item in prepared.references],
@@ -142,14 +168,33 @@ def write_verdict(document: VerdictDocument) -> None:
             {"id": finding.id, "dimension": finding.dimension,
              "severity": finding.severity, "state": finding.state.value,
              "location": finding.location, "claim": finding.claim,
-             "detail": finding.detail, "proof": finding.proof}
+             "detail": finding.detail, "proof": finding.proof,
+             "proof_strength": "executed" if finding.executed else "static"}
             for finding in result.findings
         ],
     }
+    document.run_dir.mkdir(parents=True, exist_ok=True)
+    write_document(document.run_dir / "verdict.json", payload)
+
+
+def write_document(target: Path, payload: dict[str, object]) -> None:
+    """Publish one document whole: a reader sees the old file or the new one.
+
+    A verdict written in place is a verdict a concurrent reader can catch half
+    way through, and a CI job that reads invalid JSON learns the wrong thing
+    about the change. The staging file lives in the same directory so the rename
+    is one filesystem operation.
+    """
+    staging = target.with_name(f".{target.name}.tmp")
     try:
-        document.run_dir.mkdir(parents=True, exist_ok=True)
-        (document.run_dir / "verdict.json").write_text(
-            json.dumps(payload, indent=2) + "\n", encoding="utf-8", newline="\n")
+        with staging.open("w", encoding="utf-8", newline="\n") as handle:
+            handle.write(json.dumps(payload, indent=2) + "\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(staging, target)
     except (OSError, ValueError) as exc:
-        raise ReviewError(
-            f"cannot write {document.run_dir / 'verdict.json'}: {exc}") from exc
+        try:
+            staging.unlink()
+        except OSError:
+            pass
+        raise ReviewError(f"cannot write {target}: {exc}") from exc

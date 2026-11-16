@@ -11,6 +11,28 @@ public surface, the definitions, and the release procedure — is
 
 ### Added
 
+- `council.toml` can map changed paths to the documents that govern them
+  (`[[rules]] glob/doc`). Each matching document reaches the prompt once, capped
+  at 20,000 bytes and marked when cut, under a heading that frames it as context
+  rather than instructions; the verdict records what governed the change. A rule
+  whose document cannot be read is a start failure, because the alternative is a
+  reviewer judging a diff against its memory of the rules — which is how a
+  violation passes review. Taken from deepseek-harness's review skill.
+- Proof strength is part of the verdict. Every finding records `proof_strength` —
+  `executed` when the proof that held ran a command, `static` when it only quoted
+  the code — and the reason names blocking findings that rest on quotation alone.
+  `--require-executed-proofs` makes that the rule instead of the note. This is
+  the lesson from reviewing `deepseek-harness`, where eight findings proved
+  control-flow claims by quoting the defective line: a quotation is evidence the
+  line exists, never that the code misbehaves.
+- `verdict.json` is published atomically (staged, fsynced, renamed) and states
+  `format: 1`; a consumer seeing a format it does not know must refuse rather
+  than guess. A crash no longer leaves a half-written document for CI to read.
+- `scope_ignored` is bounded at 200 paths with `scope_ignored_omitted` counting
+  the rest. A whole-repo audit against the empty tree had produced a 3.1 MB
+  verdict that was 21,629 path records and three findings.
+
+
 - Large files are reviewable, by choice. A file that no budget admits — an added
   file is one hunk carrying every line, so `src/agent_loop.py`'s 38,416 lines are
   a single 1.8 MB prompt — is still refused by default, and the refusal now states

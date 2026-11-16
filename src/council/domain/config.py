@@ -41,10 +41,29 @@ DEFAULT_POLICY = Policy()
 
 
 @dataclass(frozen=True, slots=True)
+class Rule:
+    """One path glob and the document that governs it.
+
+    Both are repository-relative POSIX paths, and both are checked: a rule may
+    not read outside the checkout, and it may not name a directory.
+    """
+
+    glob: str
+    doc: str
+
+
+#: How much of a rule's document reaches the prompt. A repository cannot make
+#: the prompt unbounded by pointing a rule at a large file; a document that is
+#: cut is recorded as truncated rather than silently shortened.
+RULE_BYTES = 20000
+
+
+@dataclass(frozen=True, slots=True)
 class Config:
     allow: frozenset[str] = DEFAULT_ALLOW
     timeout: int = 120
     sandbox: bool = True
+    rules: tuple[Rule, ...] = ()
 
 
 def parse(text: str, *, name: str = CONFIG_NAME,
@@ -55,9 +74,11 @@ def parse(text: str, *, name: str = CONFIG_NAME,
     except tomllib.TOMLDecodeError as exc:
         raise ConfigError(f"{name} is not valid TOML: {exc}") from exc
 
-    unknown = set(raw) - {"proofs"}
+    unknown = set(raw) - {"proofs", "rules"}
     if unknown:
         raise ConfigError(f"unknown key(s) in {name}: {', '.join(sorted(unknown))}")
+
+    rules = _parse_rules(raw.get("rules", []), name)
 
     proofs = raw.get("proofs", {})
     if not isinstance(proofs, dict):
@@ -93,4 +114,33 @@ def parse(text: str, *, name: str = CONFIG_NAME,
         raise ConfigError(
             "[proofs].sandbox = false, but this runner requires the sandbox")
 
-    return Config(allow=allow, timeout=timeout, sandbox=policy.sandbox or sandbox)
+    return Config(allow=allow, timeout=timeout, sandbox=policy.sandbox or sandbox,
+                  rules=rules)
+
+
+def _parse_rules(raw: object, name: str) -> tuple[Rule, ...]:
+    """`[[rules]]` entries: a glob and the document that governs what it matches."""
+    if not isinstance(raw, list):
+        raise ConfigError(f"[[rules]] in {name} must be an array of tables")
+    rules: list[Rule] = []
+    for index, entry in enumerate(raw, start=1):
+        if not isinstance(entry, dict):
+            raise ConfigError(f"[[rules]] entry {index} in {name} must be a table")
+        unknown = set(entry) - {"glob", "doc"}
+        if unknown:
+            raise ConfigError(
+                f"unknown key(s) in [[rules]] entry {index} of {name}: "
+                f"{', '.join(sorted(unknown))}")
+        values: dict[str, str] = {}
+        for key in ("glob", "doc"):
+            value = entry.get(key)
+            if not isinstance(value, str) or not value:
+                raise ConfigError(
+                    f"[[rules]] entry {index} in {name} needs a non-empty {key}")
+            if value.startswith("/") or "\\" in value or ".." in value.split("/"):
+                raise ConfigError(
+                    f"[[rules]] entry {index} in {name}: {key} {value!r} must be a "
+                    "repository-relative POSIX path")
+            values[key] = value
+        rules.append(Rule(values["glob"], values["doc"]))
+    return tuple(rules)

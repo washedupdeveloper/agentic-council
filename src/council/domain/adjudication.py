@@ -11,7 +11,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, cast
 
-from ..findings import Finding, Severity, State
+from ..findings import EXECUTED_PROOF_KINDS, Finding, Severity, State
 from ..merge import MergedFinding
 from ..verdict import Result, Verdict, judge
 
@@ -29,6 +29,9 @@ class ProofOutcome:
 
     state: State
     detail: str
+    #: Which proof kind settled it. Empty when a caller built the outcome by
+    #: hand, which counts as not demonstrated by execution.
+    kind: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -70,18 +73,24 @@ def decide(merged: Sequence[MergedFinding],
             claim=item.claims[0] if item.claims else "",
             detail=detail,
             proof=canonical_proof(item.proofs),
+            executed=any(o.kind in EXECUTED_PROOF_KINDS for o in proven),
         ))
     return Adjudication(tuple(findings), tuple(sorted(failed_samples)))
 
 
-def verdict(adjudication: Adjudication) -> Result:
+def verdict(adjudication: Adjudication, *,
+            executed_only: bool = False) -> Result:
     """The verdict, with one addition the findings cannot express.
 
     A sample that returned nothing usable means the review is missing evidence.
     If the evidence that did arrive already fails the run, fail; otherwise the
     honest answer is `INCOMPLETE`, never `PASS`.
+
+    `executed_only` is the caller's answer to a quarrel about proof strength: a
+    quotation can show that a line exists, not that the code misbehaves, so a
+    caller may require a proof that ran something before it lets it block.
     """
-    result = judge(adjudication.findings)
+    result = judge(adjudication.findings, executed_only=executed_only)
     if adjudication.failed_samples:
         listed = ", ".join(str(index) for index in adjudication.failed_samples)
         if result.verdict is Verdict.PASS:

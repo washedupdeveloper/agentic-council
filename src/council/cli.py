@@ -143,6 +143,7 @@ def _request(args: argparse.Namespace, *, allow: bool | None = None) -> ReviewRe
         max_prompt_bytes=args.max_prompt_bytes,
         window_large_files=bool(getattr(args, "window_large_files", False)),
         max_windows=int(getattr(args, "max_windows", 200)),
+        require_executed_proofs=bool(getattr(args, "require_executed_proofs", False)),
         context_depth=args.context_depth,
         time_budget=args.time_budget,
         reasoning=args.reasoning,

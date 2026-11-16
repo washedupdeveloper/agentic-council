@@ -261,6 +261,7 @@ Every flag the tool accepts, what it changes, and why it exists. `council <comma
 | `--allow-large-prompt` | off | send an oversized prompt without asking | an autonomous caller that has measured the cost can say yes in advance |
 | `--window-large-files` | off | split a file too large for one prompt into line windows, one sample each | the default refuses: windowing is the only way to review a 38,000-line addition, and it costs one sample per few hundred lines |
 | `--max-windows N` | `200` | refuse a change that would need more than N windows | a run of thousands of samples is a crawl, not a review; the limit is stated before anything is asked |
+| `--require-executed-proofs` | off | a finding proven only by quotation cannot block the run | a quotation shows a line exists, not that the code misbehaves; the default still blocks and says so in the reason |
 | `--autonomous` | off | never ask: refuse an oversized prompt, exit 3 | a script running in a terminal must not block on a question |
 | `-h, --help` | — | usage | — |
 
@@ -394,7 +395,43 @@ prompt size, context depth, samples, findings and its own verdict. Units whose
 reviewer never answered make the run `incomplete`; a run with an unreviewed unit
 can never be `pass`.
 
-## The reviewer contract
+## Rules: judge the diff against the repository's documents
+
+A repository can say which document governs which paths, and council puts that
+document in front of the reviewer before it reads the diff:
+
+```toml
+[[rules]]
+glob = "packages/goal/**"
+doc = "docs/subsystems/goal.md"
+```
+
+Each rule whose `glob` matches a changed path contributes its document once,
+capped at 20,000 bytes and marked when cut, under a heading that says the text is
+context from the repository and not instructions. A rule that matches nothing is
+not recorded; a rule naming a document that cannot be read stops the run. The
+verdict lists what governed the change:
+
+```json
+"rules": [{"glob": "packages/goal/**", "doc": "docs/subsystems/goal.md",
+           "paths": ["packages/goal/goal/src/index.ts"], "truncated": false}]
+```
+
+This is the one idea worth taking from every review process that works: a diff
+judged against the reviewer's memory of the rules is a diff nobody checked.
+
+## Proof strength
+
+Each finding records whether the proof that held *ran* something (`command`,
+`repro`) or only quoted the code (`present`, `absent`, `json`, `diff`), as
+`proof_strength` in `verdict.json`. A quotation is evidence that a line exists;
+it is not evidence that the code misbehaves. The default still lets a quoted
+finding block — half the real defects are one wrong line — and names it in the
+reason (`2 proven blocking finding(s): F-01, F-03; 1 of them proven by quotation
+only: F-03`). `--require-executed-proofs` is the strict reading: a quotation is
+reported and never blocks.
+
+## What a verdict is
 
 One call, five sections (`security`, `correctness`, `readability`,
 `architecture`, `performance`), one JSON object. A finding without a proof from

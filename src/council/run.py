@@ -85,7 +85,8 @@ def plan(request: ReviewRequest) -> Plan:
     units: tuple[Unit, ...] = ()
     if prepared.sliced:
         units = tuple(_build_units(prepared.template, prepared.base, prepared.patch,
-                                   prepared.root, request, prepared.references))
+                                   prepared.root, request, prepared.references,
+                                   prepared.rules_text))
     windows = sum(1 for unit in units if unit.window)
     # One sample per unit when it is clean, two to confirm a finding, three to
     # break a tie: the plan states the span rather than a single number.
@@ -94,7 +95,8 @@ def plan(request: ReviewRequest) -> Plan:
     return Plan(prepared.base, prepared.head, prepared.prompt_bytes,
                 request.max_prompt_bytes, prepared.sliced, units,
                 prepared.skipped, request.context_depth, prepared.scope_ignored,
-                request.include, request.exclude, windows, (low, high))
+                request.include, request.exclude, windows, (low, high),
+                prepared.rules)
 
 
 def review(request: ReviewRequest, runner: Runner) -> Report:
@@ -150,7 +152,8 @@ def review(request: ReviewRequest, runner: Runner) -> Report:
     config = prepared.config
     proofs = ProofContext(repo=root, allow=config.allow, diff=patch,
                           timeout=config.timeout, sandbox=config.sandbox)
-    units = _build_units(template, base, patch, root, request, references) if sliced else []
+    units = _build_units(template, base, patch, root, request, references,
+                         prepared.rules_text) if sliced else []
     # The whole change is the degenerate case: one unit, written at the run root.
     # Keeping it as a unit means the evidence loop below has one shape, while the
     # on-disk layout stays compatible with the whole-change format.
@@ -192,7 +195,8 @@ def review(request: ReviewRequest, runner: Runner) -> Report:
             adjudication = adjudicate(
                 merged, proofs,
                 failed_samples=[sample.index for sample in runs[0][1] if not sample.ok])
-        result = verdict(adjudication)
+        result = verdict(adjudication,
+                        executed_only=request.require_executed_proofs)
         if sliced:
             unreviewed = [unit.id for unit, _, _, _, ok in runs if not ok]
             if unreviewed:

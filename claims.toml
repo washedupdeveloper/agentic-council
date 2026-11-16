@@ -970,6 +970,78 @@ text = "Slicing a hunk into windows preserves the added and removed line numbers
 check = "python3 -m pytest tests/test_changes.py::test_a_window_keeps_the_line_numbers_of_the_whole_hunk -q"
 
 [[claim]]
+id = "a-rule-document-is-counted-when-a-file-is-windowed"
+text = "A windowed unit accounts for the rules block, so every window's prompt fits the limit."
+check = "python3 -m pytest tests/test_rules.py::test_a_rule_document_is_counted_in_every_window -q"
+falsifier = "window-accounting-ignores-the-rules"
+
+[[claim]]
+id = "a-rule-document-reaches-the-prompt"
+text = "A council.toml rule whose glob matches a changed path puts that document's text in the prompt and is recorded in the verdict."
+check = "python3 -m pytest tests/test_rules.py::test_a_rule_document_reaches_the_prompt -q"
+falsifier = "rules-never-reach-the-prompt"
+
+[[claim]]
+id = "a-rule-that-matches-nothing-is-not-recorded"
+text = "A rule whose glob matches no changed path contributes nothing to the prompt and is absent from the verdict."
+check = "python3 -m pytest tests/test_rules.py::test_a_rule_that_matches_nothing_is_not_recorded -q"
+
+[[claim]]
+id = "a-rule-document-that-cannot-be-read-is-a-start-failure"
+text = "A rule naming a document that cannot be read stops the run before the reviewer is asked."
+check = "python3 -m pytest tests/test_rules.py::test_a_rule_document_that_cannot_be_read_is_a_start_failure -q"
+falsifier = "missing-rule-document-passes"
+
+[[claim]]
+id = "a-rule-document-is-capped-and-marked"
+text = "A rule document larger than RULE_BYTES is truncated at the cap, marked in the prompt, and recorded as truncated."
+check = "python3 -m pytest tests/test_rules.py::test_a_large_rule_document_is_capped_and_marked -q"
+falsifier = "rule-document-uncapped"
+
+[[claim]]
+id = "one-document-is-read-once"
+text = "Two rules naming the same document contribute its text to the prompt once."
+check = "python3 -m pytest tests/test_rules.py::test_two_rules_naming_one_document_read_it_once -q"
+
+[[claim]]
+id = "the-configuration-refuses-a-rule-it-cannot-honour"
+text = "A rule with no doc, an escaping path, or an unknown key is a configuration error."
+check = "python3 -m pytest tests/test_rules.py::test_the_configuration_refuses_a_rule_it_cannot_honour -q"
+
+[[claim]]
+id = "a-quotation-only-finding-is-named-in-the-reason"
+text = "A proven finding whose proof only quoted a line is counted in the verdict's reason even when it blocks."
+check = "python3 -m pytest tests/test_strength.py::test_a_quotation_only_finding_is_named_in_the_reason -q"
+
+[[claim]]
+id = "a-quotation-only-finding-does-not-block-a-strict-run"
+text = "With require_executed_proofs a finding proven only by quotation passes the run and is still named."
+check = "python3 -m pytest tests/test_strength.py::test_a_quotation_only_finding_does_not_block_a_strict_run -q"
+falsifier = "executed-only-accepts-quotation"
+
+[[claim]]
+id = "an-executed-proof-still-blocks-a-strict-run"
+text = "A proof that ran a command still fails a run that requires executed proofs."
+check = "python3 -m pytest tests/test_strength.py::test_an_executed_proof_still_blocks_a_strict_run -q"
+
+[[claim]]
+id = "the-verdict-is-published-atomically"
+text = "A verdict that cannot be renamed into place leaves neither a partial document nor a staging file."
+check = "python3 -m pytest tests/test_strength.py::test_a_verdict_that_cannot_be_published_leaves_no_partial_file -q"
+
+[[claim]]
+id = "the-scope-report-is-bounded-and-counted"
+text = "The verdict names at most 200 dropped paths and counts the rest."
+check = "python3 -m pytest tests/test_strength.py::test_the_scope_report_is_bounded_and_counts_the_rest tests/test_strength.py::test_bounded_names_the_limit_and_counts_the_rest -q"
+falsifier = "scope-report-unbounded"
+
+[[claim]]
+id = "the-verdict-names-its-format"
+text = "verdict.json states the format it is written in."
+check = "python3 -m pytest tests/test_strength.py::test_the_verdict_names_its_format -q"
+falsifier = "format-field-dropped"
+
+[[claim]]
 id = "a-present-quote-may-omit-its-indentation"
 text = "A present proof holds when the quoted line matches the file's text with its leading indentation stripped."
 check = "python3 -m pytest tests/test_proofs.py::test_present_accepts_a_quote_that_omits_its_indentation -q"

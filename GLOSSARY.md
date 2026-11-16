@@ -9,6 +9,8 @@ code changes; a second name for the same thing is a defect.
 | **Change** | The text between a base revision and a head revision, plus the files the tool could not include. A change is not a commit range in the domain; it is the diff the reviewer sees. |
 | **Base / head** | The revisions that bound the change. `head` is the revision the review describes; `base` is the merge base the caller asked for. |
 | **Unit** | One prompt-sized slice of a change. A unit exists only when the full prompt exceeds the budget; every unit is either reviewed or named as unreviewed. |
+| **Rule** | A `council.toml` entry naming a path glob and the document that governs it; the document reaches the prompt once, capped, and is recorded in the verdict. |
+| **Quotation** | A proof that establishes something by matching text (`present`, `absent`, `json`, `diff`) rather than by running a command. It proves the line, not the behaviour; `executed` proofs are `command` and `repro`. |
 | **Window** | A unit that is a line range of one hunk rather than a whole file: the only way to review a file too large to send. Windows are disjoint, taken at depth 0, and cost one sample each. |
 | **Sample** | One reviewer answer to one prompt. A sample can fail; a failed sample is evidence of missing evidence, never a silent omission. |
 | **Attempt** | One try inside a sample. A sample records every attempt's failure and the last raw answer. |

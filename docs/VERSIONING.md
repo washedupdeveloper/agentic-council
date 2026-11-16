@@ -21,7 +21,8 @@ Enumerated from the tool, not from memory (`council --help`, `council review
 
 - subcommands `review`, `ci`, `init` and their flags;
 - exit codes: `0` pass, `1` fail, `2` incomplete, `3` could not start;
-- `verdict.json` and its fields, including `verdict`, `findings[].state`,
+- `verdict.json` and its fields, including `format`, `verdict`, `findings[].state`,
+  `findings[].proof_strength`, `scope_ignored_omitted`, `rules[].glob/doc/paths/truncated`,
   `prompt_bytes`, `prompt_limit`, `prompt_acknowledged`, `context_depth`,
   `diff_sha256`, `skipped`, `context`, `unresolved`, `references`, `sliced` and
   `units[]` (each unit's files, ranges, digest, prompt size, depth, whether it is a

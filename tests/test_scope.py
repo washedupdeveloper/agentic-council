@@ -229,7 +229,8 @@ def test_scope_is_applied_before_slicing(tmp_path: Path,
     seen: list[str] = []
 
     def capture(template: str, base_rev: str, patch: str, root: Path,
-                request: ReviewRequest, references: object) -> list[object]:
+                request: ReviewRequest, references: object,
+                rules: str = "") -> list[object]:
         seen.append(patch)
         return []
 

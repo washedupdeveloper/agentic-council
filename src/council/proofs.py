@@ -10,7 +10,7 @@ import json as jsonlib
 import re
 import subprocess
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
@@ -354,13 +354,19 @@ assert set(EXECUTORS) == set(PROOF_KINDS), "proof kinds and executors disagree"
 
 
 def run_proof(kind: str, params: Mapping[str, Any], ctx: ProofContext) -> ProofOutcome:
-    """Settle one proof. Malformed params cannot run, so they are `UNRUNNABLE`."""
+    """Settle one proof. Malformed params cannot run, so they are `UNRUNNABLE`.
+
+    The kind travels with the outcome. Whether a finding was demonstrated by
+    running something or only by quoting a line is part of what the verdict is
+    allowed to depend on, so it cannot be reconstructed later from the params.
+    """
     executor = EXECUTORS.get(kind)
     if executor is None:
-        return _cannot(f"{kind!r} is not a proof kind")
+        return replace(_cannot(f"{kind!r} is not a proof kind"), kind=kind)
     try:
-        return executor(params, ctx)
+        outcome = executor(params, ctx)
     except _BadParams as exc:
-        return _cannot(str(exc))
+        outcome = _cannot(str(exc))
     except Exception as exc:  # noqa: BLE001 - untrusted params must not crash the run
-        return _cannot(f"the proof crashed: {type(exc).__name__}: {exc}")
+        outcome = _cannot(f"the proof crashed: {type(exc).__name__}: {exc}")
+    return replace(outcome, kind=kind)

@@ -50,7 +50,7 @@ def _cite(findings: list[Finding]) -> str:
     return shown if len(findings) <= 3 else f"{shown}, +{len(findings) - 3} more"
 
 
-def judge(findings: Iterable[Finding]) -> Result:
+def judge(findings: Iterable[Finding], *, executed_only: bool = False) -> Result:
     """Derive the verdict from the findings' states.
 
     The rule, in full:
@@ -61,13 +61,23 @@ def judge(findings: Iterable[Finding]) -> Result:
     Fail outranks incomplete: a run that has both a real defect and an unsettled
     claim is failing for a reason you can act on, and the unsettled claim is
     still visible in `findings`.
+
+    A finding proven only by quotation is named in the reason whatever the rule
+    does with it, and `executed_only` lets a caller refuse to block on one. The
+    default stays lenient because a quoted line is often the whole defect —
+    a hard-coded secret, a missing guard — and a caller who wants more says so.
     """
     items = tuple(findings)
     proven = [f for f in items if f.blocks and f.state is State.PROVEN]
+    quoted = [f for f in proven if not f.executed]
+    if executed_only:
+        proven = [f for f in proven if f.executed]
     if proven:
+        suffix = (f"; {len(quoted)} of them proven by quotation only"
+                  if quoted and not executed_only else "")
         return Result(
             Verdict.FAIL,
-            f"{len(proven)} proven blocking finding(s): {_cite(proven)}",
+            f"{len(proven)} proven blocking finding(s): {_cite(proven)}{suffix}",
             items,
         )
 
@@ -80,5 +90,10 @@ def judge(findings: Iterable[Finding]) -> Result:
         )
 
     non_blocking = [f for f in items if not f.blocks and f.state is State.PROVEN]
-    suffix = f" ({len(non_blocking)} proven non-blocking finding(s))" if non_blocking else ""
+    notes: list[str] = []
+    if non_blocking:
+        notes.append(f"{len(non_blocking)} proven non-blocking finding(s)")
+    if quoted:
+        notes.append(f"{len(quoted)} proven by quotation only: {_cite(quoted)}")
+    suffix = f" ({'; '.join(notes)})" if notes else ""
     return Result(Verdict.PASS, f"no proven blocking findings{suffix}", items)

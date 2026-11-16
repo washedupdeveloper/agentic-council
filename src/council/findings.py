@@ -50,6 +50,12 @@ class State(Enum):
 OPEN_STATES: frozenset[State] = frozenset({State.UNSETTLED, State.UNRUNNABLE})
 
 
+#: The proof kinds that demonstrated something by running it. Everything else
+#: establishes a fact about the text, which is weaker: a `present` proof can show
+#: a line exists, never that a claim about behaviour is true.
+EXECUTED_PROOF_KINDS: frozenset[str] = frozenset({"command", "repro"})
+
+
 @dataclass(frozen=True, slots=True)
 class Finding:
     """One claim about the change, and the state its evidence reached."""
@@ -68,6 +74,9 @@ class Finding:
     #: existing eight-argument constructors keep working.
     file: str = ""
     line: int = 1
+    #: Whether the proof that held ran something (`command`, `repro`) rather
+    #: than quoting the code. Append-only, so older constructors keep working.
+    executed: bool = False
 
     @property
     def blocks(self) -> bool:

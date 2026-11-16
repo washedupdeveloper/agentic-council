@@ -18,7 +18,7 @@ from .config import CONFIG_NAME
 from .config import load as load_config
 from .domain.baseline import Baseline
 from .domain.scope import Scope, ScopeError
-from .planning import Prepared, prompt_for
+from .planning import Prepared, prompt_for, rules_block
 from .prompt import PromptError, instrument_digest
 from .reference import FetchError, fetch
 from .repo import ReviewError, diff, output
@@ -129,9 +129,15 @@ def prepare(request: ReviewRequest) -> Prepared:
     except FetchError as exc:
         raise ReviewError(str(exc)) from exc
 
+    changed = tuple(section.path for section in file_sections(patch))
+    try:
+        rules_text, rules = rules_block(root, config.rules, changed)
+    except PromptError as exc:
+        raise ReviewError(f"the reviewer prompt is not usable: {exc}") from exc
+
     try:
         fitted = prompt_for(template, base, patch, root, request.context_depth,
-                            references)
+                            references, rules_text)
     except PromptError as exc:
         raise ReviewError(f"the reviewer prompt is not usable: {exc}") from exc
     prompt_bytes = fitted.bytes
@@ -139,4 +145,4 @@ def prepare(request: ReviewRequest) -> Prepared:
     return Prepared(root, config, baseline, base, head, patch, change.skipped,
                     scope_ignored, references, prompt_file, template, digest,
                     fitted.prompt, prompt_bytes, sliced, fitted.context, diff_sha256,
-                    identity.path, identity.sha256)
+                    identity.path, identity.sha256, rules=rules, rules_text=rules_text)

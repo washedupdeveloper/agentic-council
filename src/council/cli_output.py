@@ -45,6 +45,9 @@ def print_plan(planned: Plan) -> None:
         window = (f"  lines {unit.ranges[0][1]}–{unit.ranges[0][2]}"
                   if unit.window and unit.ranges else "")
         print(f"  {safe(unit.id)}  {files}{window}  {unit.bytes:,} bytes  depth {unit.depth}")
+    if planned.rules:
+        paths = sum(len(hit.paths) for hit in planned.rules)
+        print(f"  rules: {len(planned.rules)} document(s) govern {paths} changed file(s)")
     if planned.windows:
         low, high = planned.estimated_samples
         print(f"  windows: {planned.windows} of {len(planned.units)} unit(s): "
@@ -72,6 +75,8 @@ def plan_payload(planned: Plan) -> dict[str, object]:
         "prompt_limit": planned.prompt_limit,
         "sliced": planned.sliced,
         "windows": planned.windows,
+        "rules": [{"glob": hit.glob, "doc": hit.doc, "paths": list(hit.paths),
+                   "truncated": hit.truncated} for hit in planned.rules],
         "estimated_samples": list(planned.estimated_samples),
         "units": [
             {

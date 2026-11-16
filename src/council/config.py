@@ -13,15 +13,17 @@ from .domain.config import (
     CONFIG_NAME,
     DEFAULT_ALLOW,
     DEFAULT_POLICY,
+    RULE_BYTES,
     Config,
     ConfigError,
     Policy,
+    Rule,
     parse,
 )
 
 __all__ = [
-    "CONFIG_NAME", "DEFAULT_ALLOW", "DEFAULT_POLICY", "Config", "ConfigError",
-    "Policy", "load",
+    "CONFIG_NAME", "DEFAULT_ALLOW", "DEFAULT_POLICY", "RULE_BYTES", "Config",
+    "ConfigError", "Policy", "Rule", "load",
 ]
 
 
@@ -33,7 +35,8 @@ def load(path: Path, policy: Policy = DEFAULT_POLICY) -> Config:
                 raise ConfigError(f"{path} is a broken symlink")
             raise ConfigError(f"{path} is a symlink: configuration must be a regular file")
         if not path.exists():
-            return Config(allow=policy.allow, timeout=policy.timeout, sandbox=policy.sandbox)
+            return Config(allow=policy.allow, timeout=policy.timeout,
+                          sandbox=policy.sandbox, rules=())
         if not path.is_file():
             raise ConfigError(f"{path} is not a regular file")
         text = path.read_text(encoding="utf-8")
