@@ -14,7 +14,7 @@ those proofs reached. A finding counts only once its proof holds.
     council review                        # gate: 0 pass, 1 fail, 2 incomplete, 3 could not start
     council review --plan                 # units, bytes, rules, samples: no model call, no run
     council review --include 'src/**' --exclude 'vendor/**'
-    council review --samples 3            # per unit; merged by dimension, file and line
+    council review --samples 3            # per unit; merged by file and line
     council review --report               # advice only: always exits 0
     council ci --sarif council.sarif      # headless: JSON, exit code, SARIF
     council pr 1234                       # base and head come from `gh pr view`

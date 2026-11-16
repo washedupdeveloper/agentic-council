@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from council.findings import blocks
 from council.merge import merge
 from council.schema import RawFinding
 
@@ -48,10 +49,43 @@ def test_different_lines_stay_separate() -> None:
     assert [item.line for item in merged] == [3, 9]
 
 
-def test_different_dimensions_at_one_line_stay_separate() -> None:
+def test_one_line_is_one_finding_whatever_the_dimension() -> None:
+    """The place is the key: two labels for one defect are one defect."""
     merged = merge([sample(raw(dimension="security"), raw(dimension="readability"))])
-    assert len(merged) == 2
+    assert len(merged) == 1
     assert merged[0].dimension == "security"
+
+
+def test_merging_never_weakens_a_finding() -> None:
+    """If any sample's finding blocks, the merged one blocks.
+
+    The old key was `(dimension, file, line)`, so this pair produced two rows and
+    the merged label depended on which row a reader picked. Now the label is the
+    most blocking dimension any sample used and the severity is the highest any
+    sample claimed, so a merge can only preserve or raise blocking status.
+    """
+    merged = merge([sample(raw("medium", dimension="readability")),
+                    sample(raw("low", dimension="correctness"))])
+    assert len(merged) == 1
+    assert merged[0].dimension == "correctness"
+    assert merged[0].severity == "medium"
+    assert blocks(merged[0].dimension, merged[0].severity)
+    assert any(blocks(item.dimension, item.severity) for item in
+               (raw("medium", dimension="readability"), raw("low", dimension="correctness")))
+
+
+def test_two_non_blocking_dimensions_resolve_in_canonical_order() -> None:
+    forward = merge([sample(raw(dimension="readability")),
+                     sample(raw(dimension="performance"))])
+    backward = merge([sample(raw(dimension="performance")),
+                      sample(raw(dimension="readability"))])
+    assert forward == backward
+    assert forward[0].dimension == "readability"
+
+
+def test_different_files_at_one_line_stay_separate() -> None:
+    merged = merge([sample(raw(file="a.py", line=3), raw(file="b.py", line=3))])
+    assert [(item.file, item.line) for item in merged] == [("a.py", 3), ("b.py", 3)]
 
 
 def test_a_failed_sample_contributes_nothing() -> None:

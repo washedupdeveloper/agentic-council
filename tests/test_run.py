@@ -91,6 +91,30 @@ def test_a_proven_finding_is_written_and_fails(tmp_path: Path) -> None:
     assert (report.run_dir / "sample-2.json").exists()
 
 
+def test_two_samples_that_disagree_about_the_dimension_are_one_finding(tmp_path: Path) -> None:
+    """The artefact has one row per place, and it fails the run.
+
+    Unit-level merging is tested in `tests/test_merge.py`; this proves the
+    property in `verdict.json`, which is what a reader acts on.
+    """
+    repo, _ = make_repo(tmp_path)
+    calls = {"count": 0}
+
+    def runner(_: str) -> str:
+        calls["count"] += 1
+        if calls["count"] == 1:
+            return body({"readability": [secret(severity="high", claim="Style nit.")]})
+        return body({"correctness": [secret(severity="low", claim="It is wrong.")]})
+
+    report = review(ReviewRequest(repo=repo, samples=2, run_id="relabelled"), runner)
+    assert report.verdict is Verdict.FAIL
+
+    payload = json.loads((report.run_dir / "verdict.json").read_text(encoding="utf-8"))
+    assert len(payload["findings"]) == 1
+    assert payload["findings"][0]["dimension"] == "correctness"
+    assert payload["findings"][0]["state"] == "proven"
+
+
 def test_a_baseline_suppresses_an_accepted_finding(tmp_path: Path) -> None:
     repo, _ = make_repo(tmp_path)
     first = review(ReviewRequest(repo=repo, samples=1, run_id="before"),

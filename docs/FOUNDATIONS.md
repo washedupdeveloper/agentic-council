@@ -87,10 +87,12 @@ of.
 
 **What would make it wrong.** Two things, both real:
 
-- *Misclassification.* Nothing checks that a finding's `dimension` is apt. A model
+- *Misclassification.* Nothing checks that a finding's `dimension` is apt: a model
   that files a style nit under `correctness` makes it blocking, and the proof
-  cannot help — it settles existence, not category. This is the weakest joint in
-  the whole design.
+  cannot help — it settles existence, not category. The merge cannot fix that for
+  a single finding, but it no longer compounds it: one place is one finding, and
+  its label is the most blocking dimension any sample used (M29), so a second
+  opinion can neither duplicate nor weaken a defect.
 - *Severity inflation by omission.* A model that never writes `low` for a
   correctness finding turns every typo into a gate failure.
 
@@ -185,9 +187,11 @@ Listed because a foundations document that only lists strengths is marketing.
    reviewer sees the diff and nothing else. This is recorded in `context_depth`,
    but nothing warns that a run on a TypeScript tree is single-file by
    construction.
-3. **Dimension classification is unchecked** (see decision 4). The proofs settle
-   existence; nothing settles category, and category is what makes a finding
-   blocking.
+3. **Dimension classification is unchecked, and bounded.** One place is now one
+   finding, labelled with the most blocking dimension any sample used, with the
+   highest severity (M29) — a merge cannot duplicate a defect or weaken it. A
+   single mislabelled finding still blocks, and no proof can independently
+   classify a defect: the model chooses the category.
 4. **The 32 KiB prompt default is one provider's measurement** — a 2.8 KB prompt
    was answered, a 60 KB prompt was not, on one profile on one day. It is a
    starting point, not a property of models.
