@@ -12,7 +12,6 @@ from dataclasses import dataclass
 
 #: `@@ -old,count +new,count @@`; either count is omitted for a single line.
 _HUNK = re.compile(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@")
-_HEADER = re.compile(r"^(?:diff --git |--- |\+\+\+ )")
 _A_PREFIX = ("a/", "b/")
 
 

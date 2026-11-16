@@ -692,6 +692,11 @@ text = "Importing the package performs no installed-version lookup."
 check = "python3 -m pytest tests/test_architecture.py::test_the_package_import_reads_no_metadata -q"
 
 [[claim]]
+id = "a-document-cites-only-tests-that-exist"
+text = "Every test a current-state document names exists, and history is free to name one that does not."
+check = "python3 -m pytest tests/test_doc_citations.py -q"
+
+[[claim]]
 id = "every-document-is-reachable-from-the-index"
 text = "docs/README.md links every Markdown file outside fixtures/, and every link it carries resolves."
 check = "python3 -m pytest tests/test_docs_index.py -q"

@@ -141,6 +141,7 @@ registry, so it cannot describe a claim that has no check.
 | `the-domain-kernel-does-not-act` | No domain-kernel module imports or calls an effect. | `python3 -m pytest tests/test_architecture.py::test_a_pure_module_calls_nothing_that_acts -q` |
 | `an-effectful-module-must-be-a-named-adapter` | A new module that acts must be named as an adapter. | `python3 -m pytest tests/test_architecture.py::test_every_module_that_acts_is_named_as_an_adapter -q` |
 | `the-package-import-reads-no-metadata` | Importing the package performs no installed-version lookup. | `python3 -m pytest tests/test_architecture.py::test_the_package_import_reads_no_metadata -q` |
+| `a-document-cites-only-tests-that-exist` | Every test a current-state document names exists, and history is free to name one that does not. | `python3 -m pytest tests/test_doc_citations.py -q` |
 | `every-document-is-reachable-from-the-index` | docs/README.md links every Markdown file outside fixtures/, and every link it carries resolves. | `python3 -m pytest tests/test_docs_index.py -q` |
 | `a-finding-names-the-sample-that-asserted-it` | Every finding in verdict.json names the sample files that asserted it, and each named file exists and contains the claim. | `python3 -m pytest tests/test_run.py::test_every_finding_points_at_the_sample_that_asserted_it -q` |
 | `a-windowed-finding-names-its-sample-file` | A finding from a sliced run points at the unit's sample file, and the path resolves. | `python3 -m pytest tests/test_windows.py::test_a_windowed_finding_names_its_sample_file -q` |

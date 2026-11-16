@@ -652,7 +652,7 @@ silently accepted.
 
 | id | pri | invalid transition / state | impact | fix / evidence | status |
 |---|---|---|---|---|---|
-| SM-01 | P0 | two `--no-ephemeral` runs share one run directory | mixed samples/verdict, evidence corruption | `_claim` exclusive `mkdir`; live race 3/0; `test_a_claimed_run_directory_is_exclusive` | fixed |
+| SM-01 | P0 | two `--no-ephemeral` runs share one run directory | mixed samples/verdict, evidence corruption | `_claim` exclusive `mkdir`; live race 3/0; `test_a_run_id_is_never_overwritten` | fixed |
 | SM-02 | P1 | `--keep` merges into an existing target | overwritten evidence, silent mix | `copytree` without `dirs_exist_ok`; `test_keep_refuses_an_existing_target` | fixed |
 | SM-03 | P1 | reviewer emits non-UTF-8 bytes | traceback instead of failed sample | `errors="replace"`; `test_a_non_utf8_answer_is_replaced_not_a_crash` | fixed |
 | SM-04 | P1 | JSON Pointer `/-1` or `/01` resolves an element | wrong `PROVEN`/`REFUTED` proof state | index regex; pointer tests | fixed |

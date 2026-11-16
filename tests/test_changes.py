@@ -131,7 +131,7 @@ def test_the_header_line_is_kept_verbatim() -> None:
     assert hunk.text.endswith("@@ def handler():\n a\n+b\n c\n")
 
 
-def test_a_hunk_range_is_the_new_side() -> None:
+def test_a_hunk_claims_the_new_side_range() -> None:
     assert parse_hunk("diff --git a/f b/f\n@@ -5,2 +7,3 @@\n").new_range == (7, 9)
     assert parse_hunk("@@ -5 +7 @@\n").new_range == (7, 7)
 
