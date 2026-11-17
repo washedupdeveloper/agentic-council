@@ -391,6 +391,8 @@ does not modify tracked files; the only repository edit the tool makes is
 ## Documentation
 
 - [`docs/README.md`](docs/README.md) — index of every document.
+- [`docs/COMPARISON.md`](docs/COMPARISON.md) — how this review gate differs
+  from coding agents, harnesses, workspaces and dedicated PR review tools.
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — kernel, adapters and debt.
 - [`docs/STATE-MACHINES.md`](docs/STATE-MACHINES.md) — states and invariants.
 - [`docs/BASELINE.md`](docs/BASELINE.md) — accepted-risk rules.

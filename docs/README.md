@@ -23,6 +23,7 @@ fails the gate when one exists.
 | [`PORTABILITY.md`](PORTABILITY.md) | ephemeral execution beyond NixOS, host by host |
 | [`BASELINE.md`](BASELINE.md) | accepting a proven blocking finding without hiding the evidence |
 | [`VERSIONING.md`](VERSIONING.md) | the public surface, the semantic-version policy, the release procedure |
+| [`COMPARISON.md`](COMPARISON.md) | how council differs from coding agents, harnesses, workspaces and PR review tools, with dated sources |
 | [`../skills/council/SKILL.md`](../skills/council/SKILL.md) | the skill an agent follows: how to run a review, read the verdict, and what not to do |
 | [`../src/council/prompts/reviewer.md`](../src/council/prompts/reviewer.md) | the reviewer prompt: what the model is asked, the six proof kinds, and the shape of the answer it must return |
 | [`../CHANGELOG.md`](../CHANGELOG.md) | what changed, by release |
