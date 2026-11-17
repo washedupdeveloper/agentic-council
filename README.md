@@ -1,174 +1,97 @@
 # council
 
-A review is a claim until a check settles it.
+**A review is a claim until a check settles it.**
 
-> **Where to go next:** [`docs/README.md`](docs/README.md) indexes every document
-> in this repository. The gate is `nix flake check`: the suite, the types, the
-> claims, the mutations, the Nix sources and the wheel — and it is the only thing
-> that decides whether a checkout is green.
+`council` reviews a git change with a configured AI reviewer, then requires a
+proof before a finding can block a merge. It returns one of three verdicts:
+**PASS**, **FAIL**, or **INCOMPLETE**. It is a review gate — not a linter, a
+formatter, a test runner, or a code generator.
 
-## The rule
+Every document in this repository is indexed in [`docs/README.md`](docs/README.md).
 
-Every finding carries one of four states, and the verdict is a pure function of
-those states:
+## What it is for
+
+Use `council` when a change needs a repeatable review before it merges:
+
+- **A local pre-merge check.** See what an independent reviewer finds before
+  opening a pull request.
+- **A CI gate.** Turn review evidence into a stable exit code and a SARIF log.
+- **A pull-request review.** Review the exact commit GitHub says belongs to a
+  PR, without checking out a branch yourself.
+- **Team adoption.** Record accepted risks in a reviewed baseline instead of
+  silently ignoring known findings.
+
+It is designed around **one change at a time**: a base revision and its diff.
+It is not a whole-repository audit tool, a static analyzer replacement, a
+security certification, or an autopilot that edits your code.
+
+The reviewer is a model; the proof is deterministic. A model's claim is not
+accepted just because it sounds confident. If evidence is missing, the result
+is **INCOMPLETE**, never a quiet pass.
+
+## How the verdict works
+
+A finding is one claim about the change. It has one of four states:
 
 | state | meaning |
 |---|---|
-| `proven` | the check ran and supported the claim — **this is the only state that fails a run** |
-| `refuted` | the check ran and the claim did not hold |
-| `unsettled` | no check was attempted |
-| `unrunnable` | a check was attempted and could not run here |
+| `proven` | the proof ran and supported the claim. This is the only state that can block a merge. |
+| `refuted` | the proof ran and the claim did not hold. |
+| `unsettled` | no proof was attempted. |
+| `unrunnable` | a proof was attempted but could not run here. |
 
+The verdict is a pure function of those states:
+
+```text
+any blocking finding proven       -> FAIL        exit 1
+else any blocking finding open    -> INCOMPLETE  exit 2
+else                              -> PASS        exit 0
 ```
-any blocking finding proven        -> FAIL        exit 1
-else any blocking finding open     -> INCOMPLETE  exit 2
-else                               -> PASS        exit 0
-```
 
-A **start failure** is exit 3, never 2: 2 means the review ran and is missing
-evidence. A start failure writes no run and sends no prompt.
+A **start failure** is exit `3`: no review ran, no run directory was written,
+and no model call was made. A blocking finding is one with severity `high` or
+`critical`, or any severity in the `security` or `correctness` dimension. A
+proven `low` security finding still fails; a proven `low` readability finding
+does not.
 
-## Errors and exit codes
+There is deliberately no score. A number cannot override missing evidence or a
+proven blocking finding.
 
-The CLI refuses before spending a model call when the request cannot be valid:
+## Before you start
 
-- a run id that is not one portable path segment (separators, `..`, control
-  characters, Windows-reserved characters, or more than 128 characters);
-- an empty `--repo`, `--prompt`, `--sarif` or `--keep` path;
-- a prompt that is missing, a directory, a FIFO, or not UTF-8;
-- a `--sarif` or `--keep` path whose parent is missing, or that is a symlink,
-  a directory where a file is needed, or a file where a directory is needed;
-- an empty `--base`, `--profile` or `--context-url`;
-- a `--plan` combined with `--sarif`, `--keep` or `--report` (a plan writes no
-  run, so those flags would be silently ignored);
-- a change with no reviewable text, an unknown base revision, a malformed
-  `council.toml`, or a missing reviewer binary.
+You need:
 
-A missing reviewer is a start failure (exit 3), not an `INCOMPLETE` review, and
-it is not retried. A file in the change that is a symlink is named and skipped;
-it is never followed. Human output replaces control characters from model output
-so a finding cannot drive the terminal.
+- **A git repository** with a base revision and a head. `council` reviews a diff,
+  not a directory in isolation.
+- **A configured reviewer.** The default is the `hermes` binary with the
+  `council-generalist` profile, plus provider credentials. `council doctor`
+  checks whether that combination can actually answer.
+- **Python 3.11+** for the wheel, or a container runtime for the image.
+- **`bwrap`** on Linux for sandboxed `command` and `repro` proofs. Without it
+  those proofs are `UNRUNNABLE`, and a run that depends on one is
+  `INCOMPLETE` — not a pass.
+- **Network access** to the model provider. `--context-url` and `council pr`
+  need network access too; proofs themselves run without it.
+- **`gh`** only for `council pr`.
 
-`blocking` means severity `high` or `critical` — **or any severity in `security`
-or `correctness`**. The model may rank a defect; it may not decide that a proven
-security or correctness defect is mergeable. The boundary is tested in both
-directions: a proven `low` security finding fails, a proven `low` readability
-finding passes.
+A source checkout's `nix develop` shell has the test tools, not an installed
+`council`. Build the wheel or use the image for normal use; use the dev shell
+for development.
 
-There is no score in this decision. A number may be reported beside a verdict as
-a trend; it cannot change it.
+## Install
 
-## Commands
+### Wheel (recommended for local use and CI)
 
 ```sh
-council review                # gate: 0 pass, 1 fail, 2 incomplete, 3 could not start
-council review --plan         # units, prompt sizes and skipped files; no model call
-council pr 123                # review a GitHub pull request (needs gh and its head checked out)
-council baseline create       # snapshot accepted proven findings from a kept run
-council baseline prune        # remove entries whose finding is gone
-council ci                    # the same gate for CI: verdict.json on stdout
-council doctor                # can this machine run a review? measure, don't assume
-council --version             # what is installed
-council review --report       # advice only: always exits 0
-python3 -m pytest             # the suite
-./bin/council-verify          # every claim this project makes, executed
-python3 tools/mutation_check.py   # prove the suite can fail
-python3 tools/differential.py     # v1.9.0's verdicts beside this rule
-python3 tools/release.py check    # version, changelog and prose agree
+nix build .#wheel
+python -m pip install result/council-2.0.0-py3-none-any.whl
+council --version
 ```
 
-`claims.toml` is the registry. Each entry is one sentence and the command that
-would falsify it; the loader refuses an entry with no check, and `council-verify`
-exits non-zero if any claim is false. `docs/CLAIMS.md` is generated from it
-(`council-verify --write docs/CLAIMS.md`) and checked in the flake, so the page
-cannot list a claim that has no check behind it.
+The wheel is pure Python and has no runtime dependencies. If someone gives you
+a wheel, install that file the same way.
 
-`council ci` is `council review` for a pipeline: it always prints the verdict as
-JSON and always exits with it. It deliberately does not accept `--report` — a
-gate that can be told to exit 0 is not a gate.
-
-### `council pr`
-
-`council pr 123` asks the GitHub CLI for the pull request's base and head SHAs,
-checks that the current checkout **is** that head commit with a clean worktree,
-and then reviews `base..HEAD` exactly as `council review` would. It never checks
-a branch out and never reviews local edits: a PR review is a review of a commit.
-
-It needs `gh` on `PATH` and an authenticated GitHub CLI. If the checkout is at a
-different commit, it says so and asks for `gh pr checkout 123`; if the worktree
-is dirty, it refuses. `--plan`, `--sarif`, `--json` and `--report` all work, and
-so does every review flag except `--staged` and `--base` — the base belongs to
-GitHub, and the index is not what a pull request is.
-`verdict.json` records the PR's number, URL, title and both SHAs.
-
-`council review --plan` (and `council pr N --plan`) resolves the change, builds
-the context and prompt, and prints the units it would review — file ranges,
-prompt bytes per unit, context depth and skipped files — **without calling the
-reviewer and without writing a run directory**. `--json` gives the same as
-objects. It is how a user sees why a change will be sliced or refused before
-spending a model call.
-
-## Scoped and staged review
-
-The caller owns the scope. `--include` and `--exclude` are repeated
-repository-relative globs: `*` stays in one path segment, `**` recurses, an
-exclude wins, and an include list that matches nothing is a start failure rather
-rather than an empty review. Every path the scope drops is counted: the first
-200 are named in `verdict.json.scope_ignored` and the rest in
-`scope_ignored_omitted`, so nothing disappears silently and no report becomes
-unreadable. `--plan` prints the count and the first few. A repository cannot set
-a scope in `council.toml`.
-
-```sh
-council review --include 'src/**' --exclude 'src/generated/**'
-council ci --include 'src/**/*.py'
-council review --staged        # the index against the base, not the worktree
-```
-
-See [`docs/SCOPE.md`](docs/SCOPE.md).
-
-## Baselines
-
-Existing repositories need a way to adopt the gate without failing on every
-known issue. A baseline is a committed list of proven blocking findings that a
-team has explicitly accepted; it is applied after the evidence verdict and never
-changes a finding's state.
-
-```sh
-council review --no-ephemeral --run-id before
-council baseline create --from .council/runs/before \
-  --out council-baseline.json --owner platform-team --reason "legacy, tracked" --days 90
-council ci --baseline council-baseline.json
-```
-
-`ci` and `pr` read the baseline from the **base revision** by default, so a pull
-request cannot edit the baseline to hide its own new finding. A diff that changes
-the baseline is refused unless `--allow-baseline-change` is explicit.
-`--baseline-from-base` makes a local review use the base revision;
-`--baseline-strict` fails when any entry is expired or stale. Missing evidence —
-`UNRUNNABLE`, `UNSETTLED`, a failed sample, an unreviewed unit — is never
-suppressed. Entries expire; stale entries are reported and can be pruned.
-The full contract, file format and trust rules are in
-[`docs/BASELINE.md`](docs/BASELINE.md).
-
-## Quickstart
-
-### The wheel — no nix on the host
-
-```sh
-nix build .#wheel                 # produces council-2.0.0-py3-none-any.whl
-python -m pip install council-2.0.0-py3-none-any.whl
-cd path/to/repo
-council doctor                    # is this machine able to review?
-council review --base origin/main --samples 3
-```
-
-The wheel is pure Python (3.11+), no dependencies. `command` proofs need
-`bwrap`; without it they are `UNRUNNABLE` and a run that needs one is
-`INCOMPLETE`, never a pass. The flake is how the project builds its artifacts;
-a user who installs the wheel never needs it.
-
-### The image — tool and sandbox together
+### Container
 
 ```sh
 nix build .#image
@@ -176,19 +99,169 @@ docker load < result
 docker run --rm council:2.0.0 --help
 ```
 
-The image carries the tool and `bwrap`, not Hermes. Mount the repository, put a
-`hermes` binary and its profile on the container's PATH, and it reviews like the
-wheel does; the image is the artifact where the sandbox travels with the tool.
+The image contains `council`, `git` and `bwrap`, but **not Hermes**. Mount the
+repository and make your Hermes binary and profile available inside the
+container. The image is the portable way to carry the sandbox with the tool;
+see [`docs/PORTABILITY.md`](docs/PORTABILITY.md) for host-specific details.
 
-### The GitHub Action
+### Source checkout
 
-The composite action installs the wheel into a private environment, runs
-`council doctor`, then `council ci`, and writes `council.sarif`. It needs a
-runner that has Hermes; it never installs one. The workflow in
-`.github/workflows/council.yml` is the working example, including the
-`upload-sarif` step that puts proven findings in code scanning. Set the action's
-`baseline` input to the committed baseline path; `ci` reads it from the base
-revision.
+```sh
+nix develop -c python -m pytest -q -p no:cacheprovider
+nix develop -c ./bin/council-verify
+nix flake check
+```
+
+These are maintainer commands, not user installation commands.
+
+## Your first review
+
+Run these from the repository you want to review:
+
+```sh
+council doctor
+council review --plan --base origin/main
+council review --base origin/main --samples 3
+```
+
+What each step does:
+
+- **`council doctor`** checks `git`, the reviewer binary, `bwrap`, and whether
+  the profile answers a short probe. Fix the reported prerequisite before
+  spending a model call.
+- **`council review --plan`** resolves the change and prints the units, prompt
+  sizes, context depth and skipped files. It calls no reviewer and writes no run
+  directory. Use it whenever a change is large or the base is uncertain.
+- **`council review`** performs the review. `--base` is the revision to compare
+  against; the default is `origin/HEAD`, then `HEAD~1`. Be explicit in scripts.
+  The working tree is reviewed unless you use `--staged`.
+
+A quick local check of only what your next commit would contain:
+
+```sh
+council review --staged --samples 3
+```
+
+`--staged` reviews the index against the base, not the working tree. Untracked
+and unstaged edits are deliberately excluded.
+
+## Reading the result
+
+The human-readable report lists each finding, its dimension, severity, state,
+and the proof that settled it. `--json` prints the complete `verdict.json`;
+`--sarif PATH` also writes proven findings as SARIF 2.1.0.
+
+| what you see | what it means | what to do |
+|---|---|---|
+| **PASS**, exit 0 | no proven blocking finding and no missing evidence | merge when your other checks agree |
+| **FAIL**, exit 1 | at least one blocking finding is proven | fix it, or explicitly accept it with a baseline |
+| **INCOMPLETE**, exit 2 | the review ran, but evidence is missing | make the missing proof runnable or provide the missing answer; do not treat it as a pass |
+| **start failure**, exit 3 | the review could not start; no model call and no run | read the one reported cause, usually a bad base, missing reviewer, or invalid path |
+
+`verdict.json` is the durable record: the base and head, diff digest, skipped
+files, context spans, unresolved calls, samples, findings, proof states, and
+the verdict. It states what was **not** reviewed. A sliced run records each
+unit and its own verdict; an unreviewed unit prevents `PASS`.
+
+If you want advice without a blocking exit code, use `--report`. It always
+exits 0. Do not use `--report` in a merge gate.
+
+## Common workflows
+
+### Before a commit
+
+```sh
+council review --staged --samples 2
+```
+
+### Before pushing a branch
+
+```sh
+council review --base origin/main
+```
+
+### In CI
+
+```sh
+council ci --base "$BASE_SHA" --sarif council.sarif
+```
+
+`council ci` always prints `verdict.json` and always exits with its verdict. It
+cannot be told to exit 0 with `--report`; a gate that can be disabled by a flag
+is not a gate. `ci` reads a baseline from the base revision by default.
+
+### A GitHub pull request
+
+```sh
+gh pr checkout 123
+council pr 123
+```
+
+`council pr` asks GitHub for the PR's base and head, checks that your checkout
+is the head commit with a clean worktree, and reviews that commit. It never
+checks out a branch and never reviews local edits. A PR review is a review of a
+commit. Use `council pr 123 --plan` to inspect the cost first.
+
+### Only part of a change
+
+The caller owns the scope:
+
+```sh
+council review --include 'src/**' --exclude 'src/generated/**'
+council ci --include 'src/**/*.py'
+```
+
+`*` matches within one path segment, `**` recurses, and exclude wins. An include
+that matches nothing is a start failure, not a silently empty review. Dropped
+paths are counted and named in `verdict.json`; they do not disappear.
+
+### A large change
+
+Start with the free plan:
+
+```sh
+council review --plan --base origin/main
+```
+
+`council` slices by whole file, then by hunk. It refuses before sending a prompt
+that is too large. The main levers are:
+
+- `--base REV` — review a narrower change.
+- `--context-depth N` — `0` diff only, `1` enclosing function, `2` one call
+  level, `3` two (default). Lower depth means a smaller prompt.
+- `--max-prompt-bytes N` — raise or lower the per-unit budget.
+- `--window-large-files` — split one enormous hunk into line windows, each its
+  own unit. This costs one sample per window; `--max-windows N` caps it at 200
+  by default.
+- `--samples N` — explicit sample count; `--samples auto` asks once for a clean
+  unit, twice to confirm a finding, and three times to break a tie.
+
+Windows are disjoint: a defect spanning a window boundary can be missed. That
+trade-off is recorded in the run rather than hidden. `council ci` never asks an
+interactive question; use `--allow-large-prompt` only when you have measured the
+cost and accept it.
+
+### Accepted risks (baselines)
+
+A baseline is a committed list of proven blocking findings a team has explicitly
+accepted. It is applied after the evidence verdict and never changes a finding's
+state. Missing evidence cannot be baselined.
+
+```sh
+council review --no-ephemeral --run-id before-fix
+council baseline create --from .council/runs/before-fix \
+  --out council-baseline.json --owner platform-team \
+  --reason "legacy, tracked" --days 90
+council ci --baseline council-baseline.json
+```
+
+`ci` and `pr` read the baseline from the base revision by default, so a pull
+request cannot edit the baseline to hide its own new finding. A diff that edits
+the baseline is refused unless `--allow-baseline-change` is explicit. Entries
+expire; `--baseline-strict` fails on expired or stale entries, and
+`council baseline prune` reports or writes a cleaned baseline.
+
+See [`docs/BASELINE.md`](docs/BASELINE.md) for the file format and trust rules.
 
 ## Configuration
 
@@ -202,211 +275,12 @@ timeout = 120
 sandbox = true
 ```
 
-The caller's policy is a ceiling: a repository can remove a tool, lower the
-timeout or require the sandbox, never add a tool, raise the timeout or turn the
+The repository's policy is a ceiling: it can remove a tool, lower the timeout, or
+require the sandbox; it cannot add a tool, raise the timeout, or turn the
 sandbox off. Unknown keys are refused with exit 3, so a typo cannot silently
-restore a default. `command` proofs run in an overlay sandbox; `sandbox = false`
-is refused when the caller requires it.
+restore a default.
 
-## Sandbox and cleanup
-
-On Linux with `bwrap`, the reviewer runs in a bubblewrap sandbox: an immutable
-root, a private `/tmp`, and a tmpfs overlay of `$HOME`. It can read the host and
-reach the model, but every write to `$HOME` or `/tmp` lands in the overlay and
-disappears with the process. `--sandbox` requires bwrap and fails without it;
-`--no-sandbox` opts out; the default is **on when bwrap is on PATH**. The choice
-is recorded as `reviewer_sandbox` in `verdict.json`. The Nix package puts bwrap
-on the wrapper's PATH, so a Nix/NixOS install gets this by default; a bare wheel
-without bubblewrap records `false` rather than pretending.
-
-Runs are **ephemeral by default**: the run directory lives in a private
-temporary tree and is removed after the verdict. `--keep DIR` copies the run
-there first; `--no-ephemeral` writes `.council/runs` instead. The verdict is
-printed — and a requested SARIF log is written — before the tree is removed. A
-failed run removes its temporary tree too; if `--keep` cannot copy, the evidence
-is left in place and its path is printed. Proof writes already run in an overlay
-sandbox, so they never touch the repository. For hosts without bwrap, see
-[`docs/PORTABILITY.md`](docs/PORTABILITY.md): the container is the boundary.
-
-## Flags
-
-Every flag the tool accepts, what it changes, and why it exists. `council <command>
---help` prints the same set from the parser; a test keeps this table and the parser in step.
-
-### `council review`
-
-| flag | default | what it does | why |
-|---|---|---|---|
-| `-C, --repo PATH` | `.` | the checkout to review | a review is about a repository, not a shell's idea of a directory |
-| `--base REV` | `origin/HEAD`, else `HEAD~1` | where the diff starts | a wrong base still produces a confident verdict, so the default is a chain and each step is checked |
-| `--staged` | off | review the index against the base, not the working tree | review exactly what the next commit would contain; untracked and unstaged edits are deliberately absent |
-| `--include GLOB` | all paths | review only paths matching GLOB (repeatable) | the caller, not the repository, decides what is in scope |
-| `--exclude GLOB` | none | never review paths matching GLOB (repeatable; exclude wins) | generated or vendored paths should be named, not silently forgotten |
-| `--samples N` | auto | samples to ask: N, or auto — 1 clean, 2 to confirm a finding, 3 to break a tie; per unit when a change is sliced | one sample is cheap; a second confirms a finding; a third only when the model disagrees with itself |
-| `--profile NAME` | `council-generalist` | the Hermes profile asked | the instrument is a profile, not a string in the prompt |
-| `--reviewer BIN` | `hermes` | the binary that answers a sample | the corpus harness needs a stub, and another host may need another binary |
-| `--sample-timeout N` | `900` | give up on one sample after N seconds | a model that never answers must fail in bounded time, not hold the run |
-| `--time-budget N` | none | stop starting units after N seconds; the unit in flight finishes | a large sliced review must end by a deadline even when the instrument is slow |
-| `--reasoning LEVEL` | the profile's | reasoning effort for this review: `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max`, `ultra` | the profile's level may be the wrong cost for a given run; whatever is used is recorded and hashed into the instrument |
-| `--stream` / `--no-stream` | stream | read the reviewer's JSON event stream | a non-streaming call cannot tell “thinking” from “gone”; a stream can be watched; a plain-output stub needs `--no-stream` |
-| `--idle-timeout N` | `120` | kill a stream with no event for N seconds | silence must cost the idle timeout, not the sample timeout |
-| `--prompt PATH` | the shipped prompt | a different instrument | experiments must not edit the prompt the gate uses |
-| `--sarif PATH` | off | also write proven findings as a SARIF 2.1.0 log | code scanning wants a log; `verdict.json` stays the complete evidence |
-| `--plan` | off | print units, prompt bytes, depth and skipped files; no reviewer, no run | see the cost and the slicing before spending a model call |
-| `--sandbox` / `--no-sandbox` | on when `bwrap` exists | run the reviewer in a bwrap sandbox: read-only root, private `/tmp`, overlay `$HOME` | writes vanish with the process; `--sandbox` fails rather than run unsandboxed |
-| `--ephemeral` / `--no-ephemeral` | on | keep run state in a private temp tree and remove it after the verdict; `--no-ephemeral` writes `.council/runs` | zero-footprint by default: the verdict is the product, not the leftovers |
-| `--keep DIR` | off | copy the run directory to DIR before an ephemeral removal | keep evidence deliberately, not by accident |
-| `--report` | off | exit 0 whatever the verdict | advice in a hook that must not block |
-| `--json` | off | print `verdict.json` | the machine-readable form, byte-identical to the artefact |
-| `--run-id ID` | timestamp | name the run; refused if it exists | two runs are comparable only when they can be named |
-| `--context-url URL` | none | fetch a URL as reference context (repeatable) | retrieval is context, not evidence; the caller names it, never the model |
-| `--context-depth N` | `3` | `0` diff only, `1` enclosing function, `2` +one call level, `3` +two | the context is what makes a prompt large; the caller can trade depth for size |
-| `--max-prompt-bytes N` | `32768` | refuse a prompt larger than N bytes | a prompt past the model's practical envelope is a hang, not a review; refusal is immediate |
-| `--allow-large-prompt` | off | send an oversized prompt without asking | an autonomous caller that has measured the cost can say yes in advance |
-| `--window-large-files` | off | split a file too large for one prompt into line windows, one unit each | the default refuses: windowing is the only way to review a 38,000-line addition, and it costs one sample per few hundred lines |
-| `--max-windows N` | `200` | refuse a change that would need more than N windows | a run of thousands of samples is a crawl, not a review; the limit is stated before anything is asked |
-| `--require-executed-proofs` | off | a finding proven only by quotation cannot block the run | a quotation shows a line exists, not that the code misbehaves; the default still blocks and says so in the reason |
-| `--baseline PATH` | none | accept the findings recorded in PATH | an accepted risk belongs in a reviewed file, not in a silence |
-| `--baseline-from-base` | off | read the baseline from the base revision | a change cannot edit the policy it is judged by |
-| `--baseline-strict` | off | an expired or stale entry fails the gate | an acceptance that outlives its expiry should be seen |
-| `--allow-baseline-change` | off | permit a diff that edits the baseline | maintenance is explicit, not inferred |
-| `--autonomous` | off | never ask: refuse an oversized prompt, exit 3 | a script running in a terminal must not block on a question |
-| `-h, --help` | — | usage | — |
-
-### When the prompt is too large
-
-Before the reviewer is called, `council review` measures the prompt. A change
-larger than one prompt is **sliced** first: whole files where they fit, hunks of
-a file that does not, each reviewed within the same budget (see
-[`docs/M12.md`](docs/M12.md)). The refusal below is for a single unit that
-cannot fit at all, at any context depth.
-
-Above `--max-prompt-bytes` it **stops**: nothing is sent, no run directory is written,
-and it says how large the prompt is and what the limit is. By default it then
-asks the person at the terminal what should happen:
-
-| answer | effect |
-|---|---|
-| `allow` | send this prompt anyway; the verdict records `prompt_acknowledged: true` |
-| `window` | split the file into line windows and review each as its own unit; the count and the samples it implies are printed first, and `--samples N` asks N times per window |
-| `budget N` | change the limit to N bytes for this run and retry |
-| `base REV` | review a narrower change and retry |
-| `context N` | keep the diff, change the context depth to N (0–3) and retry |
-| `?` | explain why the limit exists |
-| `cancel`, empty line, or EOF | stop with exit 3 — silence is not consent |
-
-`council ci` never asks: a pipeline has nobody to answer. It refuses unless
-`--allow-large-prompt` is given. The same is true of `council review` with no
-terminal attached, or with `--autonomous`.
-
-The default is a starting point measured, not assumed: a 2.8 KB prompt was
-answered by the reviewer, a 60 KB prompt was not, on the same profile. A run
-that needs more says so before the wait rather than after it.
-
-A file that no budget admits is refused rather than quietly dropped, and the
-refusal states what splitting it would cost: an added file arrives as one hunk
-carrying every line, so a 38,000-line addition cannot be sliced by file or by
-hunk and is one prompt of 1.8 MB. `--window-large-files` (or `window` at the
-prompt) splits such a hunk into line windows instead, each its own unit at
-`--max-prompt-bytes`, reviewed at context depth 0 because a fragment's enclosing
-function is not the thing under review. `--max-windows` (default 200) is the
-ceiling past which the run is refused even then. Windows are disjoint, so a
-defect that spans a boundary is missed; that is the price of reviewing the file
-at all, and it is recorded in `units[].ranges` rather than hidden.
-
-### `council ci`
-
-Takes every flag in the `council review` table except `--report`, `--json`,
-`--plan` and `--autonomous`: it prints `verdict.json` unconditionally and always exits with
-the verdict (0 pass, 1 fail, 2 incomplete, 3 could not start). It exists so a
-pipeline names one stable entry point instead of remembering the flags. It
-refuses an oversized prompt rather than asking; `--allow-large-prompt` is the
-explicit way to send one.
-
-### `council-verify` (maintainer entry point)
-
-Not a `council` subcommand: the registry is the project's own contract, and the
-binary is installed beside `council` for whoever maintains it.
-
-| flag | default | what it does | why |
-|---|---|---|---|
-| `--registry PATH` | `claims.toml` | the claims to run | the registry is the project's own contract, and a fork may carry another |
-| `--list` | off | print the claims without running them | reading the contract must not execute it |
-| `--write PATH` | — | render the registry as markdown | the documentation is generated, never hand-edited |
-| `--check PATH` | — | fail if the file differs from the registry | a stale page is a failing check, not a review note |
-| `-h, --help` | — | usage | — |
-
-### `council init`
-
-| flag | default | what it does | why |
-|---|---|---|---|
-| `-C, --repo PATH` | `.` | the checkout to add `.council/` to | the state directory is per repository |
-| `-h, --help` | — | usage | — |
-
-### `council doctor`
-
-Checks what a review needs on this machine and prints one line per check:
-`git`, the reviewer binary, `bwrap`, and whether the profile answers a one-line
-probe within `--probe-timeout`. A `fail` exits 1; a `warn` (for example, no
-`bwrap`) exits 0 and says what will be `UNRUNNABLE`. `--json` prints the checks
-as objects.
-
-| flag | default | what it does | why |
-|---|---|---|---|
-| `--profile NAME` | `council-generalist` | the profile asked the probe | the same instrument the review will use |
-| `--reviewer BIN` | `hermes` | the binary to look for and ask | a wrapper or another host may use another name |
-| `--probe-timeout N` | `60` | how long the profile has to answer | a dead profile must be reported in a minute, not after a review times out |
-| `--json` | off | machine-readable checks | CI can assert the machine is ready before it reviews |
-| `-h, --help` | — | usage | — |
-
-## Architecture
-
-A pure kernel and an enumerated effect shell. The kernel is `findings`, `verdict`,
-`merge`, `schema`, `prompt`, `changes`, `context`, `sarif` and
-`council.domain` (`run_id`, `config`, `adjudication`, `baseline`, `sandbox`,
-`location`, `text`, `scope`). A kernel module may not import an adapter, spawn a
-process, read or write a path, read the environment or wait; a test parses the module that is
-actually imported and enforces it (`tests/test_architecture.py`), including
-method calls and import direction. The earlier version of that gate listed
-`paths` as pure even though it called `is_symlink()`; it was replaced rather than
-patched around.
-
-Everything that acts is in a module a reader can name — git in `repo`, commands
-in `proofs` and `sandbox`, the model in `sample` and `runner`, the environment
-and policy in `config` and `baseline`, the run directory in `runstore`, the
-network in `reference`, stdout in `cli`. The exhaustive list is `ADAPTERS` in
-`tests/test_architecture.py`, and the test refuses an unlisted module that acts. The boundary, the SOLID
-scorecard and the remaining debt are in
-[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md); the domain vocabulary is in
-[`GLOSSARY.md`](GLOSSARY.md).
-
-The rebuild's acceptance criteria, every amendment to them, and the command that
-decides each one: `docs/M11.md`. The time budget and the doctor checks are
-decided in [`docs/M13.md`](docs/M13.md); release and adoption in
-[`docs/M14.md`](docs/M14.md), with the external run written up in
-[`docs/ADOPTION.md`](docs/ADOPTION.md). Every explicit and implicit state
-machine, its invariants, transitions and residual races lives in
-[`docs/STATE-MACHINES.md`](docs/STATE-MACHINES.md).
-
-## Evidence
-
-`verdict.json` records `base`, `head`, `worktree` (whether local edits were
-included), `diff_sha256`, and `skipped` — every file in the change the diff could
-not carry, with the reason (`too large`, `binary`, `not utf-8`, `unreadable`).
-It also records `context_digest`, the spans the model was shown,
-`unresolved` — calls the context could not follow — and `references`, the URLs
-the caller asked for, with a digest each. A run states what it did not look at.
-
-When the change was too large for one prompt, `verdict.json` also carries
-`sliced: true` and `units[]`: each unit's files, line ranges, diff digest,
-prompt size, context depth, samples, findings and its own verdict. Units whose
-reviewer never answered make the run `incomplete`; a run with an unreviewed unit
-can never be `pass`.
-
-## Rules: judge the diff against the repository's documents
-
-A repository can say which document governs which paths, and council puts that
-document in front of the reviewer before it reads the diff:
+A repository can also say which document governs which paths:
 
 ```toml
 [[rules]]
@@ -414,155 +288,124 @@ glob = "packages/goal/**"
 doc = "docs/subsystems/goal.md"
 ```
 
-Each rule whose `glob` matches a changed path contributes its document once,
-capped at 20,000 bytes and marked when cut, under a heading that says the text is
-context from the repository and not instructions. A rule that matches nothing is
-not recorded; a rule naming a document that cannot be read stops the run. The
-verdict lists what governed the change:
+Each matching document is included once, capped at 20,000 bytes and marked when
+truncated. A rule naming an unreadable document stops the run. The documents are
+context from the repository, not instructions from the repository.
 
-```json
-"rules": [{"glob": "packages/goal/**", "doc": "docs/subsystems/goal.md",
-           "paths": ["packages/goal/goal/src/index.ts"], "truncated": false}]
+## Flags
+
+Run `council review --help` for the authoritative help text. This is the
+complete surface at a glance.
+
+### `council review` and `council ci`
+
+`ci` accepts these except `--plan`, `--report`, `--json` and `--autonomous`;
+it always prints JSON and exits with the verdict.
+
+| flag | default | what it does |
+|---|---|---|
+| `-C, --repo PATH` | `.` | repository to review |
+| `--base REV` | `origin/HEAD`, then `HEAD~1` | revision to diff against |
+| `--staged` | off | review the index, not the working tree |
+| `--include GLOB` | all paths | keep only matching paths (repeatable) |
+| `--exclude GLOB` | none | drop matching paths (repeatable; exclude wins) |
+| `--samples N` | auto | samples per unit: N, or auto (1/2/3 policy) |
+| `--profile NAME` | `council-generalist` | Hermes profile to ask |
+| `--reviewer BIN` | `hermes` | reviewer executable |
+| `--sample-timeout N` | 900 | seconds allowed for one sample |
+| `--time-budget N` | 0 (none) | stop starting units after N seconds |
+| `--reasoning LEVEL` | profile's | `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max`, `ultra` |
+| `--stream` / `--no-stream` | stream | read JSON events; a silent stream is killed |
+| `--idle-timeout N` | 120 | seconds of stream silence before killing |
+| `--sandbox` / `--no-sandbox` | on when `bwrap` exists | run the reviewer in bubblewrap |
+| `--ephemeral` / `--no-ephemeral` | ephemeral | remove the run tree, or write `.council/runs` |
+| `--keep DIR` | none | copy the run to DIR before ephemeral cleanup |
+| `--prompt PATH` | shipped prompt | use a different reviewer prompt |
+| `--sarif PATH` | none | write proven findings as SARIF 2.1.0 |
+| `--run-id ID` | timestamp | name this run; duplicate ids are refused |
+| `--baseline PATH` | none | accepted-risk baseline to apply |
+| `--baseline-from-base` | off for review; on for ci/pr | read the baseline from the base revision |
+| `--baseline-strict` | off | fail on expired or stale baseline entries |
+| `--allow-baseline-change` | off | allow the reviewed diff to edit the baseline |
+| `--context-url URL` | none | fetch reference context (repeatable; never a proof) |
+| `--context-depth N` | 3 | 0 diff, 1 enclosing function, 2 +one call level, 3 +two |
+| `--max-prompt-bytes N` | 32768 | refuse a larger prompt |
+| `--allow-large-prompt` | off | send an oversized prompt without asking |
+| `--window-large-files` | off | split an oversized hunk into line windows |
+| `--max-windows N` | 200 | refuse a change needing more than N windows |
+| `--require-executed-proofs` | off | quotation-only findings cannot block |
+| `--autonomous` | off | never ask; refuse an oversized prompt with exit 3 |
+| `--plan` | off | show units and prompt sizes; no model call, no run |
+| `--report` | off | advice only; exit 0 whatever the verdict |
+| `--json` | off | print the complete `verdict.json` |
+| `-h, --help` | — | usage |
+
+### Other commands
+
+| command | options |
+|---|---|
+| `council pr NUMBER` | every review option except `--base` and `--staged`, plus the positional PR number |
+| `council baseline create` | `--from DIR`, `--out PATH`, `--owner NAME`, `--reason TEXT`, `--days N` |
+| `council baseline prune` | `--baseline PATH`, `--from DIR`, `--write` |
+| `council init` | `-C, --repo PATH` |
+| `council doctor` | `--profile NAME`, `--reviewer BIN`, `--probe-timeout N`, `--json` |
+| `council --version` | print the installed version |
+| `council -h` / `council --help` | command overview |
+
+## Troubleshooting
+
+| symptom | likely cause | fix |
+|---|---|---|
+| `council: command not found` | wheel is not installed in the active environment | install it with `pip`, or use `python -m council` in that environment |
+| `council doctor` reports a missing reviewer | `hermes` is not on `PATH` | install Hermes or pass `--reviewer /path/to/hermes` |
+| doctor's profile check fails | profile missing, unconfigured, or provider unreachable | configure the Hermes profile and credentials; retry `council doctor` |
+| `bwrap` warning | Linux sandbox is unavailable | install bubblewrap, use the container, or accept that `command`/`repro` proofs will be `UNRUNNABLE` |
+| `INCOMPLETE` | a sample failed, a proof could not run, or a unit was not reviewed | read `verdict.json`; fix the blocker and rerun; do not treat it as PASS |
+| prompt is too large | the change exceeds the per-unit budget | run `--plan`; narrow `--base`, lower `--context-depth`, raise `--max-prompt-bytes`, or use `--window-large-files` |
+| review is very slow | too many units or samples, or a slow provider | reduce `--samples`/`--context-depth`, use `--time-budget`, review a narrower base, or choose `--window-large-files` deliberately |
+| PR review refuses the checkout | worktree is dirty or not at the PR head | run `gh pr checkout NUMBER` and clean local edits |
+| baseline entry expired | the accepted risk has outlived its date | renew it, or run `council baseline prune` and review the result |
+
+## Safety and privacy
+
+`council` sends the reviewed diff, selected context and any caller-supplied
+`--context-url` to the configured model provider. Do not review a change
+containing credentials or secrets you are not allowed to send to that provider.
+Keep provider keys out of the repository and out of prompts.
+
+Proof commands run in a bubblewrap sandbox when available: no network, a
+read-only root, a private `/tmp` and an overlay of `$HOME`. Writes vanish with
+the process. `--no-sandbox` opts out and should be reserved for trusted
+repositories. A repository's `council.toml` can only narrow the caller's proof
+policy, not widen it.
+
+Runs are ephemeral by default. `--keep DIR` is the explicit way to retain a run;
+`--no-ephemeral` writes into `.council/runs`, which is ignored by git. A review
+does not modify tracked files; the only repository edit the tool makes is
+`council init`, which adds `.council/` to `.gitignore`.
+
+## Documentation
+
+- [`docs/README.md`](docs/README.md) — index of every document.
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — kernel, adapters and debt.
+- [`docs/STATE-MACHINES.md`](docs/STATE-MACHINES.md) — states and invariants.
+- [`docs/BASELINE.md`](docs/BASELINE.md) — accepted-risk rules.
+- [`docs/SCOPE.md`](docs/SCOPE.md) — include/exclude and staged review.
+- [`docs/PORTABILITY.md`](docs/PORTABILITY.md) — containers and hosts without
+  NixOS.
+- [`docs/VERSIONING.md`](docs/VERSIONING.md) — releases and the public surface.
+- [`docs/CLAIMS.md`](docs/CLAIMS.md) — the executable claims registry.
+- [`skills/council/SKILL.md`](skills/council/SKILL.md) — the agent-facing skill.
+
+## Development
+
+```sh
+nix develop -c python -m pytest -q -p no:cacheprovider
+nix develop -c ./bin/council-verify
+nix develop -c python tools/mutation_check.py
+nix flake check
 ```
 
-This is the one idea worth taking from every review process that works: a diff
-judged against the reviewer's memory of the rules is a diff nobody checked.
-
-## Proof strength
-
-Each finding records whether the proof that held *ran* something (`command`,
-`repro`) or only quoted the code (`present`, `absent`, `json`, `diff`), as
-`proof_strength` in `verdict.json`. A quotation is evidence that a line exists;
-it is not evidence that the code misbehaves. The default still lets a quoted
-finding block — half the real defects are one wrong line — and names it in the
-reason (`2 proven blocking finding(s): F-01, F-03; 1 of them proven by quotation
-only: F-03`). `--require-executed-proofs` is the strict reading: a quotation is
-reported and never blocks.
-
-## What a verdict is
-
-One call per unit — the whole change, a file, a hunk, or a line window — and
-five sections per answer (`security`, `correctness`, `readability`,
-`architecture`, `performance`) in one JSON object. A finding without a proof from
-the closed set (`absent`, `present`, `command`, `repro`, `json`, `diff`)
-is refused by the parser, not by the prompt alone.
-
-Two kinds carry the weight. `repro` is the only kind whose pass condition is a
-non-zero exit: the command must fail, because the finding claims a defect that
-can be demonstrated, and a quotation cannot demonstrate one. `absent` takes an
-optional `within` list of POSIX globs, so an absence claim is settled inside the
-subtree it is about — and a scope that matches no file is `UNRUNNABLE`, never a
-free pass.
-
-The prompt ships with the tool at `src/council/prompts/reviewer.md`; `--prompt`
-names a different one. It carries the change **and the functions around it**: for
-every changed Python file the enclosing function is included, then the repository
-functions it calls, two levels deep. `--context-depth` is the lever on that: `0`
-sends the diff alone, `1` the enclosing function, `2` one call level, `3` two (the
-default). Anything the resolver could not follow is
-named in the prompt rather than left out. It is deliberately **not** read from
-the repository under review — otherwise the code being judged could supply a
-prompt that reports nothing. Every run records a digest over the template, the
-profile, the dimensions **and the profile's own configuration**: the model,
-provider and reasoning default live in a Hermes profile file this tool does not
-parse, so its bytes are hashed instead. Two runs are comparable only when the
-digest matches, and a run that could not read that file says so rather than
-assuming it did.
-
-## Container
-
-`nix build .#image` → an OCI tarball with `council`, `git` and `bash`. It carries
-the tool, not the reviewer: mount one at `/bin/hermes` or pass `--reviewer`.
-Command proofs need user namespaces; a runtime that blocks them makes those
-proofs `UNRUNNABLE`, never unsandboxed.
-
-`nix build .#wheel` → `council-2.0.0-py3-none-any.whl`, with no dependencies:
-`pip install` it on any host with Python 3.11+. A wheel cannot carry `bwrap`, so
-`command` proofs on a bare host are `UNRUNNABLE` unless bubblewrap is installed;
-the image is the artifact where the sandbox travels with the tool. Nix builds
-both; a user needs neither nix nor this repository to run the wheel.
-
-## Releasing
-
-The version lives in `pyproject.toml`, the newest heading in `CHANGELOG.md`,
-and any prose that quotes it (`Current release vX.Y.Z`, or a wheel filename).
-`python tools/release.py check` asserts all three agree, that `## Unreleased`
-is first, and that releases are unique, dated and descending; it is a check in
-the flake. `python tools/release.py bump --version X.Y.Z` moves the Unreleased
-entries under a dated heading, updates every copy, and prints the `git tag`
-command rather than running it — tagging is a person's decision.
-
-The policy, the public surface and the definitions are
-[`docs/VERSIONING.md`](docs/VERSIONING.md).
-
-## Layout
-
-```
-src/council/findings.py   Finding, State, Severity — the domain
-src/council/verdict.py    judge() — the whole decision
-src/council/base.py       which revision the diff is taken against
-src/council/paths.py      where a run's artefacts live
-src/council/schema.py     the reviewer's output contract
-src/council/prompt.py     render the template, digest the instrument
-src/council/changes.py    the diff parser, shared by the diff proof and context
-src/council/context.py    the functions around the change, and their calls
-src/council/sample.py     one sample: run, retry once, record
-src/council/proofs.py     the six proof kinds
-src/council/sandbox.py    bubblewrap: no network, overlay tree
-src/council/claims.py     the claim registry and its runner
-src/council/prompts/      the reviewer prompt, shipped with the tool
-skills/council/           the agent-facing skill
-fixtures/                 the six-rung corpus and the golden rounds from v1.9.0
-```
-
-## The sandbox
-
-A `command` proof runs under `bubblewrap`: no network, a read-only root, a
-private `/tmp` and `$HOME`, and a cleared environment. The repository is an
-overlay — a proof may write, and the writes vanish with it. A write anywhere
-else is `UNRUNNABLE`, not refuted. `[proofs] sandbox = false` opts out; without
-`bwrap` on `PATH` the same proofs are `UNRUNNABLE` and never fall back to
-running unsandboxed.
-
-## Known limits
-
-The reviewer is an external process, and its speed is not the tool's. On the
-provider measured on 2026-11-09: a trivial prompt answered in 11–22 s; a 2.8 KB
-review (the docs commit) completed three samples; review prompts of 5.8 KB,
-31 KB and 84 KB did not return within 6–10 minutes. A sliced run makes one call
-per unit, so a slow provider makes a large change slow even when every unit fits.
-
-`--sample-timeout` (default 900 s) bounds one attempt; a sample that does not
-answer is a failed sample, and a run with one is `INCOMPLETE` — never a pass.
-`--time-budget` stops starting units after N seconds; the units still to come are
-recorded as unreviewed (`units[].error`), and the run cannot be `PASS`.
-`--context-depth` and `--samples` are the cost levers, and a narrower `--base`
-is the reliable one. `council doctor` reports what this machine can do before a
-review depends on it.
-
-This is a property of the instrument, not of the verdict: the tool never trades
-a missing answer for a pass.
-
-The profile on this host sets `reasoning_effort: ultra`. The same 7,954-byte
-prompt answered in 84 s (plain) and 69 s (streamed), and a two-sample `ultra`
-review of an external repository reached `PASS` in 239 s with five proven
-findings; earlier attempts at the same level did not answer in 90 s. Usage shows
-one API call, ~4.5k reasoning tokens at `ultra` and ~5.2k at `none`, and
-`finish_reason=stop` when it answers: the failures were provider stalls, not
-reasoning overruns. `--reasoning` still names the instrument in `verdict.json`
-and in the digest, but it is not a reliability lever.
-
-The transport is the guard: `--stream` (the default) reads the answer as JSON
-events and `--idle-timeout` (default 120 s) kills a request that goes silent, so
-a stalled provider costs two minutes, not the whole sample timeout. `--no-stream`
-exists for a host whose Hermes has no `stream-json`. A silent or answerless
-sample is still a failed sample, and a run with one is `INCOMPLETE`, never a
-pass.
-
-## What is not here
-
-- A browser. A DOM claim is a `command` proof: the repository runs its own
-  browser test, and the tool only records whether it passed.
-- Calibration: there is no score, so there is nothing to calibrate.
-- A second live v1 checkout. v2 is the successor; v1.9.0 behavior is pinned by
-  the fixtures and the differential check in this repository.
+The full gate is `nix flake check`: tests, types, claims, mutations, the
+differential corpus, and the Nix sources. A green test suite alone is not a
+release.
