@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from council.sample import ReviewerMissing, run_sample, write_sample
-from council.schema import DIMENSIONS
+from council.domain.schema import DIMENSIONS
 
 VALID = json.dumps({"sections": {name: [] for name in DIMENSIONS}})
 BROKEN = "not json at all"

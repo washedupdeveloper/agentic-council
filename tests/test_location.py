@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from council.domain.location import Location
-from council.findings import Finding, State
+from council.domain.findings import Finding, State
 
 
 @pytest.mark.parametrize(

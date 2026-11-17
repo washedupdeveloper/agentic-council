@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Literal
 
-from .domain.location import Location
+from .location import Location
 
 #: The only severities a finding may carry. Ordered, and `BLOCKING` is derived
 #: from this tuple rather than restated, so a new severity cannot be blocking in

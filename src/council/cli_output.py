@@ -9,7 +9,7 @@ from __future__ import annotations
 from .domain.text import sanitize
 from .planning import Plan
 from .run import Report
-from .verdict import Result
+from .domain.verdict import Result
 
 
 def safe(text: object) -> str:

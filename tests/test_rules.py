@@ -18,7 +18,7 @@ import pytest
 from council.config import ConfigError
 from council.repo import ReviewError
 from council.run import ReviewRequest, plan, review
-from council.schema import DIMENSIONS
+from council.domain.schema import DIMENSIONS
 
 SENTINEL = "never log the api key"
 

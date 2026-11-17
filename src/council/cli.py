@@ -36,8 +36,8 @@ from .run import (
     review,
 )
 from .runner import hermes_runner
-from .sarif import render as render_sarif
-from .verdict import Verdict
+from .domain.sarif import render as render_sarif
+from .domain.verdict import Verdict
 from .version import current_version
 
 _OVERSIZE_HELP = """\

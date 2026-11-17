@@ -12,14 +12,14 @@ from typing import Any
 import pytest
 
 from council.baseline import from_run, write as write_baseline
-from council.prompt import instrument_digest
+from council.domain.prompt import instrument_digest
 from council.runner import profile_fingerprint
 from council.repo import init
 from council.run import (DEFAULT_PROFILE, PromptTooLarge, ReviewError, ReviewRequest,
                          default_prompt, plan, review)
 from council.sample import ReviewerMissing
-from council.schema import DIMENSIONS
-from council.verdict import Verdict
+from council.domain.schema import DIMENSIONS
+from council.domain.verdict import Verdict
 
 PROMPT = "Base {{base}}\n\n{{diff}}\n"
 

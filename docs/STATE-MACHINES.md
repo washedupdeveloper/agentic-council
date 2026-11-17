@@ -30,7 +30,7 @@ process, not a monkeypatched function.
 | M3 slicing | `run._build_units` / `run.plan` | plan only in memory |
 | M4 sample, retry, agreement | `sample.run_sample` / `run._samples` | `sample-N.json` |
 | M5 transport | `runner.hermes_runner` / `runner._read_stream` | `failures[]` |
-| M6 adjudication and verdict | `adjudicate.py` / `verdict.py` | `verdict.json` |
+| M6 adjudication and verdict | `adjudicate.py` / `domain/verdict.py` | `verdict.json` |
 | M7 run persistence | `run.review` / `paths.py` | `.council/runs/<id>/` |
 | M8 ephemeral output and cleanup | `cli._finish_ephemeral` | temp tree / `--keep` |
 | M9 proof execution | `proofs.run_proof` | `verdict.json` finding states |

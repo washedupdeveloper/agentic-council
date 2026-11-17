@@ -19,8 +19,8 @@ import pytest
 from council.repo import ReviewError
 from council.run import ReviewRequest, review
 from council.runstore import SCOPE_REPORT_LIMIT, VERDICT_FORMAT, bounded
-from council.schema import DIMENSIONS
-from council.verdict import Verdict
+from council.domain.schema import DIMENSIONS
+from council.domain.verdict import Verdict
 
 
 def git(repo: Path, *args: str) -> str:

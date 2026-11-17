@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Callable
 
-from council.context import build
+from council.domain.context import build
 
 
 def reader(files: dict[str, str]) -> Callable[[str], str | None]:

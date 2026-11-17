@@ -14,9 +14,9 @@ from pathlib import Path
 
 import pytest
 
-from council.findings import State
+from council.domain.findings import State
 from council.proofs import EXECUTORS, ProofContext, change_lines, run_proof
-from council.schema import PROOF_KINDS
+from council.domain.schema import PROOF_KINDS
 
 ALLOW = frozenset({"true", "false", "sh", "jq", "python3"})
 

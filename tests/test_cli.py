@@ -11,12 +11,12 @@ from typing import Any
 import pytest
 
 import council.cli as cli
-from council.findings import Finding, State
+from council.domain.findings import Finding, State
 from council.domain.baseline import GateResult
 from council.domain.scope import ScopeIgnored
 from council.repo import Skipped
 from council.run import PromptTooLarge, Report, ReviewError
-from council.verdict import Result, Verdict
+from council.domain.verdict import Result, Verdict
 
 
 def report(verdict: Verdict, *, run_dir: Path | None = None,

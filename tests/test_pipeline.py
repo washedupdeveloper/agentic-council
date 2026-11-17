@@ -11,11 +11,11 @@ import json
 from pathlib import Path
 
 from council.adjudicate import adjudicate, verdict
-from council.merge import merge
+from council.domain.merge import merge
 from council.proofs import ProofContext
 from council.sample import run_sample
-from council.schema import DIMENSIONS
-from council.verdict import Verdict
+from council.domain.schema import DIMENSIONS
+from council.domain.verdict import Verdict
 
 ALLOW = frozenset({"rg", "git"})
 DIFF = """diff --git a/app.py b/app.py

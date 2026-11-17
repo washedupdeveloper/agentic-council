@@ -9,7 +9,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 from .domain.adjudication import Adjudication, ProofOutcome, decide, verdict
-from .merge import MergedFinding
+from .domain.merge import MergedFinding
 from .proofs import ProofContext, run_proof
 
 __all__ = ["Adjudication", "ProofOutcome", "adjudicate", "verdict"]

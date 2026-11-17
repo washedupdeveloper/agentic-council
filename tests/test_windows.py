@@ -19,8 +19,8 @@ from council.cli import _request
 from council.cli_parser import build_parser
 from council.repo import ReviewError
 from council.run import PromptTooLarge, ReviewRequest, plan, review
-from council.schema import DIMENSIONS
-from council.verdict import Verdict
+from council.domain.schema import DIMENSIONS
+from council.domain.verdict import Verdict
 
 PROMPT = "Base {{base}}\n\n{{diff}}\n"
 LINES = 300

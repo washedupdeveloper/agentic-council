@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from council.findings import Finding, State
-from council.sarif import render
-from council.schema import DIMENSIONS
-from council.verdict import Result, Verdict
+from council.domain.findings import Finding, State
+from council.domain.sarif import render
+from council.domain.schema import DIMENSIONS
+from council.domain.verdict import Result, Verdict
 
 
 def finding(state: State, *, severity: str = "critical", location: str = "a.py:2",

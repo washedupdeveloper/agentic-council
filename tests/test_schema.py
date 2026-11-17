@@ -6,7 +6,7 @@ import json
 
 import pytest
 
-from council.schema import DIMENSIONS, SchemaError, parse_reviewer_output
+from council.domain.schema import DIMENSIONS, SchemaError, parse_reviewer_output
 
 
 def payload(**sections: list[dict[str, object]]) -> str:

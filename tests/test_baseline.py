@@ -28,8 +28,8 @@ from council.domain.baseline import (
     parse,
     render,
 )
-from council.findings import Finding, State
-from council.verdict import Result, Verdict
+from council.domain.findings import Finding, State
+from council.domain.verdict import Result, Verdict
 
 CREATED = date(2026, 1, 1)
 EXPIRES = date(2026, 4, 1)

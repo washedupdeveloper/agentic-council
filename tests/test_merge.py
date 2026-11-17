@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from council.findings import blocks
-from council.merge import merge
-from council.schema import RawFinding
+from council.domain.findings import blocks
+from council.domain.merge import merge
+from council.domain.schema import RawFinding
 
 
 def raw(severity: str = "high", file: str = "a.py", line: int = 3,

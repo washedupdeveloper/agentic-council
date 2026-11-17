@@ -11,7 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from fnmatch import fnmatchcase
 
-from ..changes import file_sections
+from .changes import file_sections
 from .text import printable
 
 

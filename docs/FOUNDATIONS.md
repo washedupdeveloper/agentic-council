@@ -5,9 +5,8 @@ alternative it rejects, what would make it wrong, and where in the tree it
 lives. The last section is the list of things this page cannot defend, which is
 the part worth reading first if you are deciding whether to trust the tool.
 
-Numbers in this page are measured at the commit that added `format: 1` to
-`verdict.json`: 44 modules, 5,515 lines under `src/council`, 40 test files, 203
-claims, 43 mutations.
+Numbers in this page are current for this checkout: 44 modules, 5,560 lines
+under `src/council`, 43 test files, 214 claims, 57 falsifiers, 48 mutations.
 
 ---
 
@@ -29,7 +28,7 @@ the rule turns into a filter for what is easy to prove: unused imports and
 `TODO`s pass, race conditions do not. This is a live risk, and §8 says how live.
 
 **Where.** `src/council/proofs.py` (executors), `domain/adjudication.py:decide`
-(state from outcomes), `findings.py:State`.
+(state from outcomes), `domain/findings.py:State`.
 
 ---
 
@@ -48,8 +47,8 @@ a way the function cannot see (different model, different profile, different
 prompt), then "pure" only means "deterministic given a black box". Hence
 decision 5: the instrument is recorded, so a disagreement is attributable.
 
-**Where.** `src/council/verdict.py:judge` (three rules, five lines of logic),
-`verdict.py:Result`.
+**Where.** `src/council/domain/verdict.py:judge` (three rules, five lines of logic),
+`domain/verdict.py:Result`.
 
 ---
 
@@ -69,7 +68,8 @@ nobody wires into CI. The mitigation is measurement, not hope: `council doctor`
 fails before a run when the machine cannot produce evidence, and the time budget
 exists so a slow provider cannot silently convert every run to `INCOMPLETE`.
 
-**Where.** `verdict.py:Verdict`, `verdict.py:exit_code`, `domain/adjudication.py:verdict`
+**Where.** `domain/verdict.py:Verdict`, `domain/verdict.py:exit_code`,
+`domain/adjudication.py:verdict`
 (the sample-failure addition), `cli.py` exit paths.
 
 ---
@@ -101,8 +101,8 @@ a per-run count of blocking findings by dimension, and a baseline that can carry
 an accepted `low` correctness finding. `--baseline` exists; an adjudicated
 "accepted" state does not.
 
-**Where.** `findings.py:BLOCKING`, `findings.py:ALWAYS_BLOCKING`, `findings.py:Finding.blocks`,
-`verdict.py:judge`.
+**Where.** `domain/findings.py:BLOCKING`, `domain/findings.py:ALWAYS_BLOCKING`,
+`domain/findings.py:Finding.blocks`, `domain/verdict.py:judge`.
 
 ---
 
@@ -121,7 +121,7 @@ answer, it is noise that makes every run look unique. The rule is: hash what
 changes the prompt or the decoding, nothing else. Transport (`stream`/`plain`)
 is deliberately excluded and recorded separately.
 
-**Where.** `prompt.py:instrument_digest`, `runner.py:profile_fingerprint`,
+**Where.** `domain/prompt.py:instrument_digest`, `runner.py:profile_fingerprint`,
 `prepare.py`, `verdict.json:digest`, `profile_config_sha256`.
 
 **The trail, per finding.** `findings[].evidence` names the sample files whose
@@ -157,8 +157,8 @@ what would work is a bug, not a stance.
 
 ## 7. The tool must be able to fail its own tests
 
-**Decision.** 203 claims, each naming a command that decides it, 49 of them
-naming a *falsifier*; 43 mutations of the rules the claims protect, run against a
+**Decision.** 214 claims, each naming a command that decides it, 57 of them
+naming a *falsifier*; 48 mutations of the rules the claims protect, run against a
 copy of the source, with the requirement that every mutation break at least one
 claim and every declared falsifier break its own.
 

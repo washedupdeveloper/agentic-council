@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from council.prompt import CONTRACT, PromptError, instrument_digest, render
-from council.schema import PROOF_KINDS, SEVERITIES
+from council.domain.prompt import CONTRACT, PromptError, instrument_digest, render
+from council.domain.schema import PROOF_KINDS, SEVERITIES
 
 TEMPLATE = "Base {{base}}\n\n{{diff}}"
 

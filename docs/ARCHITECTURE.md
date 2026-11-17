@@ -8,7 +8,10 @@ architecture pass after the state-machine milestone.
 The concept is sound and the structure is now honest. The review's decisions —
 what a run id is, what a configuration means, what a set of proof outcomes
 settles, what an accepted risk means, and what a sandbox invocation looks like —
-are pure functions in `council.domain` and the pure renderers beside it. The earlier purity claim was
+are pure functions in `council.domain`. The package is the kernel, not a selection
+from it: `findings`, `verdict`, `merge`, `schema`, `prompt`, `changes`, `context`,
+`sarif` and `vocabulary` live there, so a new pure module has one home and
+`tests/test_architecture.py` refuses a module that is neither kernel nor adapter. The earlier purity claim was
 false: `paths` was on the pure list while it called `is_symlink()` and
 `exists()`, and the test only inspected a short list of call names. That test
 could not fail for the defect it existed to prevent. It has been replaced with a
@@ -19,8 +22,8 @@ adapter.
 The implementation is not fully DDD or fully SOLID. The orchestration is split
 along change boundaries: `request` owns the caller's value, `planning` owns
 prompt/unit decisions, `sampling` owns the review sample policy, `runstore` owns
-the on-disk contract and the unit record, `changes` owns the one diff grammar,
-and `run` composes them. `proofs.py` still executes checks
+the on-disk contract and the unit record, and `run` composes them. The diff
+grammar, the prompt and the vocabulary they all build on are in the kernel. `proofs.py` still executes checks
 in the same module that defines proof semantics; that remains recorded as debt,
 not relabelled as architecture.
 

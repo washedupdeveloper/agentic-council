@@ -11,9 +11,9 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, cast
 
-from ..findings import EXECUTED_PROOF_KINDS, Finding, Severity, State
-from ..merge import MergedFinding
-from ..verdict import Result, Verdict, judge
+from .findings import EXECUTED_PROOF_KINDS, Finding, Severity, State
+from .merge import MergedFinding
+from .verdict import Result, Verdict, judge
 
 
 def canonical_proof(proofs: Sequence[tuple[str, Mapping[str, Any]]]) -> str:

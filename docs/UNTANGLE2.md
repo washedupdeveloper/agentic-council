@@ -46,12 +46,15 @@ one starts from a fresh inventory and does not re-open what that pass settled.
    `run.py:123`). **Left:** the locals are used once each in a 90-line function; a
    split into `Change`/`Instrument` would move the same fields behind three names
    and touch every caller. Recorded, not fixed.
-6. **The kernel boundary is a list in a test, not a package.** `PURE` names
+6. **The kernel boundary was a list in a test, not a package.** `PURE` named
    `verdict`, `findings`, `merge`, `schema`, `prompt`, `changes`, `context`,
-   `sarif` and `vocabulary` at top level while `domain/` holds the rest, and
-   `domain/adjudication.py:16` imports `..verdict` — the kernel reaching itself
-   through the shell namespace. **Left:** moving nine modules is ~60 import edits
-   and every document path; it belongs in a commit that changes nothing else.
+   `sarif` and `vocabulary` at top level while `domain/` held the rest, and
+   `domain/adjudication.py:16` imported `..verdict` — the kernel reaching itself
+   through the shell namespace. **Fixed in the next pass:** the nine modules moved
+   into `domain/`, `PURE` is now the package, and a new test refuses a module that
+   is neither kernel nor named adapter. The move cost 76 rewritten import lines, one
+   `from . import findings, verdict` in `council/__init__.py` that no `from .name`
+   rule matched, and six mutation anchors — which is exactly why the gate exists.
 7. **`planning` is an adapter that claimed to be pure.** Its docstring said "pure
    decisions except for the injected file reader", but `build_units` builds the
    reader itself (`:153`), so the ladder cannot be tested without a checkout.

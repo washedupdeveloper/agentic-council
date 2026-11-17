@@ -10,9 +10,9 @@ from __future__ import annotations
 
 import pytest
 
-from council.findings import SEVERITIES, Finding, State
-from council.schema import DIMENSIONS
-from council.verdict import Result, Verdict, exit_code, judge
+from council.domain.findings import SEVERITIES, Finding, State
+from council.domain.schema import DIMENSIONS
+from council.domain.verdict import Result, Verdict, exit_code, judge
 
 
 def finding(severity: str = "high", state: State = State.PROVEN, ident: str = "F-1",

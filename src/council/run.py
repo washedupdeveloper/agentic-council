@@ -13,8 +13,8 @@ from .adjudicate import adjudicate, verdict
 from .domain.adjudication import missing_evidence
 from .domain.baseline import GateResult, apply_baseline
 from .domain.scope import ScopeIgnored
-from .findings import Finding
-from .merge import merge
+from .domain.findings import Finding
+from .domain.merge import merge
 from .paths import run_dir as run_path, validate_run_id
 from .planning import (Plan as Plan, Prepared as Prepared,
                        PromptTooLarge as PromptTooLarge, Unit as Unit,
@@ -30,8 +30,8 @@ from .sampling import (samples as _samples, unit_verdict as _unit_verdict)
 from .proofs import ProofContext
 from .repo import ReviewError, Skipped, state_dir_ignored
 from .sample import Runner, SampleResult
-from .schema import RawFinding
-from .verdict import Result, Verdict
+from .domain.schema import RawFinding
+from .domain.verdict import Result, Verdict
 
 
 @dataclass(frozen=True, slots=True)

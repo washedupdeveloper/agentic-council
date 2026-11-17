@@ -14,7 +14,7 @@ import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
-from council.changes import change_lines, file_sections, parse_hunk
+from council.domain.changes import change_lines, file_sections, parse_hunk
 
 # Lines that cannot confuse the diff format with a newline of their own.
 LINE = st.text(alphabet=st.characters(blacklist_categories=("Cc", "Cs")), max_size=20)

@@ -8,9 +8,9 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from .findings import Finding, blocks
+from .domain.findings import Finding, blocks
 from .sample import Runner, SampleResult, run_sample
-from .verdict import Verdict, judge
+from .domain.verdict import Verdict, judge
 
 AUTO_MAX = 3
 

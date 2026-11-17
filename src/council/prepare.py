@@ -13,13 +13,13 @@ from pathlib import Path
 from .base import resolve_base
 from .baseline import load as load_baseline
 from .baseline import load_at as load_baseline_at
-from .changes import file_sections
+from .domain.changes import file_sections
 from .config import CONFIG_NAME
 from .config import load as load_config
 from .domain.baseline import Baseline
 from .domain.scope import Scope, ScopeError
 from .planning import Prepared, prompt_for, rules_block
-from .prompt import PromptError, instrument_digest
+from .domain.prompt import PromptError, instrument_digest
 from .reference import FetchError, fetch
 from .repo import ReviewError, diff, output
 from .repo import root as repo_root

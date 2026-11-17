@@ -18,26 +18,29 @@ from pathlib import Path
 
 import pytest
 
-#: The decision kernel. Everything here answers a question without touching the world.
+#: The decision kernel: everything under `council.domain`. Answering a question
+#: there may not read, write, spawn, wait or touch the environment. The list is
+#: the package, not a selection from it — a pure module that lives outside is a
+#: module the next reader has to classify by hand.
 PURE = (
-    "findings",
-    "verdict",
-    "merge",
-    "schema",
-    "prompt",
-    "changes",
-    "context",
-    "sarif",
     "domain.__init__",
-    "domain.run_id",
-    "domain.config",
     "domain.adjudication",
     "domain.baseline",
-    "domain.scope",
-    "domain.sandbox",
+    "domain.changes",
+    "domain.config",
+    "domain.context",
+    "domain.findings",
     "domain.location",
+    "domain.merge",
+    "domain.prompt",
+    "domain.run_id",
+    "domain.sandbox",
+    "domain.sarif",
+    "domain.schema",
+    "domain.scope",
     "domain.text",
-    "vocabulary",
+    "domain.verdict",
+    "domain.vocabulary",
 )
 
 #: The effect shell. Each of these may read, write, spawn or wait.
@@ -159,6 +162,17 @@ def test_every_module_that_acts_is_named_as_an_adapter() -> None:
             acted.append(module)
     unclassified = sorted(set(acted) - ADAPTERS)
     assert not unclassified, f"effectful modules not named as adapters: {unclassified}"
+
+
+def test_every_module_is_either_kernel_or_adapter() -> None:
+    """Two homes. A module in neither is a boundary nobody declared."""
+    package = Path(importlib.import_module("council").__file__ or "").parent
+    kernel = {f"domain.{path.stem}" for path in (package / "domain").glob("*.py")}
+    kernel |= {"domain.__init__", "__init__"}
+    modules = {path.stem for path in package.glob("*.py")} | {
+        f"domain.{path.stem}" for path in (package / "domain").glob("*.py")}
+    stray = sorted(modules - kernel - ADAPTERS)
+    assert not stray, f"modules that are neither kernel nor named adapter: {stray}"
 
 
 def test_the_package_import_reads_no_metadata() -> None:

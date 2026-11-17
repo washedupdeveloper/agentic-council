@@ -16,8 +16,8 @@ import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
-from council.findings import State
-from council.schema import PROOF_KINDS
+from council.domain.findings import State
+from council.domain.schema import PROOF_KINDS
 from council.proofs import ProofContext, ProofOutcome, _BadParams, _int_param, _pointer, _str_param, run_proof
 
 ALLOW = frozenset({"true", "false"})

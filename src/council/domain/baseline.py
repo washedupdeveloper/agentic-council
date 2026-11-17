@@ -14,9 +14,9 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import date
 
-from ..findings import SEVERITIES, Finding, State
-from ..verdict import Result, Verdict, judge
-from ..verdict import exit_code as verdict_exit_code
+from .findings import SEVERITIES, Finding, State
+from .verdict import Result, Verdict, judge
+from .verdict import exit_code as verdict_exit_code
 
 BASELINE_VERSION = 1
 

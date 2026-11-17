@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Callable
 
 from .repo import ReviewError
-from .schema import ReviewerOutput, SchemaError, parse_reviewer_output
+from .domain.schema import ReviewerOutput, SchemaError, parse_reviewer_output
 
 #: prompt -> the model's raw text. Raising `OSError` means the reviewer could not run.
 Runner = Callable[[str], str]

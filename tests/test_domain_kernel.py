@@ -10,9 +10,9 @@ from council.domain.adjudication import ProofOutcome, decide
 from council.domain.config import ConfigError, parse
 from council.domain.run_id import validate_run_id
 from council.domain.sandbox import command
-from council.findings import State
-from council.merge import MergedFinding
-from council.verdict import Verdict
+from council.domain.findings import State
+from council.domain.merge import MergedFinding
+from council.domain.verdict import Verdict
 
 
 def merged() -> MergedFinding:

@@ -15,15 +15,15 @@ from typing import TypeVar
 from dataclasses import dataclass
 from pathlib import Path
 
-from .context import Context
+from .domain.context import Context
 from .domain.baseline import GateResult
-from .findings import Finding
+from .domain.findings import Finding
 from .planning import Prepared, Unit
 from .repo import ReviewError
 from .request import ReviewRequest
 from .sample import SampleResult
 from .sample import write_sample as _write_sample_file
-from .verdict import Result
+from .domain.verdict import Result
 
 
 #: The `verdict.json` format. A consumer must refuse a format it does not know

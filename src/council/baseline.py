@@ -19,7 +19,7 @@ from .domain.baseline import (
     parse as parse_baseline,
     render as render_baseline,
 )
-from .findings import Finding, State, blocks
+from .domain.findings import Finding, State, blocks
 from .repo import ReviewError, output
 
 MAX_BASELINE_BYTES = 1_000_000

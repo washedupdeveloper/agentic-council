@@ -13,13 +13,13 @@ import fnmatch
 from dataclasses import dataclass
 from pathlib import Path
 
-from .changes import Hunk, file_sections
+from .domain.changes import Hunk, file_sections
 from .config import RULE_BYTES, Config, Rule
-from .context import Context
-from .context import build as build_context
+from .domain.context import Context
+from .domain.context import build as build_context
 from .domain.baseline import Baseline
 from .domain.scope import ScopeIgnored
-from .prompt import render
+from .domain.prompt import render
 from .reference import Reference
 from .repo import ReviewError, Skipped, python_files
 from .request import ReviewRequest

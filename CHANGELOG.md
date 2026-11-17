@@ -96,6 +96,13 @@ public surface, the definitions, and the release procedure — is
 
 ### Changed
 
+- The kernel is one package. `findings`, `verdict`, `merge`, `schema`, `prompt`,
+  `changes`, `context`, `sarif` and `vocabulary` moved into `council.domain`, so
+  the purity list in `tests/test_architecture.py` is the package rather than a
+  selection from it, `domain.adjudication` no longer imports upward through the
+  shell namespace, and a new test refuses a module that is neither kernel nor
+  named adapter. No public name changed: `council.findings` and `council.verdict`
+  still resolve, now to the kernel modules.
 - The diff is parsed once. `changes.Hunk` carries the header line verbatim, the
   new-side range and `slice()`; `change_lines`, `file_sections` and the window
   slicer read the same parse, so a header edge case has one place to be fixed and

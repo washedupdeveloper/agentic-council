@@ -11,7 +11,7 @@ import pytest
 from council.domain.scope import Scope, ScopeError
 from council.repo import diff
 from council.run import ReviewError, ReviewRequest, review
-from council.schema import DIMENSIONS
+from council.domain.schema import DIMENSIONS
 
 PATCH = (
     "diff --git a/src/a.py b/src/a.py\n"

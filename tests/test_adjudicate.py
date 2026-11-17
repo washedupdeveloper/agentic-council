@@ -6,11 +6,11 @@ from pathlib import Path
 from typing import Any
 
 from council.adjudicate import adjudicate, verdict
-from council.findings import State
-from council.merge import MergedFinding
+from council.domain.findings import State
+from council.domain.merge import MergedFinding
 from council.proofs import ProofContext
 from council.domain.adjudication import missing_evidence
-from council.verdict import Result, Verdict
+from council.domain.verdict import Result, Verdict
 
 ALLOW = frozenset({"true"})
 
