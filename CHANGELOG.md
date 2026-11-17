@@ -11,6 +11,9 @@ public surface, the definitions, and the release procedure — is
 
 ### Added
 
+- `council pr` accepts a pull-request number, URL or branch. `gh pr view`
+  resolves the target to the same base/head pair; the checkout and clean-worktree
+  checks are unchanged. The decision is [`docs/M31.md`](docs/M31.md).
 - The Nix side is checked by a standard rather than by eye. `flake.nix` takes
   `rokokol/nix-best-practices-skill` as an input and exposes
   `checks.nix-lint`, which holds the flake and the scripts to twenty rules that

@@ -191,6 +191,14 @@ MUTATIONS: tuple[Mutation, ...] = (
              "prepare.py",
              "if not patch.strip():",
              "if False:"),
+    Mutation("pr-target-is-ignored",
+             "pr.py",
+             "ref = _target(target)",
+             'ref = "7"'),
+    Mutation("pr-cli-target-is-ignored",
+             "cli.py",
+             "pr: PullRequest = resolve_pr(args.target, args.repo)",
+             "pr: PullRequest = resolve_pr(7, args.repo)"),
 )
 
 

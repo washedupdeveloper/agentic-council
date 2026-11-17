@@ -512,6 +512,18 @@ text = "A pull request number is resolved through gh into both SHAs and its iden
 check = "python3 -m pytest tests/test_pr.py::test_resolve_reads_the_pull_request -q"
 
 [[claim]]
+id = "a-pr-target-may-be-a-number-url-or-branch"
+text = "A pull request target may be a number, URL or branch and is passed to gh pr view."
+check = "python3 -m pytest tests/test_pr.py::test_resolve_accepts_a_pull_request_url tests/test_pr.py::test_resolve_accepts_a_pull_request_branch -q"
+falsifier = "pr-target-is-ignored"
+
+[[claim]]
+id = "the-cli-passes-a-pr-target-to-the-resolver"
+text = "The pr command hands its target to the resolver rather than replacing it."
+check = "python3 -m pytest tests/test_cli.py::test_pr_passes_its_target_to_the_resolver -q"
+falsifier = "pr-cli-target-is-ignored"
+
+[[claim]]
 id = "a-pull-request-must-be-checked-out-at-its-head"
 text = "A checkout at a commit other than the PR head is refused with the gh checkout command."
 check = "python3 -m pytest tests/test_pr.py::test_a_checkout_at_another_commit_is_refused -q"

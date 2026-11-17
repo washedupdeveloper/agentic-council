@@ -388,6 +388,24 @@ def test_pr_takes_its_base_from_github_and_records_it(
     assert getattr(request, "pull_request") == pull
 
 
+def test_pr_passes_its_target_to_the_resolver(
+        monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    pull = cli.PullRequest(7, "https://example/7", "A change", "a" * 40, "b" * 40,
+                           "main", "topic")
+    seen: dict[str, object] = {}
+
+    def fake_resolve(target: str, repo: Path) -> cli.PullRequest:
+        seen["target"] = target
+        return pull
+
+    monkeypatch.setattr(cli, "resolve_pr", fake_resolve)
+    monkeypatch.setattr(cli, "verify_checkout", lambda pr, repo: None)
+    monkeypatch.setattr(cli, "review", lambda request, runner: report(Verdict.PASS))
+    assert cli.main(["pr", "https://github.com/o/r/pull/7",
+                     "-C", str(tmp_path), "--run-id", "pr-target"]) == 0
+    assert seen["target"] == "https://github.com/o/r/pull/7"
+
+
 def test_pr_does_not_accept_a_base() -> None:
     with pytest.raises(SystemExit) as stopped:
         cli.main(["pr", "7", "--base", "main"])

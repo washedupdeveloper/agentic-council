@@ -42,6 +42,11 @@ the evidence states, the blocking rule, or the sandbox. The requested PR is
 still resolved by GitHub; the target is not trusted as evidence.
 
 Regression tests cover number, URL, branch, empty target and option-like target.
+A claim in `claims.toml` binds the URL and branch cases to the gate, and a second
+claim binds the CLI's target passthrough. Two mutations prove the tests can
+fail: `pr-target-is-ignored` replaces the resolved target with `"7"` before
+`gh pr view`, and `pr-cli-target-is-ignored` passes `7` instead of the CLI's
+target to the resolver. The decision is recorded in [`M31.md`](M31.md).
 
 ## Already present — do not re-add as “new”
 

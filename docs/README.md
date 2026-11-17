@@ -55,6 +55,7 @@ looks the way it does.
 | [`M28.md`](M28.md) | rules, proof strength, atomic publication, a bounded report |
 | [`M29.md`](M29.md) | one place is one finding: the merge keys on `(file, line)` |
 | [`M30.md`](M30.md) | every assertion carries its source: findings name their evidence, the skill declares the CLI |
+| [`M31.md`](M31.md) | a pull-request target may be a number, URL or branch, resolved by `gh` |
 
 The series has gaps — `M21`–`M24` and `M27` have no record here. Those changes
 went in without a decision record; this page does not invent one after the fact.
