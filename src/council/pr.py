@@ -29,32 +29,45 @@ class PullRequest:
     head_ref: str
 
 
-def resolve(number: int, repo: Path, *, gh: str = "gh") -> PullRequest:
+def _target(value: str | int) -> str:
+    """A positive number, URL or branch; reject an empty or option-like value."""
+    if isinstance(value, int):
+        if value < 1:
+            raise ReviewError("a pull request number is a positive integer")
+        return str(value)
+    if not isinstance(value, str) or not value.strip():
+        raise ReviewError("a pull request number, URL or branch is required")
+    target = value.strip()
+    if target.startswith("-"):
+        raise ReviewError("a pull request target must not start with '-'")
+    return target
+
+
+def resolve(target: str | int, repo: Path, *, gh: str = "gh") -> PullRequest:
     """Ask `gh` for the PR's base and head SHAs."""
-    if number < 1:
-        raise ReviewError("a pull request number is a positive integer")
+    ref = _target(target)
     binary = shutil.which(gh)
     if binary is None:
         raise ReviewError("`gh` is not installed or not on PATH: `council pr` needs the GitHub CLI")
     try:
-        proc = subprocess.run([binary, "pr", "view", str(number), "--json", FIELDS],
+        proc = subprocess.run([binary, "pr", "view", ref, "--json", FIELDS],
                               cwd=repo, capture_output=True, text=True, check=False,
                               timeout=30)
     except (OSError, subprocess.SubprocessError, ValueError, UnicodeDecodeError) as exc:
-        raise ReviewError(f"gh pr view {number} could not run: {exc}") from exc
+        raise ReviewError(f"gh pr view {ref} could not run: {exc}") from exc
     if proc.returncode != 0:
         detail = proc.stderr.strip() or proc.stdout.strip() or f"exit {proc.returncode}"
-        raise ReviewError(f"gh pr view {number} failed: {detail}")
+        raise ReviewError(f"gh pr view {ref} failed: {detail}")
     try:
         data = json.loads(proc.stdout)
     except json.JSONDecodeError as exc:
-        raise ReviewError(f"gh pr view {number} returned no JSON") from exc
+        raise ReviewError(f"gh pr view {ref} returned no JSON") from exc
     try:
         return PullRequest(int(data["number"]), str(data["url"]), str(data["title"]),
                            str(data["baseRefOid"]), str(data["headRefOid"]),
                            str(data["baseRefName"]), str(data["headRefName"]))
     except (KeyError, TypeError, ValueError) as exc:
-        raise ReviewError(f"gh pr view {number} returned an incomplete pull request") from exc
+        raise ReviewError(f"gh pr view {ref} returned an incomplete pull request") from exc
 
 
 def verify_checkout(pr: PullRequest, repo: Path) -> None:

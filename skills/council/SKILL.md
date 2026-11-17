@@ -21,6 +21,7 @@ those proofs reached. A finding counts only once its proof holds.
     council review --report               # advice only: always exits 0
     council ci --sarif council.sarif      # headless: JSON, exit code, SARIF
     council pr 1234                       # base and head come from `gh pr view`
+    council pr https://github.com/o/r/pull/1234  # URL or branch also work
     council doctor                        # can this machine produce evidence at all?
 
 A review is **ephemeral by default**: the run directory is removed after the

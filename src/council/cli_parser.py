@@ -166,8 +166,8 @@ def build_parser() -> argparse.ArgumentParser:
     add_review_arguments(ci, advice=False)
     ci.set_defaults(report=False, json=True, baseline_from_base=True)
 
-    pr = sub.add_parser("pr", help="review a GitHub pull request by number")
-    pr.add_argument("number", type=int, help="pull request number")
+    pr = sub.add_parser("pr", help="review a GitHub pull request by number, URL or branch")
+    pr.add_argument("target", help="pull request number, URL, or branch")
     add_review_arguments(pr, advice=True, base=False, staged=False)
     pr.set_defaults(baseline_from_base=True)
 

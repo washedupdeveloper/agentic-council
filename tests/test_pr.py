@@ -125,6 +125,50 @@ def test_a_gh_timeout_is_a_review_error(monkeypatch: pytest.MonkeyPatch,
         resolve(7, tmp_path)
 
 
+def test_resolve_accepts_a_pull_request_url(tmp_path: Path,
+                                            monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(pr_module.shutil, "which", lambda name: "/usr/bin/gh")
+    seen: dict[str, object] = {}
+
+    def run(argv: list[str], **kwargs: object) -> SimpleNamespace:
+        seen["argv"] = argv
+        return SimpleNamespace(returncode=0, stdout=json.dumps(DATA), stderr="")
+
+    monkeypatch.setattr(pr_module.subprocess, "run", run)
+    result = resolve("https://github.com/o/r/pull/7", tmp_path)
+    assert result.number == 7
+    assert seen["argv"] == ["/usr/bin/gh", "pr", "view",
+                            "https://github.com/o/r/pull/7", "--json", pr_module.FIELDS]
+
+
+def test_resolve_accepts_a_pull_request_branch(tmp_path: Path,
+                                               monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(pr_module.shutil, "which", lambda name: "/usr/bin/gh")
+    seen: dict[str, object] = {}
+
+    def run(argv: list[str], **kwargs: object) -> SimpleNamespace:
+        seen["argv"] = argv
+        return SimpleNamespace(returncode=0, stdout=json.dumps(DATA), stderr="")
+
+    monkeypatch.setattr(pr_module.subprocess, "run", run)
+    assert resolve("topic", tmp_path).number == 7
+    assert seen["argv"][3] == "topic"
+
+
+def test_an_empty_pull_request_target_is_refused(tmp_path: Path,
+                                                 monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(pr_module.shutil, "which", lambda name: "/usr/bin/gh")
+    with pytest.raises(ReviewError, match="number, URL or branch"):
+        resolve("  ", tmp_path)
+
+
+def test_an_option_like_target_is_refused(tmp_path: Path,
+                                          monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(pr_module.shutil, "which", lambda name: "/usr/bin/gh")
+    with pytest.raises(ReviewError, match="must not start"):
+        resolve("--help", tmp_path)
+
+
 def test_a_non_positive_pull_request_is_refused(monkeypatch: pytest.MonkeyPatch,
                                                 tmp_path: Path) -> None:
     monkeypatch.setattr(pr_module.shutil, "which", lambda name: "/usr/bin/gh")

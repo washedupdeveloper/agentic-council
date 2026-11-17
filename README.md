@@ -201,10 +201,11 @@ gh pr checkout 123
 council pr 123
 ```
 
-`council pr` asks GitHub for the PR's base and head, checks that your checkout
-is the head commit with a clean worktree, and reviews that commit. It never
-checks out a branch and never reviews local edits. A PR review is a review of a
-commit. Use `council pr 123 --plan` to inspect the cost first.
+`council pr` accepts a pull-request number, URL or branch. It asks GitHub for
+the PR's base and head, checks that your checkout is the head commit with a
+clean worktree, and reviews that commit. It never checks out a branch and never
+reviews local edits. A PR review is a review of a commit. Use
+`council pr 123 --plan` to inspect the cost first.
 
 ### Only part of a change
 
@@ -348,7 +349,7 @@ it always prints JSON and exits with the verdict.
 
 | command | options |
 |---|---|
-| `council pr NUMBER` | every review option except `--base` and `--staged`, plus the positional PR number |
+| `council pr TARGET` | every review option except `--base` and `--staged`, plus a PR number, URL or branch |
 | `council baseline create` | `--from DIR`, `--out PATH`, `--owner NAME`, `--reason TEXT`, `--days N` |
 | `council baseline prune` | `--baseline PATH`, `--from DIR`, `--write` |
 | `council init` | `-C, --repo PATH` |
@@ -393,6 +394,8 @@ does not modify tracked files; the only repository edit the tool makes is
 - [`docs/README.md`](docs/README.md) — index of every document.
 - [`docs/COMPARISON.md`](docs/COMPARISON.md) — how this review gate differs
   from coding agents, harnesses, workspaces and dedicated PR review tools.
+- [`docs/FEATURES.md`](docs/FEATURES.md) — adopted, deferred and rejected
+  features from those adjacent systems.
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — kernel, adapters and debt.
 - [`docs/STATE-MACHINES.md`](docs/STATE-MACHINES.md) — states and invariants.
 - [`docs/BASELINE.md`](docs/BASELINE.md) — accepted-risk rules.

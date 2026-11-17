@@ -164,7 +164,7 @@ def _request(args: argparse.Namespace, *, allow: bool | None = None) -> ReviewRe
 
 def _bind_pr(args: argparse.Namespace) -> None:
     """Resolve the PR and make its base the review's base. Never checks out."""
-    pr: PullRequest = resolve_pr(args.number, args.repo)
+    pr: PullRequest = resolve_pr(args.target, args.repo)
     verify_checkout(pr, args.repo)
     args.base = pr.base
     args.pull_request = pr
