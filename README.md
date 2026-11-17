@@ -26,8 +26,8 @@ It is not a whole-repository audit tool, a static analyzer replacement, a
 security certification, or an autopilot that edits your code.
 
 The reviewer is a model; the proof is deterministic. A model's claim is not
-accepted just because it sounds confident. If evidence is missing, the result
-is **INCOMPLETE**, never a quiet pass.
+accepted just because it sounds confident. If a blocking claim cannot be
+settled, the result is **INCOMPLETE**, never a quiet pass.
 
 ## How the verdict works
 
@@ -153,9 +153,9 @@ and the proof that settled it. `--json` prints the complete `verdict.json`;
 
 | what you see | what it means | what to do |
 |---|---|---|
-| **PASS**, exit 0 | no proven blocking finding and no missing evidence | merge when your other checks agree |
+| **PASS**, exit 0 | no proven blocking finding and no open blocking finding | merge when your other checks agree |
 | **FAIL**, exit 1 | at least one blocking finding is proven | fix it, or explicitly accept it with a baseline |
-| **INCOMPLETE**, exit 2 | the review ran, but evidence is missing | make the missing proof runnable or provide the missing answer; do not treat it as a pass |
+| **INCOMPLETE**, exit 2 | at least one blocking finding is open, or a unit/sample was not reviewed | obtain the missing evidence; do not treat it as a pass |
 | **start failure**, exit 3 | the review could not start; no model call and no run | read the one reported cause, usually a bad base, missing reviewer, or invalid path |
 
 `verdict.json` is the durable record: the base and head, diff digest, skipped
