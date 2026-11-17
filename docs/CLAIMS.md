@@ -111,6 +111,9 @@ registry, so it cannot describe a claim that has no check.
 | `a-pull-request-refuses-a-dirty-worktree` | A dirty worktree is refused: a PR review is the commit, not local edits. | `python3 -m pytest tests/test_pr.py::test_a_dirty_worktree_is_refused -q` |
 | `a-pull-request-takes-its-base-from-github` | The PR command uses GitHub's base and records the pull request in the request. | `python3 -m pytest tests/test_cli.py::test_pr_takes_its_base_from_github_and_records_it -q` |
 | `a-plan-writes-no-run-directory` | A plan names its units and creates no run directory. | `python3 -m pytest tests/test_run.py::test_a_plan_names_the_units_and_writes_nothing -q` |
+| `the-mcp-server-exposes-three-tools` | The MCP server lists exactly council_plan, council_review and council_doctor. | `python3 -m pytest tests/test_mcp_server.py::test_mcp_lists_the_three_tools -q` |
+| `the-mcp-server-runs-the-core-gate` | The MCP review tool returns the real council verdict and retained evidence. | `python3 -m pytest tests/test_mcp_server.py::test_mcp_review_runs_the_gate_and_exposes_evidence -q` |
+| `the-acp-agent-runs-the-core-gate` | The ACP agent returns the real council verdict from /review. | `python3 -m pytest tests/test_acp_agent.py::test_acp_review_returns_the_gate_verdict -q` |
 | `the-cli-prints-a-plan` | council review --plan prints the plan and exits 0. | `python3 -m pytest tests/test_cli.py::test_plan_prints_and_writes_nothing -q` |
 | `a-sandboxed-reviewer-cannot-write-to-the-host` | A sandboxed reviewer's writes to HOME and /tmp do not reach the host. | `python3 -m pytest tests/test_runner.py::test_a_sandboxed_reviewer_cannot_write_to_the_host -q` |
 | `the-reviewer-sandbox-needs-bwrap` | The sandbox fails rather than running unsandboxed when bwrap is absent. | `python3 -m pytest tests/test_runner.py::test_the_sandbox_needs_bwrap -q` |

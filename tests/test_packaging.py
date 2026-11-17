@@ -32,8 +32,19 @@ def test_the_package_ships_a_typed_marker() -> None:
     assert (Path(council.__file__).resolve().parent / "py.typed").is_file()
 
 
-def test_both_console_scripts_are_declared() -> None:
+def test_the_console_scripts_are_declared() -> None:
     assert project()["scripts"] == {
         "council": "council.cli:main",
         "council-verify": "council.claims:main",
+        "council-mcp": "council_mcp:main",
+        "council-acp": "council_acp:main",
     }
+
+
+def test_the_protocol_adapters_are_optional_extras() -> None:
+    extras = project()["optional-dependencies"]
+    assert "mcp" in extras
+    assert "acp" in extras
+    assert "server" in extras
+    assert any(dep.startswith("mcp") for dep in extras["mcp"])
+    assert any(dep.startswith("agent-client-protocol") for dep in extras["acp"])

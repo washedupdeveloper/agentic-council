@@ -544,6 +544,22 @@ text = "A plan names its units and creates no run directory."
 check = "python3 -m pytest tests/test_run.py::test_a_plan_names_the_units_and_writes_nothing -q"
 
 [[claim]]
+id = "the-mcp-server-exposes-three-tools"
+text = "The MCP server lists exactly council_plan, council_review and council_doctor."
+check = "python3 -m pytest tests/test_mcp_server.py::test_mcp_lists_the_three_tools -q"
+
+[[claim]]
+id = "the-mcp-server-runs-the-core-gate"
+text = "The MCP review tool returns the real council verdict and retained evidence."
+check = "python3 -m pytest tests/test_mcp_server.py::test_mcp_review_runs_the_gate_and_exposes_evidence -q"
+falsifier = "mcp-review-always-passes"
+
+[[claim]]
+id = "the-acp-agent-runs-the-core-gate"
+text = "The ACP agent returns the real council verdict from /review."
+check = "python3 -m pytest tests/test_acp_agent.py::test_acp_review_returns_the_gate_verdict -q"
+
+[[claim]]
 id = "the-cli-prints-a-plan"
 text = "council review --plan prints the plan and exits 0."
 check = "python3 -m pytest tests/test_cli.py::test_plan_prints_and_writes_nothing -q"

@@ -11,6 +11,11 @@ public surface, the definitions, and the release procedure — is
 
 ### Added
 
+- `council-mcp` and `council-acp`, optional additive adapters around the public
+  CLI. MCP exposes `council_plan`, `council_review` and `council_doctor`; ACP
+  exposes `/plan`, `/review`, `/verdict` and `/help`. The core package remains
+  free of protocol dependencies and unchanged; evidence is retained under the
+  server's own state root. See [`docs/AGENT-SERVER.md`](docs/AGENT-SERVER.md).
 - `council pr` accepts a pull-request number, URL or branch. `gh pr view`
   resolves the target to the same base/head pair; the checkout and clean-worktree
   checks are unchanged. The decision is [`docs/M31.md`](docs/M31.md).

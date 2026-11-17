@@ -19,7 +19,8 @@ three copies of the version disagree.
 Enumerated from the tool, not from memory (`council --help`, `council review
 --help`, `council ci --help`, `council init --help`; `nix flake show`):
 
-- subcommands `review`, `ci`, `init` and their flags;
+- subcommands `review`, `ci`, `init`, `pr`, `baseline` and `doctor`, their flags,
+  and the optional console scripts `council-mcp` and `council-acp`;
 - exit codes: `0` pass, `1` fail, `2` incomplete, `3` could not start;
 - `verdict.json` and its fields, including `format`, `verdict`, `findings[].state`,
   `findings[].proof_strength`, `scope_ignored_omitted`, `rules[].glob/doc/paths/truncated`,

@@ -56,8 +56,9 @@
           ln -s ${base pkgs}/bin/council-verify $out/bin/council-verify
         '';
 
-      # One interpreter with the two tools the checks need, so `nix develop`,
-      # `nix build` and `nix flake check` agree on the versions.
+      # One interpreter with the tools the checks need. The protocol SDKs are
+      # dev dependencies because the server adapters are tested here; the core
+      # `council` package itself still has no runtime dependencies.
       pythonEnv =
         pkgs:
         pkgs.python3.withPackages (ps: [
@@ -67,7 +68,41 @@
           ps.setuptools
           ps.pip
           ps.wheel
+          ps.mcp
+          ps.agent-client-protocol
         ]);
+
+      # The optional protocol servers use the same source and version. Their
+      # Python closures differ: the core package must not gain MCP/ACP deps.
+      serverBase =
+        pkgs: deps:
+        pkgs.python3Packages.buildPythonApplication {
+          pname = "council-server";
+          inherit version;
+          format = "pyproject";
+          src = self;
+          nativeBuildInputs = with pkgs; [ python3Packages.setuptools ];
+          dependencies = deps;
+          doCheck = false;
+          meta = {
+            description = "council's optional ACP and MCP adapters";
+            mainProgram = "council";
+          };
+        };
+
+      serverApp =
+        pkgs: deps: commands:
+        pkgs.runCommand "council-server-${version}"
+          {
+            nativeBuildInputs = with pkgs; [ makeWrapper ];
+          }
+          ''
+            mkdir -p $out/bin
+            for name in council council-verify ${commands}; do
+              makeWrapper ${serverBase pkgs deps}/bin/$name $out/bin/$name \
+                --prefix PATH : ${pkgs.bubblewrap}/bin
+            done
+          '';
 
       # A writable copy of the tree: the flake source is read-only, and pytest,
       # mypy and the mutation check all write caches.
@@ -123,6 +158,15 @@
             WorkingDir = "/repo";
           };
         };
+
+        # Protocol-specific server closures. The core `council` package above
+        # remains free of both SDKs.
+        council-mcp = serverApp pkgs (with pkgs.python3Packages; [ mcp ]) "council-mcp";
+        council-acp = serverApp pkgs (with pkgs.python3Packages; [ agent-client-protocol ]) "council-acp";
+        council-server = serverApp pkgs (with pkgs.python3Packages; [
+          mcp
+          agent-client-protocol
+        ]) "council-mcp council-acp";
       });
 
       checks = each (
@@ -175,6 +219,11 @@
           # that must exit 0, so the documentation cannot outrun the code.
           # Invoked through bash because the sandbox has no /usr/bin/env.
           claims = mkCheck "council-claims" "bash ./bin/council-verify && bash ./bin/council-verify --check docs/CLAIMS.md";
+
+          # The optional adapters are importable and expose their command help
+          # under the same test interpreter as the core suite.
+          server-mcp = mkCheck "council-server-mcp" "PYTHONPATH=src python -m council_mcp --help > /dev/null";
+          server-acp = mkCheck "council-server-acp" "PYTHONPATH=src python -m council_acp --help > /dev/null";
 
           # The suite, broken on purpose eighteen ways. It must notice each one.
           mutations = mkCheck "council-mutations" "python tools/mutation_check.py";

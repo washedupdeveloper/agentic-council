@@ -25,6 +25,7 @@ fails the gate when one exists.
 | [`VERSIONING.md`](VERSIONING.md) | the public surface, the semantic-version policy, the release procedure |
 | [`COMPARISON.md`](COMPARISON.md) | how council differs from coding agents, harnesses, workspaces and PR review tools, with dated sources |
 | [`FEATURES.md`](FEATURES.md) | scope decisions for features borrowed from adjacent systems: what was adopted, deferred or rejected |
+| [`AGENT-SERVER.md`](AGENT-SERVER.md) | install and configure the optional ACP and MCP adapters, with Zed, VS Code and OpenCode examples |
 | [`../skills/council/SKILL.md`](../skills/council/SKILL.md) | the skill an agent follows: how to run a review, read the verdict, and what not to do |
 | [`../src/council/prompts/reviewer.md`](../src/council/prompts/reviewer.md) | the reviewer prompt: what the model is asked, the six proof kinds, and the shape of the answer it must return |
 | [`../CHANGELOG.md`](../CHANGELOG.md) | what changed, by release |
@@ -56,6 +57,7 @@ looks the way it does.
 | [`M29.md`](M29.md) | one place is one finding: the merge keys on `(file, line)` |
 | [`M30.md`](M30.md) | every assertion carries its source: findings name their evidence, the skill declares the CLI |
 | [`M31.md`](M31.md) | a pull-request target may be a number, URL or branch, resolved by `gh` |
+| [`M32.md`](M32.md) | expose V2 to ACP and MCP hosts without changing the core |
 
 The series has gaps — `M21`–`M24` and `M27` have no record here. Those changes
 went in without a decision record; this page does not invent one after the fact.

@@ -11,11 +11,22 @@ requires-python = ">=3.11"
 dependencies = []
 
 [project.optional-dependencies]
-dev = ["hypothesis>=6", "mypy>=1.10", "pytest>=8"]
+dev = [
+  "hypothesis>=6",
+  "mypy>=1.10",
+  "pytest>=8",
+  "mcp>=1.29,<2",
+  "agent-client-protocol>=0.12,<1",
+]
+mcp = ["mcp>=1.29,<2"]
+acp = ["agent-client-protocol>=0.12,<1"]
+server = ["mcp>=1.29,<2", "agent-client-protocol>=0.12,<1"]
 
 [project.scripts]
 council = "council.cli:main"
 council-verify = "council.claims:main"
+council-mcp = "council_mcp:main"
+council-acp = "council_acp:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

@@ -151,8 +151,8 @@ unsandboxed.
 The repository’s `claims.toml` ties each documented claim to a command that
 must pass. `council-verify` executes the registry, `docs/CLAIMS.md` is generated
 from it, and the mutation check deliberately breaks rules to prove the test
-suite can fail. At the commit this page was written, the registry held **216
-claims**, with **50 mutations** caught.
+suite can fail. At the commit this page was written, the registry held **219
+claims**, with **51 mutations** caught.
 
 ## What council does not do
 

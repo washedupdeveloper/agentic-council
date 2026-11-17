@@ -199,6 +199,10 @@ MUTATIONS: tuple[Mutation, ...] = (
              "cli.py",
              "pr: PullRequest = resolve_pr(args.target, args.repo)",
              "pr: PullRequest = resolve_pr(7, args.repo)"),
+    Mutation("mcp-review-always-passes",
+             "../council_mcp/server.py",
+             '"verdict": payload.get("verdict"),',
+             '"verdict": "pass",'),
 )
 
 

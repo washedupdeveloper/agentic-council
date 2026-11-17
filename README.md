@@ -92,6 +92,16 @@ The wheel is pure Python and has no runtime dependencies. If someone gives you
 a wheel, install that file the same way; an installed wheel does not need Nix.
 `nix build` is only how this repository produces the artifact.
 
+To use the optional agent-server adapters, install the protocol extras:
+
+```sh
+pip install 'council[mcp,acp]'
+```
+
+`council-mcp` is for MCP hosts and `council-acp` is for ACP clients such as
+Zed's Agent Panel. The core `council` command does not import either SDK. See
+[`docs/AGENT-SERVER.md`](docs/AGENT-SERVER.md).
+
 ### Container
 
 ```sh
@@ -396,6 +406,8 @@ does not modify tracked files; the only repository edit the tool makes is
   from coding agents, harnesses, workspaces and dedicated PR review tools.
 - [`docs/FEATURES.md`](docs/FEATURES.md) — adopted, deferred and rejected
   features from those adjacent systems.
+- [`docs/AGENT-SERVER.md`](docs/AGENT-SERVER.md) — the optional ACP and MCP
+  adapters for Agent Panel and MCP hosts.
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — kernel, adapters and debt.
 - [`docs/STATE-MACHINES.md`](docs/STATE-MACHINES.md) — states and invariants.
 - [`docs/BASELINE.md`](docs/BASELINE.md) — accepted-risk rules.
