@@ -181,12 +181,12 @@
             name: command:
             pkgs.runCommand name
               {
-                nativeBuildInputs = [
+                nativeBuildInputs = with pkgs; [
                   py
-                  pkgs.git
-                  pkgs.bubblewrap
-                  pkgs.ruff
-                  pkgs.pyright
+                  git
+                  bubblewrap
+                  ruff
+                  pyright
                 ];
               }
               ''
@@ -257,13 +257,13 @@
 
       devShells = each (pkgs: {
         default = pkgs.mkShell {
-          packages = [
+          packages = with pkgs; [
             (pythonEnv pkgs)
-            pkgs.git
-            pkgs.ruff
-            pkgs.jq
-            pkgs.bubblewrap
-            pkgs.pyright
+            git
+            ruff
+            jq
+            bubblewrap
+            pyright
             nix-best-practices.packages.${pkgs.stdenv.hostPlatform.system}.check-nix
           ];
           shellHook = ''
