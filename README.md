@@ -89,7 +89,8 @@ council --version
 ```
 
 The wheel is pure Python and has no runtime dependencies. If someone gives you
-a wheel, install that file the same way.
+a wheel, install that file the same way; an installed wheel does not need Nix.
+`nix build` is only how this repository produces the artifact.
 
 ### Container
 
@@ -123,6 +124,9 @@ council doctor
 council review --plan --base origin/main
 council review --base origin/main --samples 3
 ```
+
+If you plan to keep run artifacts, run `council init` once; it adds `.council/`
+to the repository's `.gitignore`. Reviewing does not require it.
 
 What each step does:
 
