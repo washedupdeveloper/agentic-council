@@ -127,6 +127,37 @@ def test_skills_dir_env_supplies_the_destination(tmp_path: Path) -> None:
     assert (dest / "probe" / "SKILL.md").is_file()
 
 
+def test_the_cli_reaches_the_verb(tmp_path: Path,
+                                  capsys: pytest.CaptureFixture[str]) -> None:
+    """`council setup skill` must go through `main`, not fall through to `review`.
+
+    The module tests above call `run` directly, so they cannot see a missing dispatch
+    branch: the verb parsed, the parser accepted it, and `main` still asked for a review.
+    """
+    from council import cli
+
+    lib = library(tmp_path / "lib", "probe")
+    assert cli.main(["setup", "skill", "--library", str(lib), "--list"]) == 0
+    assert "probe" in capsys.readouterr().out
+
+    dest = tmp_path / "skills"
+    assert cli.main(["setup", "skill", "probe", "--library", str(lib),
+                     "--dest", str(dest)]) == 0
+    assert (dest / "probe" / "SKILL.md").is_file()
+
+
+def test_a_cli_refusal_exits_three(tmp_path: Path,
+                                   capsys: pytest.CaptureFixture[str]) -> None:
+    """A refusal is exit 3, like every other error the CLI reports."""
+    from council import cli
+    from council.cli_parser import EXIT_ERROR
+
+    lib = library(tmp_path / "lib", "probe")
+    assert cli.main(["setup", "skill", "absent", "--library", str(lib),
+                     "--dest", str(tmp_path / "skills")]) == EXIT_ERROR
+    assert "absent" in capsys.readouterr().err
+
+
 def test_agent_with_no_installed_directory_is_refused(tmp_path: Path) -> None:
     lib = library(tmp_path / "lib", "probe")
     with pytest.raises(SkillSetupError) as raised:

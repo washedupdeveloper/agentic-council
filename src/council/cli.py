@@ -391,6 +391,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.command == "doctor":
         return _doctor(args)
 
+    if args.command == "setup":
+        return _setup(args)
+
     if args.command in ("review", "ci", "pr"):
         try:
             _preflight(args)
