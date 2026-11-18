@@ -1,0 +1,33 @@
+name: gate
+
+# The portable gate on a hosted runner: the same `nix flake check` that runs locally, so a
+# push to v2 is verified without waiting for a person. `council.yml` beside this one stays
+# manual on purpose — it spends model time and needs a self-hosted runner; this spends
+# neither.
+
+on:
+  push:
+    branches: [v2]
+  pull_request:
+    branches: [v2]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One gate per ref: a second push makes the first result irrelevant.
+concurrency:
+  group: gate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    name: nix flake check
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: cachix/install-nix-action@v31
+      - run: nix flake check --print-build-logs
