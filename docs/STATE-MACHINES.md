@@ -1,6 +1,6 @@
 # State machines
 
-This is the state-machine map of `review-council` v2: the states the CLI and run
+This is the state-machine map of `council` (v2): the states the CLI and run
 engine can actually occupy, the invariants that must hold in each, the
 transitions between them, and the invalid states/transitions that the code can
 reach. It is deliberately one file: a transition that is not here is either

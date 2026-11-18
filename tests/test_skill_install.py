@@ -95,7 +95,7 @@ def test_dry_run_writes_nothing(tmp_path: Path,
 
 
 def test_library_is_found_by_contract_not_by_name(tmp_path: Path) -> None:
-    lib = library(tmp_path / "not-called-hermes-skills", "probe")
+    lib = library(tmp_path / "not-the-expected-name", "probe")
     nested = lib / "some" / "deep" / "place"
     nested.mkdir(parents=True)
     assert skill_install.run(args(names=["probe"], dest=tmp_path / "skills"), env={},
