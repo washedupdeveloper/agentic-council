@@ -345,6 +345,18 @@ def _baseline(args: argparse.Namespace) -> int:
         return EXIT_ERROR
 
 
+def _setup(args: object) -> int:
+    """`setup skill`: install from a library. Refusals are exit 3, like every other."""
+    from .skill_install import SkillSetupError
+    from .skill_install import run as run_setup
+
+    try:
+        return run_setup(args)
+    except SkillSetupError as exc:
+        print(f"council: {exc}", file=sys.stderr)
+        return EXIT_ERROR
+
+
 def _doctor(args: argparse.Namespace) -> int:
     """Report what this machine can do. A fail is exit 1; a warning is not."""
     runner = hermes_runner(args.profile, binary=args.reviewer,

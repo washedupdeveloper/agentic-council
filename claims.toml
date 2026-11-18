@@ -1157,3 +1157,13 @@ id = "ci-staged-reaches-the-reviewer"
 text = "The ci command runs a staged review through the real CLI into the reviewer prompt."
 check = "python3 -m pytest tests/test_cli_scope.py::test_ci_runs_a_staged_review -q"
 falsifier = "staged-reads-worktree"
+
+[[claim]]
+id = "skill-installs-without-naming-an-agent"
+text = "A skill installs into any destination directory, with no agent named."
+check = "python3 -m pytest tests/test_skill_install.py::test_installs_into_a_destination_with_no_agent_named -q"
+
+[[claim]]
+id = "skill-install-refuses-to-overwrite"
+text = "An install refuses to replace a skill that differs, and says how to force it."
+check = "python3 -m pytest tests/test_skill_install.py::test_a_differing_skill_is_refused_without_force -q"

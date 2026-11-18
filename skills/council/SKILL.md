@@ -1,8 +1,8 @@
 ---
 name: council
 description: Use when a change needs a blocking-defect verdict. Runs `council review` and reports the states behind the verdict.
-commands: [review, ci, pr, baseline, init, doctor]
-flags: [--plan, --include, --exclude, --samples, --report, --json, --sarif, --no-ephemeral, --keep, --require-executed-proofs, --base]
+commands: [review, ci, pr, baseline, init, doctor, setup]
+flags: [--plan, --include, --exclude, --samples, --report, --json, --sarif, --no-ephemeral, --keep, --require-executed-proofs, --base, --library, --dest, --agent, --list, --force, --dry-run]
 artefacts: [verdict.json, sample-N.json]
 ---
 
@@ -27,6 +27,23 @@ those proofs reached. A finding counts only once its proof holds.
 A review is **ephemeral by default**: the run directory is removed after the
 verdict. Pass `--no-ephemeral` to keep `.council/runs/<id>/`, or `--keep DIR` to
 copy it before the temporary tree goes.
+
+## Install the skill
+
+The skill that teaches an agent to run this tool is a directory, so installing it is a copy
+into a directory the agent already reads. `setup skill` installs skills from a *library* —
+any directory carrying `library/contract.json` — and names no agent of its own:
+
+    council setup skill --list                        # what the library holds
+    council setup skill probe --dest ~/my-agent/skills
+    council setup skill probe --agent claude          # a conventional location, if it exists
+    council setup skill probe --dest ./skills --dry-run
+
+`--library` picks the library, else `$SKILLS_LIBRARY`, else the nearest ancestor holding a
+contract. `--dest` picks the destination, else `$SKILLS_DIR`, else the directory `--agent`
+resolves to — and `--agent` refuses to invent one that is not already on disk, so a machine
+without that agent gets a message rather than a stray directory. A skill is overwritten only
+when the copy is identical (reported as unchanged) or when you pass `--force`.
 
 ## Read
 

@@ -198,4 +198,25 @@ def build_parser() -> argparse.ArgumentParser:
     doctor.add_argument("--probe-timeout", type=positive, default=60, metavar="SECONDS",
                         help="how long the profile has to answer the probe (default: 60)")
     doctor.add_argument("--json", action="store_true", help="print the checks as JSON")
+
+    setup = sub.add_parser("setup", help="install this tool's skills from a skill library")
+    setup_sub = setup.add_subparsers(dest="setup_action", required=True)
+    skill = setup_sub.add_parser(
+        "skill", help="install skill(s) from a library into an agent's skills directory")
+    skill.add_argument("names", nargs="*", metavar="NAME",
+                       help="skills to install (see --list for what the library holds)")
+    skill.add_argument("--library", type=path, metavar="DIR",
+                       help="skill library root (default: $SKILLS_LIBRARY, else the "
+                            "nearest directory holding library/contract.json)")
+    skill.add_argument("--dest", type=path, metavar="DIR",
+                       help="skills directory to install into (default: $SKILLS_DIR, "
+                            "else the one --agent resolves to)")
+    skill.add_argument("--agent",
+                       help="fill --dest from an agent's conventional skills directory")
+    skill.add_argument("--list", action="store_true",
+                       help="print the library's skills and exit")
+    skill.add_argument("--force", action="store_true",
+                       help="replace a skill that differs")
+    skill.add_argument("--dry-run", action="store_true",
+                       help="report what would happen and write nothing")
     return parser

@@ -69,6 +69,7 @@ ADAPTERS = frozenset({
     "sample",
     "sampling",
     "sandbox",
+    "skill_install",
     "version",
 })
 

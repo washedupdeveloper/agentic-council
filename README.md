@@ -364,8 +364,30 @@ it always prints JSON and exits with the verdict.
 | `council baseline prune` | `--baseline PATH`, `--from DIR`, `--write` |
 | `council init` | `-C, --repo PATH` |
 | `council doctor` | `--profile NAME`, `--reviewer BIN`, `--probe-timeout N`, `--json` |
+| `council setup skill NAME…` | `--library DIR`, `--dest DIR`, `--agent NAME`, `--list`, `--force`, `--dry-run` |
 | `council --version` | print the installed version |
 | `council -h` / `council --help` | command overview |
+
+## Installing skills from a library
+
+`council setup skill` copies skills out of a *skill library* — any directory carrying
+`library/contract.json` — into a directory an agent reads. It names no agent: `--dest` is
+the neutral destination, and `$SKILLS_DIR` sets it once. `--agent` is convenience only, for
+the conventional location of an agent that is already installed; when that directory is not
+there, the verb says so instead of creating one.
+
+Library resolution is by structure, never by name: `--library`, else `$SKILLS_LIBRARY`, else
+the nearest ancestor directory holding a contract. The same verb therefore serves Hermes, a
+different agent, or a directory you keep yourself, with no second code path.
+
+```sh
+council setup skill --list
+council setup skill probe --dest ~/my-agent/skills
+council setup skill probe --agent claude --dry-run
+```
+
+A skill is replaced only when the copy is byte-identical (reported as `unchanged`) or when
+`--force` is given; otherwise the verb refuses and leaves the directory alone.
 
 ## Troubleshooting
 
