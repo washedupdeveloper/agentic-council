@@ -5,7 +5,7 @@
   "worktree": true,
   "diff_sha256": "86765cb97a3839bf63a1a7d1c6b5c6651d5a355e30c008e807f686b1b6adcc28",
   "digest": "0b90ce8002cbc1bd",
-  "prompt": "/home/nixolotl/projects/review-council-v2/src/council/prompts/reviewer.md",
+  "prompt": "src/council/prompts/reviewer.md",
   "prompt_bytes": 2071,
   "prompt_limit": 32768,
   "prompt_acknowledged": false,
