@@ -14,6 +14,7 @@ fails the gate when one exists.
 | [`STATE-MACHINES.md`](STATE-MACHINES.md) | every state the CLI and the run engine can occupy, the invariants, the exit codes |
 | [`../GLOSSARY.md`](../GLOSSARY.md) | the vocabulary, fixed: finding, proof, unit, window, sample, verdict, digest |
 | [`CLAIMS.md`](CLAIMS.md) | generated: every claim this project makes and the command that would falsify it |
+| [`VERIFICATION.md`](VERIFICATION.md) | the verification milestone: what must be proven, how, and what is proven so far |
 
 ## Reference
 
