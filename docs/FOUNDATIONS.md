@@ -6,7 +6,7 @@ lives. The last section is the list of things this page cannot defend, which is
 the part worth reading first if you are deciding whether to trust the tool.
 
 Numbers in this page are current for this checkout: 44 modules, 5,573 lines
-under `src/council`, 46 test files, 219 claims, 60 falsifiers, 51 mutations.
+under `src/council`, 46 test files, 223 claims, 62 falsifiers, 53 mutations.
 
 ---
 
@@ -157,8 +157,8 @@ what would work is a bug, not a stance.
 
 ## 7. The tool must be able to fail its own tests
 
-**Decision.** 219 claims, each naming a command that decides it, 60 of them
-naming a *falsifier*; 51 mutations of the rules the claims protect, run against a
+**Decision.** 223 claims, each naming a command that decides it, 62 of them
+naming a *falsifier*; 53 mutations of the rules the claims protect, run against a
 copy of the source, with the requirement that every mutation break at least one
 claim and every declared falsifier break its own.
 

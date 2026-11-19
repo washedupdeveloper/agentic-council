@@ -203,6 +203,14 @@ MUTATIONS: tuple[Mutation, ...] = (
              "../council_mcp/server.py",
              '"verdict": payload.get("verdict"),',
              '"verdict": "pass",'),
+    Mutation("acp-commands-are-not-advertised",
+             "../council_acp/agent.py",
+             "asyncio.create_task(self._announce_commands(session_id))",
+             "pass"),
+    Mutation("sandbox-reviewer-keeps-symlink",
+             "runner.py",
+             "binary = str(Path(located).resolve())",
+             "binary = located"),
 )
 
 

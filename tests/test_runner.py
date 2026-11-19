@@ -151,6 +151,16 @@ print(json.dumps({"sections": {}}))
     assert not marker_tmp.exists()
 
 
+def test_a_symlinked_reviewer_runs_in_the_sandbox(tmp_path: Path) -> None:
+    if shutil.which("bwrap") is None:
+        pytest.skip("bwrap is not available")
+    binary = py_script(tmp_path, 'print(json.dumps({"sections": {}}))')
+    linked = tmp_path / "reviewer"
+    linked.symlink_to(binary)
+    answer = hermes_runner("p", binary=str(linked), timeout=20, sandbox=True)("q")
+    assert answer.strip() == '{"sections": {}}'
+
+
 def test_the_sandbox_needs_bwrap(tmp_path: Path,
                                  monkeypatch: pytest.MonkeyPatch) -> None:
     binary = py_script(tmp_path, 'print(json.dumps({"sections": {}}))')

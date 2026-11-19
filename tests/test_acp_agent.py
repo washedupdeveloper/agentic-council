@@ -6,9 +6,15 @@ import asyncio
 import os
 import sys
 from pathlib import Path
+from typing import Any
 
 from acp import PROTOCOL_VERSION
-from acp.schema import AgentMessageChunk, ClientCapabilities, TextContentBlock
+from acp.schema import (
+    AgentMessageChunk,
+    AvailableCommandsUpdate,
+    ClientCapabilities,
+    TextContentBlock,
+)
 from acp.stdio import spawn_agent_process
 
 from conftest import SOURCE
@@ -16,11 +22,15 @@ from conftest import SOURCE
 
 class RecordingClient:
     def __init__(self) -> None:
-        self.updates: list[AgentMessageChunk] = []
+        self.updates: list[Any] = []
+        self.commands: list[AvailableCommandsUpdate] = []
 
-    async def session_update(self, session_id: str, update: AgentMessageChunk,
+    async def session_update(self, session_id: str, update: Any,
                              **kwargs: object) -> None:
-        self.updates.append(update)
+        if isinstance(update, AvailableCommandsUpdate):
+            self.commands.append(update)
+        else:
+            self.updates.append(update)
 
 
 def env() -> dict[str, str]:
@@ -95,3 +105,50 @@ def test_acp_help_is_deterministic(review_repo: Path, tmp_path: Path,
                                            "/help"))
     assert stop == "end_turn"
     assert any("/review" in update for update in updates)
+
+
+def test_acp_loads_a_session_after_reopen(review_repo: Path,
+                                         tmp_path: Path,
+                                         fake_reviewer: Path) -> None:
+    async def run() -> None:
+        client = RecordingClient()
+        async with spawn_agent_process(
+            lambda conn: client,
+            sys.executable, *args(review_repo, tmp_path, fake_reviewer),
+            cwd=str(tmp_path), env=env(),
+        ) as (connection, _process):
+            initialized = await connection.initialize(
+                protocol_version=PROTOCOL_VERSION,
+                client_capabilities=ClientCapabilities(),
+            )
+            assert initialized.agent_capabilities.load_session is True
+            await connection.load_session(
+                cwd=str(review_repo), session_id="reopened")
+            await asyncio.sleep(1.2)
+
+    asyncio.run(run())
+
+
+def test_acp_advertises_its_commands_on_session_start(review_repo: Path,
+                                                     tmp_path: Path,
+                                                     fake_reviewer: Path) -> None:
+    async def run() -> list[str]:
+        client = RecordingClient()
+        async with spawn_agent_process(
+            lambda conn: client,
+            sys.executable, *args(review_repo, tmp_path, fake_reviewer),
+            cwd=str(tmp_path), env=env(),
+        ) as (connection, _process):
+            await connection.initialize(
+                protocol_version=PROTOCOL_VERSION,
+                client_capabilities=ClientCapabilities(),
+            )
+            await connection.new_session(cwd=str(review_repo))
+            await asyncio.sleep(1.2)
+            return [
+                command.name
+                for update in client.commands
+                for command in update.available_commands
+            ]
+
+    assert asyncio.run(run()) == ["plan", "review", "verdict", "help"]

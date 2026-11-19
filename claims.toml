@@ -560,6 +560,18 @@ text = "The ACP agent returns the real council verdict from /review."
 check = "python3 -m pytest tests/test_acp_agent.py::test_acp_review_returns_the_gate_verdict -q"
 
 [[claim]]
+id = "the-acp-agent-advertises-its-commands"
+text = "The ACP agent advertises its slash commands when a session starts."
+check = "python3 -m pytest tests/test_acp_agent.py::test_acp_advertises_its_commands_on_session_start -q"
+falsifier = "acp-commands-are-not-advertised"
+
+[[claim]]
+id = "a-symlinked-reviewer-runs-in-the-sandbox"
+text = "A symlinked reviewer executable is resolved before bubblewrap mounts it."
+check = "python3 -m pytest tests/test_runner.py::test_a_symlinked_reviewer_runs_in_the_sandbox -q"
+falsifier = "sandbox-reviewer-keeps-symlink"
+
+[[claim]]
 id = "the-cli-prints-a-plan"
 text = "council review --plan prints the plan and exits 0."
 check = "python3 -m pytest tests/test_cli.py::test_plan_prints_and_writes_nothing -q"

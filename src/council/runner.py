@@ -48,7 +48,11 @@ def _sandbox_argv(argv: list[str], prompt_dir: Path) -> list[str]:
     bwrap = shutil.which("bwrap")
     if bwrap is None:
         raise OSError("bwrap is required for the reviewer sandbox but is not on PATH")
-    binary = shutil.which(argv[0]) or argv[0]
+    located = shutil.which(argv[0]) or argv[0]
+    # bwrap refuses to mount onto a symlink destination. Resolve the executable
+    # first and run that path inside the sandbox, so a Nix profile symlink (or
+    # any other shim) does not make an otherwise healthy reviewer unlaunchable.
+    binary = str(Path(located).resolve())
     if shutil.which(argv[0]) is None and not Path(argv[0]).is_file():
         raise ReviewerMissing(f"{argv[0]!r} is not installed or not on PATH")
     if not os.access(binary, os.X_OK):
@@ -57,7 +61,8 @@ def _sandbox_argv(argv: list[str], prompt_dir: Path) -> list[str]:
         home = str(Path.home())
     except RuntimeError as exc:
         raise ReviewError("HOME is not set: the reviewer sandbox needs a home to overlay") from exc
-    return reviewer_argv(argv, prompt_dir, bwrap=bwrap, binary=binary, home=home)
+    return reviewer_argv([binary, *argv[1:]], prompt_dir, bwrap=bwrap,
+                         binary=binary, home=home)
 
 
 def _terminate(proc: subprocess.Popen[str]) -> None:

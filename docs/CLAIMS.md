@@ -114,6 +114,8 @@ registry, so it cannot describe a claim that has no check.
 | `the-mcp-server-exposes-three-tools` | The MCP server lists exactly council_plan, council_review and council_doctor. | `python3 -m pytest tests/test_mcp_server.py::test_mcp_lists_the_three_tools -q` |
 | `the-mcp-server-runs-the-core-gate` | The MCP review tool returns the real council verdict and retained evidence. | `python3 -m pytest tests/test_mcp_server.py::test_mcp_review_runs_the_gate_and_exposes_evidence -q` |
 | `the-acp-agent-runs-the-core-gate` | The ACP agent returns the real council verdict from /review. | `python3 -m pytest tests/test_acp_agent.py::test_acp_review_returns_the_gate_verdict -q` |
+| `the-acp-agent-advertises-its-commands` | The ACP agent advertises its slash commands when a session starts. | `python3 -m pytest tests/test_acp_agent.py::test_acp_advertises_its_commands_on_session_start -q` |
+| `a-symlinked-reviewer-runs-in-the-sandbox` | A symlinked reviewer executable is resolved before bubblewrap mounts it. | `python3 -m pytest tests/test_runner.py::test_a_symlinked_reviewer_runs_in_the_sandbox -q` |
 | `the-cli-prints-a-plan` | council review --plan prints the plan and exits 0. | `python3 -m pytest tests/test_cli.py::test_plan_prints_and_writes_nothing -q` |
 | `a-sandboxed-reviewer-cannot-write-to-the-host` | A sandboxed reviewer's writes to HOME and /tmp do not reach the host. | `python3 -m pytest tests/test_runner.py::test_a_sandboxed_reviewer_cannot_write_to_the_host -q` |
 | `the-reviewer-sandbox-needs-bwrap` | The sandbox fails rather than running unsandboxed when bwrap is absent. | `python3 -m pytest tests/test_runner.py::test_the_sandbox_needs_bwrap -q` |

@@ -19,9 +19,12 @@ from acp import (
 )
 from acp.interfaces import Client
 from acp.schema import (
+    AgentCapabilities,
     AgentMessageChunk,
     AudioContentBlock,
     AuthenticateResponse,
+    AvailableCommand,
+    AvailableCommandsUpdate,
     ClientCapabilities,
     CloseSessionResponse,
     EmbeddedResourceContentBlock,
@@ -58,6 +61,14 @@ class Session:
     last: dict[str, Any] | None = None
 
 
+_COMMANDS = [
+    AvailableCommand(name="plan", description="Show review units, prompt sizes and sample cost"),
+    AvailableCommand(name="review", description="Review the workspace and report a verdict"),
+    AvailableCommand(name="verdict", description="Show the last verdict"),
+    AvailableCommand(name="help", description="Show council commands"),
+]
+
+
 @dataclass
 class CouncilAgent(Agent):
     config: ServerConfig
@@ -78,6 +89,7 @@ class CouncilAgent(Agent):
             protocol_version=protocol_version,
             agent_info=Implementation(name="council", title="Council review gate",
                                       version=__version__),
+            agent_capabilities=AgentCapabilities(load_session=True),
         )
 
     async def new_session(
@@ -94,6 +106,9 @@ class CouncilAgent(Agent):
         workspace = path.resolve()
         self.sessions[session_id] = Session(
             str(workspace), replace(self.config, root=workspace))
+        # A session update sent while session/new is still in flight makes the
+        # Zed ACP client close the transport. Let the response leave first.
+        asyncio.create_task(self._announce_commands(session_id))
         return NewSessionResponse(session_id=session_id)
 
     async def load_session(
@@ -104,7 +119,14 @@ class CouncilAgent(Agent):
         additional_directories: list[str] | None = None,
         **kwargs: Any,
     ) -> LoadSessionResponse | None:
-        return None
+        path = local_path(cwd).expanduser()
+        if not path.is_dir():
+            raise ValueError(f"workspace is not a directory: {cwd}")
+        workspace = path.resolve()
+        self.sessions[session_id] = Session(
+            str(workspace), replace(self.config, root=workspace))
+        asyncio.create_task(self._announce_commands(session_id))
+        return LoadSessionResponse()
 
     async def list_sessions(self, cwd: str | None = None,
                             cursor: str | None = None,
@@ -196,6 +218,20 @@ class CouncilAgent(Agent):
         session = self.sessions.get(session_id)
         if session is not None and session.task is not None:
             session.task.cancel()
+
+    async def _announce_commands(self, session_id: str) -> None:
+        await asyncio.sleep(1.0)
+        if session_id in self.sessions:
+            await self._publish_commands(session_id)
+
+    async def _publish_commands(self, session_id: str) -> None:
+        if self.conn is None:
+            return
+        await self.conn.session_update(
+            session_id,
+            AvailableCommandsUpdate(session_update="available_commands_update",
+                                    available_commands=_COMMANDS),
+        )
 
     async def _send(self, session_id: str, text: str) -> None:
         if self.conn is None:
