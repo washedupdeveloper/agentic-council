@@ -566,6 +566,12 @@ check = "python3 -m pytest tests/test_acp_agent.py::test_acp_advertises_its_comm
 falsifier = "acp-commands-are-not-advertised"
 
 [[claim]]
+id = "the-acp-agent-does-not-repeat-its-name"
+text = "ACP status and error messages are plain text, without a duplicate council: prefix."
+check = "python3 -m pytest tests/test_acp_agent.py::test_acp_empty_change_is_a_clean_message -q"
+falsifier = "acp-prefixes-are-not-cleaned"
+
+[[claim]]
 id = "a-symlinked-reviewer-runs-in-the-sandbox"
 text = "A symlinked reviewer executable is resolved before bubblewrap mounts it."
 check = "python3 -m pytest tests/test_runner.py::test_a_symlinked_reviewer_runs_in_the_sandbox -q"

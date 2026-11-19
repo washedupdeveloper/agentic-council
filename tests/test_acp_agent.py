@@ -97,6 +97,19 @@ def test_acp_review_returns_the_gate_verdict(review_repo: Path, tmp_path: Path,
     assert "FAIL" in joined
     assert "A password is committed." in joined
     assert "reason:" in joined
+    assert not any(update.startswith("council:") for update in updates)
+    assert "council: council:" not in joined
+
+
+def test_acp_empty_change_is_a_clean_message(review_repo: Path, tmp_path: Path,
+                                             fake_reviewer: Path) -> None:
+    updates, stop = asyncio.run(run_prompt(review_repo, tmp_path, fake_reviewer,
+                                           "/review --base HEAD"))
+    assert stop == "end_turn"
+    joined = "\n".join(updates)
+    assert "the change is empty: base and head are the same" in joined
+    assert not any(update.startswith("council:") for update in updates)
+    assert "council: council:" not in joined
 
 
 def test_acp_help_is_deterministic(review_repo: Path, tmp_path: Path,

@@ -195,7 +195,7 @@ class CouncilAgent(Agent):
                 await self._send(session_id, _HELP)
                 return PromptResponse(stop_reason="end_turn")
             options = replace(options, repo=session.cwd)
-            await self._send(session_id, "council: working…")
+            await self._send(session_id, "working…\n")
             if text.startswith("/plan"):
                 result = await run_plan(session.config, options)
                 await self._send(session_id, _plan_text(result.payload))
@@ -206,10 +206,10 @@ class CouncilAgent(Agent):
                 await self._send(session_id, _review_text(result.payload, result.stderr))
             return PromptResponse(stop_reason="end_turn")
         except asyncio.CancelledError:
-            await self._send(session_id, "council: cancelled")
+            await self._send(session_id, "cancelled")
             return PromptResponse(stop_reason="cancelled")
         except (CouncilError, ValueError) as exc:
-            await self._send(session_id, f"council: {exc}")
+            await self._send(session_id, _clean_message(str(exc)))
             return PromptResponse(stop_reason="end_turn")
         finally:
             session.task = None
@@ -303,9 +303,16 @@ def _parse_command(text: str) -> ReviewOptions | None:
                          context_depth=depth, time_budget=budget)
 
 
+def _clean_message(text: str) -> str:
+    """Drop a CLI-owned ``council:`` prefix; the editor already labels the agent."""
+    while text.startswith("council: "):
+        text = text[len("council: "):]
+    return text
+
+
 def _plan_text(payload: Any) -> str:
     if not isinstance(payload, dict):
-        return "council: plan returned an unexpected result"
+        return "plan returned an unexpected result"
     units = payload.get("units", [])
     return (
         f"PLAN  {payload.get('prompt_bytes', '?')} bytes; "
@@ -318,7 +325,7 @@ def _plan_text(payload: Any) -> str:
 
 def _review_text(payload: Any, stderr: str) -> str:
     if not isinstance(payload, dict):
-        return "council: review returned an unexpected result"
+        return "review returned an unexpected result"
     findings = payload.get("findings", [])
     if not isinstance(findings, list):
         findings = []
@@ -332,13 +339,13 @@ def _review_text(payload: Any, stderr: str) -> str:
                          f"{finding.get('location', '')}: "
                          f"{finding.get('claim', '')}")
     if stderr.strip():
-        lines.append(f"notes: {stderr.strip().splitlines()[-1]}")
+        lines.append(f"notes: {_clean_message(stderr.strip().splitlines()[-1])}")
     return "\n".join(lines)
 
 
 def _verdict_text(payload: dict[str, Any] | None) -> str:
     if payload is None:
-        return "council: no review has run in this session"
+        return "no review has run in this session"
     return _review_text(payload, "")
 
 
