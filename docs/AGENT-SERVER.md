@@ -135,6 +135,17 @@ through the editor's terminal or ask the editor to write files. The workspace
 comes from the ACP session. A Windows workspace path is translated to `/mnt/...`
 when the server runs under WSL.
 
+A screenshot is not part of the reviewer prompt. Attach one to the retained run
+with:
+
+```sh
+council evidence add <run-id> path/to/shot.png \
+  --state-root ~/.cache/council/runs --label "Zed Agent Panel"
+```
+
+`/verdict` appends the direct links from that run. A missing screenshot is
+reported as `[missing]`; it does not change the verdict or the ACP response.
+
 ### Host matrix
 
 | Host | Project opened in Zed | ACP command | Review sandbox |

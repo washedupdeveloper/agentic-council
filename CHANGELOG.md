@@ -11,6 +11,11 @@ public surface, the definitions, and the release procedure — is
 
 ### Added
 
+- `council evidence add` and `council evidence list` attach local screenshots to
+  a kept run. Images are hash-named under `artifacts/`, recorded in a relative
+  `artifacts.json` sidecar, and exposed as direct links; the reviewer never reads
+  them and a moved or deleted image is reported, not treated as a failure. See
+  [`docs/EVIDENCE.md`](docs/EVIDENCE.md).
 - `council-mcp` and `council-acp`, optional additive adapters around the public
   CLI. MCP exposes `council_plan`, `council_review` and `council_doctor`; ACP
   exposes `/plan`, `/review`, `/verdict` and `/help`. The core package remains

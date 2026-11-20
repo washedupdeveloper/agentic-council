@@ -7,6 +7,7 @@ module adds the file-system guard that refuses a symlinked state directory.
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from .domain.run_id import MAX_RUN_ID, validate_run_id
@@ -16,8 +17,8 @@ from .domain.run_id import MAX_RUN_ID, validate_run_id
 STATE_DIR = ".council"
 RUNS = "runs"
 
-__all__ = ["MAX_RUN_ID", "RUNS", "STATE_DIR", "run_dir", "runs_root", "state_root",
-           "validate_run_id"]
+__all__ = ["MAX_RUN_ID", "RUNS", "STATE_DIR", "cache_runs_root", "run_dir", "runs_root",
+           "state_root", "validate_run_id"]
 
 
 def runs_root(repo: Path) -> Path:
@@ -48,3 +49,18 @@ def run_dir(repo: Path, run_id: str) -> Path:
     `--run ../../etc` from writing outside the checkout.
     """
     return state_root(repo) / validate_run_id(run_id)
+
+
+def cache_runs_root() -> Path:
+    """The per-user state root used by the protocol servers.
+
+    It is deliberately outside the reviewed checkout: a server can retain
+    evidence for many repositories without writing into any of them.
+    """
+    if os.name == "nt":
+        base = Path(os.environ.get("LOCALAPPDATA",
+                                   str(Path.home() / "AppData" / "Local")))
+    else:
+        configured = os.environ.get("XDG_CACHE_HOME")
+        base = Path(configured) if configured else Path.home() / ".cache"
+    return base / "council" / "runs"

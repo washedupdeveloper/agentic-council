@@ -14,6 +14,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+from . import artifacts as artifact_store
 from . import baseline as baseline_io
 from . import doctor as diagnostics
 from .agents import AgentOptions, DEFAULT_REGISTRY, resolve as resolve_agent
@@ -417,6 +418,45 @@ def _agents(args: argparse.Namespace) -> int:
     return 0
 
 
+def _evidence_text(directory: Path, entries: tuple[artifact_store.Artifact, ...]) -> None:
+    """Print one direct link per artifact; a missing file is still a link."""
+    print(f"ARTIFACTS {directory}")
+    if not entries:
+        print("  none")
+        return
+    for entry in entries:
+        item = entry.payload(directory)
+        suffix = "  [missing]" if item["missing"] else ""
+        print(f"  {artifact_store.markdown(directory, entry)}{suffix}")
+
+
+def _evidence(args: argparse.Namespace) -> int:
+    """Attach local screenshots to a kept run, or list their direct links."""
+    try:
+        directory = artifact_store.resolve_run(
+            args.run_id, repo=args.repo, state_root=args.state_root)
+        if args.evidence_action == "add":
+            added = artifact_store.add(directory, args.files, label=args.label)
+            entries = added
+        else:
+            entries = artifact_store.read(directory)
+    except (ReviewError, OSError, ValueError) as exc:
+        print(f"council: {_safe(exc)}", file=sys.stderr)
+        return EXIT_ERROR
+    if args.json:
+        print(json.dumps(
+            {"run": str(directory),
+             "artifacts": [entry.payload(directory) for entry in entries]},
+            indent=2))
+    elif args.evidence_action == "add":
+        for entry in entries:
+            print(f"added {entry.path}")
+        _evidence_text(directory, entries)
+    else:
+        _evidence_text(directory, entries)
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
 
@@ -436,6 +476,9 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     if args.command == "agents":
         return _agents(args)
+
+    if args.command == "evidence":
+        return _evidence(args)
 
     if args.command == "doctor":
         return _doctor(args)

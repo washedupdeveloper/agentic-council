@@ -5,8 +5,8 @@ alternative it rejects, what would make it wrong, and where in the tree it
 lives. The last section is the list of things this page cannot defend, which is
 the part worth reading first if you are deciding whether to trust the tool.
 
-Numbers in this page are current for this checkout: 48 modules, 6,111 lines
-under `src/council`, 48 test files, 231 claims, 70 falsifiers, 61 mutations.
+Numbers in this page are current for this checkout: 49 modules, 6,475 lines
+under `src/council`, 49 test files, 234 claims, 73 falsifiers, 64 mutations.
 
 ---
 
@@ -157,8 +157,8 @@ what would work is a bug, not a stance.
 
 ## 7. The tool must be able to fail its own tests
 
-**Decision.** 231 claims, each naming a command that decides it, 70 of them
-naming a *falsifier*; 61 mutations of the rules the claims protect, run against a
+**Decision.** 234 claims, each naming a command that decides it, 73 of them
+naming a *falsifier*; 64 mutations of the rules the claims protect, run against a
 copy of the source, with the requirement that every mutation break at least one
 claim and every declared falsifier break its own.
 

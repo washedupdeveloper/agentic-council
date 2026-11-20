@@ -1227,3 +1227,21 @@ id = "the-digest-names-the-agent"
 text = "The instrument digest changes when the selected reviewer adapter changes."
 check = "python3 -m pytest tests/test_prompt.py::test_the_digest_changes_with_the_agent -q"
 falsifier = "digest-ignores-agent"
+
+[[claim]]
+id = "a-screenshot-is-stored-as-a-relative-link"
+text = "A screenshot is copied under the run's artifacts directory and recorded with a relative path."
+check = "python3 -m pytest tests/test_evidence.py::test_adding_a_screenshot_writes_a_relative_link -q"
+falsifier = "evidence-stores-an-absolute-path"
+
+[[claim]]
+id = "a-missing-screenshot-is-not-a-failure"
+text = "A deleted screenshot is still listed as a link and a missing marker, without failing the command."
+check = "python3 -m pytest tests/test_evidence.py::test_a_deleted_screenshot_is_listed_as_missing_without_failure -q"
+falsifier = "evidence-hides-a-missing-file"
+
+[[claim]]
+id = "the-verdict-exposes-screenshot-links"
+text = "The council verdict can append a direct link to each screenshot in the retained run."
+check = "python3 -m pytest tests/test_evidence.py::test_the_verdict_can_append_the_direct_link -q"
+falsifier = "evidence-link-is-blank"

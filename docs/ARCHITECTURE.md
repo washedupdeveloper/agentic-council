@@ -43,6 +43,7 @@ not relabelled as architecture.
 | Sandbox argv construction does not look up or spawn anything | Resolved `bwrap`, repo and `PATH` are arguments. | `domain.sandbox.command`; `sandbox.argv` resolves and delegates. |
 | Importing the package performs no metadata I/O | Importing `council` is clean; `council.__version__` resolves on access through `version.current_version`. | `test_the_package_import_reads_no_metadata`; `version.current_version`. |
 | A new impure module cannot join silently | The gate classifies every effectful module as an adapter. | `test_every_module_that_acts_is_named_as_an_adapter`. |
+| A screenshot is local evidence, not reviewer input | Images are copied under `artifacts/`, linked by relative paths, and never added to the prompt; a missing file is reported, not fatal. | `artifacts.py`; `tests/test_evidence.py`; claims `a-screenshot-is-stored-as-a-relative-link`, `a-missing-screenshot-is-not-a-failure`. |
 | A rule cannot silently disappear | A rule that matches is in the prompt and in the verdict; one whose document cannot be read stops the run; one that matches nothing is in neither. | `planning.rules_block`; `tests/test_rules.py`; claims `a-rule-document-reaches-the-prompt`, `a-rule-document-that-cannot-be-read-is-a-start-failure`. |
 | A rule cannot silently disappear | A rule that matches is in the prompt and in the verdict; one whose document cannot be read stops the run; one that matches nothing is in neither. | `planning.rules_block`; `tests/test_rules.py`; claims `a-rule-document-reaches-the-prompt`, `a-rule-document-that-cannot-be-read-is-a-start-failure`. |
 | Unit granularity is a ladder, not a guess | A change too large for one prompt is split at the finest boundary that exists — file, then hunk, then line window — and every unit produced fits the budget. | `planning.build_units`; `changes.Hunk.slice`; `tests/test_windows.py`; claim `windowing-splits-a-file-into-units-that-fit`. |
@@ -71,7 +72,7 @@ council.adjudicate, run, request, planning, prepare, sampling, runstore
                           application/orchestration; effects through calls
         ^
         | imports
-council.repo, runner, agents, proofs, pr, doctor, config, baseline, paths, sample, sandbox,
+council.repo, runner, agents, proofs, pr, doctor, config, baseline, paths, sample, sandbox, artifacts,
 council.cli, cli_parser, cli_output, version
                           effect adapters
 ```

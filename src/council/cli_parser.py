@@ -197,6 +197,23 @@ def build_parser() -> argparse.ArgumentParser:
     agents = sub.add_parser("agents", help="list reviewer adapters available in this build")
     agents.add_argument("--json", action="store_true", help="print the adapter list as JSON")
 
+    evidence = sub.add_parser("evidence", help="attach local screenshots to a kept run")
+    evidence_sub = evidence.add_subparsers(dest="evidence_action", required=True)
+    for action, description in (("add", "copy screenshot(s) into a run"),
+                                ("list", "show the run's screenshots as direct links")):
+        item = evidence_sub.add_parser(action, help=description)
+        item.add_argument("run_id", help="retained run id")
+        if action == "add":
+            item.add_argument("files", nargs="+", type=path, metavar="IMAGE",
+                              help="screenshot or other local evidence file")
+            item.add_argument("--label", default="",
+                              help="text for the direct link (default: the file name)")
+        item.add_argument("-C", "--repo", type=path, default=Path("."),
+                          help="repository whose .council/runs is searched (default: current)")
+        item.add_argument("--state-root", type=path, default=None, metavar="DIR",
+                          help="directory containing retained run ids (e.g. the ACP cache)")
+        item.add_argument("--json", action="store_true", help="print links and metadata as JSON")
+
     doctor = sub.add_parser("doctor", help="check that this machine can run a review")
     doctor.add_argument("--agent", default=DEFAULT_AGENT,
                         help="reviewer adapter to check (default: hermes)")

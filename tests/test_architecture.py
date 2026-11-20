@@ -47,6 +47,7 @@ PURE = (
 ADAPTERS = frozenset({
     "__main__",
     "adjudicate",
+    "artifacts",
     "base",
     "baseline",
     "claims",

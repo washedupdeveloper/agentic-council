@@ -7,6 +7,7 @@ import asyncio
 import shlex
 import sys
 from dataclasses import dataclass, field, replace
+from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
@@ -40,6 +41,8 @@ from acp.schema import (
     TextContentBlock,
 )
 from council import __version__
+from council import artifacts as artifact_store
+from council.repo import ReviewError
 
 from council_server.cli import (
     CouncilError,
@@ -59,6 +62,7 @@ class Session:
     config: ServerConfig
     task: asyncio.Task[Any] | None = None
     last: dict[str, Any] | None = None
+    last_run: Path | None = None
 
 
 _COMMANDS = [
@@ -188,7 +192,7 @@ class CouncilAgent(Agent):
                 await self._send(session_id, _HELP)
                 return PromptResponse(stop_reason="end_turn")
             if text.startswith("/verdict"):
-                await self._send(session_id, _verdict_text(session.last))
+                await self._send(session_id, _verdict_text(session.last, session.last_run))
                 return PromptResponse(stop_reason="end_turn")
             options = _parse_command(text)
             if options is None:
@@ -203,7 +207,9 @@ class CouncilAgent(Agent):
                 result = await run_review(session.config, options)
                 if isinstance(result.payload, dict):
                     session.last = result.payload
-                await self._send(session_id, _review_text(result.payload, result.stderr))
+                session.last_run = result.run_dir
+                await self._send(session_id, _review_text(result.payload, result.stderr,
+                                                          result.run_dir))
             return PromptResponse(stop_reason="end_turn")
         except asyncio.CancelledError:
             await self._send(session_id, "cancelled")
@@ -323,7 +329,7 @@ def _plan_text(payload: Any) -> str:
     )
 
 
-def _review_text(payload: Any, stderr: str) -> str:
+def _review_text(payload: Any, stderr: str, run_dir: Path | None = None) -> str:
     if not isinstance(payload, dict):
         return "review returned an unexpected result"
     findings = payload.get("findings", [])
@@ -332,6 +338,8 @@ def _review_text(payload: Any, stderr: str) -> str:
     lines = [f"{str(payload.get('verdict', 'UNKNOWN')).upper()}  "
              f"exit {payload.get('exit_code', '?')}",
              f"reason: {payload.get('reason', '')}"]
+    if run_dir is not None:
+        lines.append(f"run: {run_dir}")
     for finding in findings:
         if isinstance(finding, dict):
             lines.append(f"- {finding.get('state', '')} "
@@ -343,10 +351,29 @@ def _review_text(payload: Any, stderr: str) -> str:
     return "\n".join(lines)
 
 
-def _verdict_text(payload: dict[str, Any] | None) -> str:
+def _artifact_lines(run_dir: Path | None) -> list[str]:
+    """A direct link per screenshot, without asking a model to read it."""
+    if run_dir is None:
+        return []
+    try:
+        entries = artifact_store.read(run_dir)
+    except (OSError, ValueError, ReviewError):
+        return ["artifacts: manifest unreadable"]
+    if not entries:
+        return []
+    lines = ["artifacts:"]
+    for entry in entries:
+        missing = " [missing]" if not (run_dir / entry.path).is_file() else ""
+        lines.append(f"- {artifact_store.markdown(run_dir, entry)}{missing}")
+    return lines
+
+
+def _verdict_text(payload: dict[str, Any] | None, run_dir: Path | None = None) -> str:
     if payload is None:
         return "no review has run in this session"
-    return _review_text(payload, "")
+    text = _review_text(payload, "", run_dir)
+    artifacts = _artifact_lines(run_dir)
+    return text + ("\n" + "\n".join(artifacts) if artifacts else "")
 
 
 def main(argv: list[str] | None = None) -> int:

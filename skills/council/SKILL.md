@@ -1,9 +1,9 @@
 ---
 name: council
 description: Use when a change needs a blocking-defect verdict. Runs `council review` and reports the states behind the verdict.
-commands: [review, ci, pr, baseline, init, agents, doctor, setup]
-flags: [--plan, --include, --exclude, --samples, --report, --json, --sarif, --no-ephemeral, --keep, --require-executed-proofs, --base, --library, --dest, --agent, --list, --force, --dry-run]
-artefacts: [verdict.json, sample-N.json]
+commands: [review, ci, pr, baseline, init, agents, evidence, doctor, setup]
+flags: [--plan, --include, --exclude, --samples, --report, --json, --sarif, --no-ephemeral, --keep, --require-executed-proofs, --base, --library, --dest, --agent, --list, --force, --dry-run, --label, --state-root]
+artefacts: [verdict.json, sample-N.json, artifacts.json]
 ---
 
 # council
@@ -30,6 +30,17 @@ carries. A finding counts only once its proof holds.
 A review is **ephemeral by default**: the run directory is removed after the
 verdict. Pass `--no-ephemeral` to keep `.council/runs/<id>/`, or `--keep DIR` to
 copy it before the temporary tree goes.
+
+Screenshots are local evidence, not reviewer input. Attach one to a kept run
+and print its direct link:
+
+    council evidence add <run-id> .screens/zed-review.png --label "Zed review panel"
+    council evidence list <run-id>
+
+The sidecar is `artifacts.json`; the image is copied under `artifacts/`. A moved
+or deleted image is reported as missing, not treated as a failed review. Use
+`--state-root <runs-dir>` for a run retained by the ACP/MCP server outside the
+repository.
 
 ## Install the skill
 

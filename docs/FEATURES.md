@@ -48,6 +48,25 @@ fail: `pr-target-is-ignored` replaces the resolved target with `"7"` before
 `gh pr view`, and `pr-cli-target-is-ignored` passes `7` instead of the CLI's
 target to the resolver. The decision is recorded in [`M31.md`](M31.md).
 
+## Implemented: local screenshot evidence
+
+A screenshot can help a person confirm an editor state, but it is not a finding
+and it is not something the reviewer can settle. `council evidence add` copies
+an image under a kept run, records a relative path and hash in
+`artifacts.json`, and `council evidence list` prints a direct file link. The
+reviewer prompt is unchanged; the image is never read by the model.
+
+Why it fits: it strengthens **auditable evidence for a person** without
+changing the review contract, the evidence states, the blocking rule or the
+sandbox. `.council/` is already gitignored, and ACP/MCP runs live outside the
+repository, so screenshots stay local by default.
+
+Regression tests cover relative links, duplicate bytes, a missing image, a
+state-root lookup, bad run ids, a missing source and a manifest path escape.
+Claims bind the relative link, the missing-file behavior and the verdict link;
+mutations prove those checks can fail. The workflow is documented in
+[`EVIDENCE.md`](EVIDENCE.md).
+
 ## Already present — do not re-add as “new”
 
 Several features visible in adjacent tools already exist here in a

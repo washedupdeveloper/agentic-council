@@ -182,6 +182,46 @@ unit and its own verdict; an unreviewed unit prevents `PASS`.
 If you want advice without a blocking exit code, use `--report`. It always
 exits 0. Do not use `--report` in a merge gate.
 
+## Screenshots and run evidence
+
+A screenshot is useful evidence for a person, but it is not a finding and the
+reviewer never reads it. `council` stores screenshots beside a kept run and
+prints a direct link:
+
+```sh
+council review --no-ephemeral --run-id before-fix --base origin/main
+council evidence add before-fix .screens/zed-review.png --label "Zed review panel"
+council evidence list before-fix
+```
+
+`evidence add` copies the file into:
+
+```text
+.council/runs/before-fix/artifacts/<sha256-prefix>-<name>.<ext>
+.council/runs/before-fix/artifacts.json
+```
+
+The manifest records a **relative** path, the SHA-256, byte size, media type,
+label and capture time. `evidence list` turns each path into a direct file link
+and adds `[missing]` if the image was moved or deleted. A missing screenshot
+does not change the verdict, fail the command, or make the run incomplete;
+the screenshot is user evidence, not a proof the reviewer can settle.
+
+Run `.council/` is gitignored by default. Runs kept by the ACP/MCP server live
+under the per-user cache (`~/.cache/council/runs` on Linux, `%LOCALAPPDATA%` on
+Windows), outside the reviewed repository. To attach a screenshot to one of
+those runs, name the cache root explicitly:
+
+```sh
+council evidence add <run-id> path/to/shot.png \
+  --state-root ~/.cache/council/runs --label "Zed Agent Panel"
+```
+
+`council evidence list <run-id> --json` emits the same links and metadata for a
+tool. `council evidence` never sends the image to a model and never rewrites
+the image bytes. If a run was ephemeral, its directory is already gone; use
+`--no-ephemeral` or `--keep DIR` when the screenshots should persist.
+
 ## Common workflows
 
 ### Before a commit
@@ -367,6 +407,8 @@ it always prints JSON and exits with the verdict.
 | `council baseline prune` | `--baseline PATH`, `--from DIR`, `--write` |
 | `council init` | `-C, --repo PATH` |
 | `council agents` | `--json` |
+| `council evidence add RUN_ID IMAGE…` | `--label TEXT`, `-C, --repo PATH`, `--state-root DIR`, `--json` |
+| `council evidence list RUN_ID` | `-C, --repo PATH`, `--state-root DIR`, `--json` |
 | `council doctor` | `--agent NAME`, `--profile NAME`, `--reviewer BIN`, `--probe-timeout N`, `--json` |
 | `council setup skill NAME…` | `--library DIR`, `--dest DIR`, `--agent NAME`, `--list`, `--force`, `--dry-run` |
 | `council --version` | print the installed version |
@@ -434,6 +476,8 @@ does not modify tracked files; the only repository edit the tool makes is
   features from those adjacent systems.
 - [`docs/AGENT-SERVER.md`](docs/AGENT-SERVER.md) — the optional ACP and MCP
   adapters for Agent Panel and MCP hosts.
+- [`docs/EVIDENCE.md`](docs/EVIDENCE.md) — local screenshots, direct links and
+  the sidecar manifest.
 - [`docs/AGENT-ADAPTERS.md`](docs/AGENT-ADAPTERS.md) — add a reviewer agent;
   Hermes is the reference adapter.
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — kernel, adapters and debt.

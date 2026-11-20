@@ -97,6 +97,7 @@ def test_acp_review_returns_the_gate_verdict(review_repo: Path, tmp_path: Path,
     assert "FAIL" in joined
     assert "A password is committed." in joined
     assert "reason:" in joined
+    assert "run:" in joined
     assert not any(update.startswith("council:") for update in updates)
     assert "council: council:" not in joined
 
