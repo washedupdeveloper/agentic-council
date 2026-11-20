@@ -1,0 +1,30 @@
+version: 2
+
+# Dependencies move on a schedule, but a version change is still a decision: every
+# PR runs the full gate and a human merges it. There is deliberately no auto-merge.
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 3
+    groups:
+      actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: "deps"
+
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 3
+    groups:
+      python:
+        patterns: ["*"]
+    commit-message:
+      prefix: "deps"

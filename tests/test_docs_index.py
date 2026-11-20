@@ -9,7 +9,8 @@ ROOT = Path(__file__).resolve().parent.parent
 INDEX = ROOT / "docs" / "README.md"
 LINK = re.compile(r"\]\(([^)\s]+)\)")
 #: Fixture trees are other repositories' files; they are not this project's docs.
-SKIP = {"fixtures"}
+#: OpenSpec holds workflow artifacts and deltas; the spec validator owns them.
+SKIP = {"fixtures", "openspec"}
 
 
 def documents() -> list[Path]:

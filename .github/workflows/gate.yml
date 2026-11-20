@@ -43,3 +43,5 @@ jobs:
           nix shell nixpkgs#bubblewrap -c bwrap --unshare-user --dev-bind / / true \
             && echo "bwrap: usable"
       - run: nix flake check --print-build-logs
+      - name: validate OpenSpec changes
+        run: nix shell nixpkgs#nodejs_22 -c npx -y @fission-ai/openspec@1.15.0 validate --all --strict

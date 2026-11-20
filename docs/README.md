@@ -9,6 +9,7 @@ fails the gate when one exists.
 | document | what it is |
 |---|---|
 | [`../README.md`](../README.md) | the tool: the rule, the commands, the flags, the exit codes |
+| [`../AGENTS.md`](../AGENTS.md) | the working contract: OpenSpec communication and weekly dependency maintenance |
 | [`FOUNDATIONS.md`](FOUNDATIONS.md) | the seven decisions the tool rests on, each with its rejected alternative and what would make it wrong |
 | [`ARCHITECTURE.md`](ARCHITECTURE.md) | the module map, the dependency rule, the run pipeline, the remaining debt |
 | [`STATE-MACHINES.md`](STATE-MACHINES.md) | every state the CLI and the run engine can occupy, the invariants, the exit codes |

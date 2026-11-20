@@ -6,7 +6,7 @@ lives. The last section is the list of things this page cannot defend, which is
 the part worth reading first if you are deciding whether to trust the tool.
 
 Numbers in this page are current for this checkout: 49 modules, 6,475 lines
-under `src/council`, 49 test files, 234 claims, 73 falsifiers, 64 mutations.
+under `src/council`, 50 test files, 234 claims, 73 falsifiers, 64 mutations.
 
 ---
 
