@@ -86,7 +86,11 @@ def test_missing_council_is_a_clean_error(tmp_path: Path) -> None:
 
 @pytest.mark.skipif(os.name == "nt", reason="WSL path translation")
 def test_a_windows_workspace_path_is_translated_for_wsl() -> None:
-    assert local_path(r"C:\Users\Storm\repo") == Path("/mnt/c/Users/Storm/repo")
+    assert local_path(r"C:\Users\you\repo") == Path("/mnt/c/Users/you/repo")
+
+
+def test_a_posix_workspace_path_is_not_translated() -> None:
+    assert local_path("/home/user/repo") == Path("/home/user/repo")
 
 
 def test_the_server_passes_its_selected_agent(tmp_path: Path) -> None:

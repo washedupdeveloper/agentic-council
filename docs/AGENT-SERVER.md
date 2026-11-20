@@ -98,8 +98,8 @@ give it the workspace path explicitly:
       "command": "wsl.exe",
       "args": [
         "-d", "NixOS", "--",
-        "/home/nixolotl/.nix-profile/bin/council-mcp",
-        "--repo-root", "C:\\Users\\Storm\\path\\to\\repo"
+        "/home/<user>/.nix-profile/bin/council-mcp",
+        "--repo-root", "C:\\Users\\<you>\\path\\to\\repo"
       ]
     }
   }
@@ -135,6 +135,22 @@ through the editor's terminal or ask the editor to write files. The workspace
 comes from the ACP session. A Windows workspace path is translated to `/mnt/...`
 when the server runs under WSL.
 
+### Host matrix
+
+| Host | Project opened in Zed | ACP command | Review sandbox |
+|---|---|---|---|
+| Linux | native Linux path | `council-acp` | `bwrap` when installed |
+| macOS | native macOS path | `council-acp` | not exercised by this project |
+| Windows | native Windows path | `council-acp` from a native install | no `bwrap`; the reviewer runs natively |
+| Windows | WSL path (`\\wsl$\\...` / Zed WSL project) | `/home/<user>/.nix-profile/bin/council-acp` | `bwrap` inside WSL |
+| Windows | native Windows path, reviewer in WSL | `wsl.exe -d <distro> -- /home/<user>/.nix-profile/bin/council-acp` | `bwrap` inside WSL |
+
+The last row is the current WSL test setup: Zed runs on Windows, the project and
+the ACP server run in WSL, and the server translates the editor's Windows
+workspace path to `/mnt/<drive>/...` before resolving the repository. The direct
+Linux path is only valid when Zed executes the command inside that same WSL
+environment; a native Windows Zed process cannot execute it directly.
+
 ### Zed Agent Panel
 
 Add an external agent in Zed:
@@ -161,7 +177,7 @@ On Windows with council in WSL:
       "command": "wsl.exe",
       "args": [
         "-d", "NixOS", "--",
-        "/home/nixolotl/.nix-profile/bin/council-acp"
+        "/home/<user>/.nix-profile/bin/council-acp"
       ]
     }
   }
