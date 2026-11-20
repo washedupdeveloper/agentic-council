@@ -2,7 +2,7 @@
 
 **A review is a claim until a check settles it.**
 
-`council` reviews a git change with a configured AI reviewer, then requires a
+`council` reviews a git change with a configured reviewer adapter, then requires a
 proof before a finding can block a merge. It returns one of three verdicts:
 **PASS**, **FAIL**, or **INCOMPLETE**. It is a review gate — not a linter, a
 formatter, a test runner, or a code generator.
@@ -63,9 +63,10 @@ You need:
 
 - **A git repository** with a base revision and a head. `council` reviews a diff,
   not a directory in isolation.
-- **A configured reviewer.** The default is the `hermes` binary with the
-  `council-generalist` profile, plus provider credentials. `council doctor`
-  checks whether that combination can actually answer.
+- **A configured reviewer.** The default is the `hermes` adapter with the
+  `council-generalist` profile, plus provider credentials. `council agents` lists
+  the adapters in this build, and `council doctor` checks whether the selected
+  one can actually answer.
 - **Python 3.11+** for the wheel, or a container runtime for the image.
 - **`bwrap`** on Linux for sandboxed `command` and `repro` proofs. Without it
   those proofs are `UNRUNNABLE`, and a run that depends on one is
@@ -110,10 +111,10 @@ docker load < result
 docker run --rm council:2.0.0 --help
 ```
 
-The image contains `council`, `git` and `bwrap`, but **not Hermes**. Mount the
-repository and make your Hermes binary and profile available inside the
-container. The image is the portable way to carry the sandbox with the tool;
-see [`docs/PORTABILITY.md`](docs/PORTABILITY.md) for host-specific details.
+The image contains `council`, `git` and `bwrap`, but **not a reviewer agent**.
+Mount the repository and make the selected adapter's binary and profile available
+inside the container. The image is the portable way to carry the sandbox with the
+tool; see [`docs/PORTABILITY.md`](docs/PORTABILITY.md) for host-specific details.
 
 ### Source checkout
 
@@ -130,6 +131,7 @@ These are maintainer commands, not user installation commands.
 Run these from the repository you want to review:
 
 ```sh
+council agents
 council doctor
 council review --plan --base origin/main
 council review --base origin/main --samples 3
@@ -325,8 +327,9 @@ it always prints JSON and exits with the verdict.
 | `--include GLOB` | all paths | keep only matching paths (repeatable) |
 | `--exclude GLOB` | none | drop matching paths (repeatable; exclude wins) |
 | `--samples N` | auto | samples per unit: N, or auto (1/2/3 policy) |
-| `--profile NAME` | `council-generalist` | Hermes profile to ask |
-| `--reviewer BIN` | `hermes` | reviewer executable |
+| `--agent NAME` | `hermes` | reviewer adapter; `council agents` lists the build |
+| `--profile NAME` | `council-generalist` | profile for adapters that use one (Hermes) |
+| `--reviewer BIN` | adapter default | executable for the selected adapter |
 | `--sample-timeout N` | 900 | seconds allowed for one sample |
 | `--time-budget N` | 0 (none) | stop starting units after N seconds |
 | `--reasoning LEVEL` | profile's | `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max`, `ultra` |
@@ -363,7 +366,8 @@ it always prints JSON and exits with the verdict.
 | `council baseline create` | `--from DIR`, `--out PATH`, `--owner NAME`, `--reason TEXT`, `--days N` |
 | `council baseline prune` | `--baseline PATH`, `--from DIR`, `--write` |
 | `council init` | `-C, --repo PATH` |
-| `council doctor` | `--profile NAME`, `--reviewer BIN`, `--probe-timeout N`, `--json` |
+| `council agents` | `--json` |
+| `council doctor` | `--agent NAME`, `--profile NAME`, `--reviewer BIN`, `--probe-timeout N`, `--json` |
 | `council setup skill NAME…` | `--library DIR`, `--dest DIR`, `--agent NAME`, `--list`, `--force`, `--dry-run` |
 | `council --version` | print the installed version |
 | `council -h` / `council --help` | command overview |
@@ -394,8 +398,8 @@ A skill is replaced only when the copy is byte-identical (reported as `unchanged
 | symptom | likely cause | fix |
 |---|---|---|
 | `council: command not found` | wheel is not installed in the active environment | install it with `pip`, or use `python -m council` in that environment |
-| `council doctor` reports a missing reviewer | `hermes` is not on `PATH` | install Hermes or pass `--reviewer /path/to/hermes` |
-| doctor's profile check fails | profile missing, unconfigured, or provider unreachable | configure the Hermes profile and credentials; retry `council doctor` |
+| `council doctor` reports a missing reviewer | the selected adapter's executable is not on `PATH` | install it, pass `--reviewer /path/to/binary`, or select another adapter |
+| doctor's agent check fails | adapter missing, profile unconfigured, or provider unreachable | configure the selected adapter and its credentials; retry `council doctor` |
 | `bwrap` warning | Linux sandbox is unavailable | install bubblewrap, use the container, or accept that `command`/`repro` proofs will be `UNRUNNABLE` |
 | `INCOMPLETE` | a sample failed, a proof could not run, or a unit was not reviewed | read `verdict.json`; fix the blocker and rerun; do not treat it as PASS |
 | prompt is too large | the change exceeds the per-unit budget | run `--plan`; narrow `--base`, lower `--context-depth`, raise `--max-prompt-bytes`, or use `--window-large-files` |
@@ -430,6 +434,8 @@ does not modify tracked files; the only repository edit the tool makes is
   features from those adjacent systems.
 - [`docs/AGENT-SERVER.md`](docs/AGENT-SERVER.md) — the optional ACP and MCP
   adapters for Agent Panel and MCP hosts.
+- [`docs/AGENT-ADAPTERS.md`](docs/AGENT-ADAPTERS.md) — add a reviewer agent;
+  Hermes is the reference adapter.
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — kernel, adapters and debt.
 - [`docs/STATE-MACHINES.md`](docs/STATE-MACHINES.md) — states and invariants.
 - [`docs/BASELINE.md`](docs/BASELINE.md) — accepted-risk rules.

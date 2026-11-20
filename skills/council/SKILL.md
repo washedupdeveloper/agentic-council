@@ -1,16 +1,18 @@
 ---
 name: council
 description: Use when a change needs a blocking-defect verdict. Runs `council review` and reports the states behind the verdict.
-commands: [review, ci, pr, baseline, init, doctor, setup]
+commands: [review, ci, pr, baseline, init, agents, doctor, setup]
 flags: [--plan, --include, --exclude, --samples, --report, --json, --sarif, --no-ephemeral, --keep, --require-executed-proofs, --base, --library, --dest, --agent, --list, --force, --dry-run]
 artefacts: [verdict.json, sample-N.json]
 ---
 
 # council
 
-`council review` diffs a change against a base, asks a Hermes profile for
-findings, executes each finding's proof, and derives the verdict from the states
-those proofs reached. A finding counts only once its proof holds.
+`council review` diffs a change against a base, asks the configured reviewer
+agent for findings, executes each finding's proof, and derives the verdict from
+the states those proofs reached. Hermes is the only adapter shipped today; the
+`--agent` flag selects an adapter, and `council agents` lists what this build
+carries. A finding counts only once its proof holds.
 
 ## Run
 
@@ -22,6 +24,7 @@ those proofs reached. A finding counts only once its proof holds.
     council ci --sarif council.sarif      # headless: JSON, exit code, SARIF
     council pr 1234                       # base and head come from `gh pr view`
     council pr https://github.com/o/r/pull/1234  # URL or branch also work
+    council agents                        # reviewer adapters in this build
     council doctor                        # can this machine produce evidence at all?
 
 A review is **ephemeral by default**: the run directory is removed after the

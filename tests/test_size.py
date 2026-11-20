@@ -14,7 +14,9 @@ from pathlib import Path
 SOURCE = Path(__file__).resolve().parent.parent / "src" / "council"
 
 #: Raise a ratchet deliberately, in the diff that needs the room.
-SOURCE_LIMIT = 6000
+#: The adapter seam adds an explicit package boundary; the review engine still
+#: stays under the previous ceiling after the Hermes transport moved out.
+SOURCE_LIMIT = 6200
 MODULE_LIMIT = 50
 
 

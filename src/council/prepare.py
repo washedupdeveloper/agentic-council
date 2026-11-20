@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 from pathlib import Path
 
+from .agents import AgentOptions, resolve
 from .base import resolve_base
 from .baseline import load as load_baseline
 from .baseline import load_at as load_baseline_at
@@ -24,7 +25,6 @@ from .reference import FetchError, fetch
 from .repo import ReviewError, diff, output
 from .repo import root as repo_root
 from .request import ReviewRequest
-from .runner import profile_fingerprint
 
 
 def default_prompt() -> Path:
@@ -119,10 +119,19 @@ def prepare(request: ReviewRequest) -> Prepared:
         raise
     except (OSError, UnicodeDecodeError) as exc:
         raise ReviewError(f"cannot read the reviewer prompt at {prompt_file}: {exc}") from exc
-    identity = profile_fingerprint(request.profile)
-    digest = instrument_digest(template, profile=request.profile,
-                               reasoning=request.reasoning,
-                               profile_fingerprint=identity.sha256 or None)
+    try:
+        adapter = resolve(request.agent)
+        options = AgentOptions(binary=request.reviewer or adapter.default_binary,
+                               profile=request.profile,
+                               reasoning=request.reasoning, stream=request.stream,
+                               idle_timeout=request.idle_timeout,
+                               sandbox=request.sandbox)
+        identity = adapter.identity(options)
+    except ValueError as exc:
+        raise ReviewError(str(exc)) from exc
+    digest = instrument_digest(template, agent=request.agent, profile=request.profile,
+                               agent_fingerprint=identity.sha256 or None,
+                               reasoning=request.reasoning)
 
     try:
         references = tuple(fetch(url) for url in request.context_urls)
@@ -145,4 +154,7 @@ def prepare(request: ReviewRequest) -> Prepared:
     return Prepared(root, config, baseline, base, head, patch, change.skipped,
                     scope_ignored, references, prompt_file, template, digest,
                     fitted.prompt, prompt_bytes, sliced, fitted.context, diff_sha256,
-                    identity.path, identity.sha256, rules=rules, rules_text=rules_text)
+                    identity.source, identity.sha256,
+                    agent=request.agent, agent_config=identity.source,
+                    agent_config_sha256=identity.sha256, reviewer=options.binary,
+                    rules=rules, rules_text=rules_text)

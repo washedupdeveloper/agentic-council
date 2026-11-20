@@ -9,12 +9,14 @@ import shutil
 import sys
 import tempfile
 from collections.abc import Sequence
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Any
 
 from . import baseline as baseline_io
 from . import doctor as diagnostics
+from .agents import AgentOptions, DEFAULT_REGISTRY, resolve as resolve_agent
 from .cli_output import plan_payload as _plan_payload
 from .cli_output import print_plan as _print_plan
 from .cli_output import print_report as _print_report
@@ -35,7 +37,6 @@ from .run import (
     plan,
     review,
 )
-from .runner import hermes_runner
 from .domain.sarif import render as render_sarif
 from .domain.verdict import Verdict
 from .version import current_version
@@ -137,6 +138,7 @@ def _request(args: argparse.Namespace, *, allow: bool | None = None) -> ReviewRe
     """The request the CLI's parsed arguments describe."""
     return ReviewRequest(
         repo=args.repo, base=getattr(args, "base", None), samples=args.samples,
+        agent=args.agent, reviewer=args.reviewer or "",
         profile=args.profile, prompt=args.prompt, run_id=args.run_id,
         context_urls=tuple(args.context_url),
         allow_large_prompt=args.allow_large_prompt if allow is None else allow,
@@ -160,6 +162,28 @@ def _request(args: argparse.Namespace, *, allow: bool | None = None) -> ReviewRe
         exclude=tuple(getattr(args, "exclude", ())),
         staged=bool(getattr(args, "staged", False)),
     )
+
+
+def _agent_options(args: argparse.Namespace,
+                   adapter: Any | None = None) -> AgentOptions:
+    """The deployment values a selected adapter may use."""
+    selected = adapter if adapter is not None else resolve_agent(args.agent)
+    binary = args.reviewer or selected.default_binary
+    return AgentOptions(binary=binary, profile=args.profile,
+                        reasoning=getattr(args, "reasoning", None),
+                        stream=bool(getattr(args, "stream", True)),
+                        idle_timeout=int(getattr(args, "idle_timeout", 120)),
+                        timeout=int(getattr(args, "sample_timeout", 900)),
+                        sandbox=bool(getattr(args, "sandbox", False)))
+
+
+def _agent_runner(args: argparse.Namespace, *, timeout: int | None = None) -> Any:
+    """Resolve the selected adapter and build its sample runner."""
+    adapter = resolve_agent(args.agent)
+    options = _agent_options(args, adapter)
+    if timeout is not None:
+        options = replace(options, timeout=timeout)
+    return adapter.runner(options)
 
 
 def _bind_pr(args: argparse.Namespace) -> None:
@@ -198,6 +222,7 @@ def _check_output(path: Path, flag: str, *, directory: bool) -> None:
 def _preflight(args: argparse.Namespace) -> None:
     """Everything that can be refused before a run directory or a model call."""
     try:
+        resolve_agent(args.agent)
         _request(args).validate()
     except ValueError as exc:
         raise ReviewError(str(exc)) from exc
@@ -247,10 +272,7 @@ def _review(args: argparse.Namespace) -> Report:
     if sandbox and shutil.which("bwrap") is None:
         raise ReviewError("--sandbox needs bwrap on PATH; install bubblewrap or use --no-sandbox")
     args.sandbox = sandbox
-    runner = hermes_runner(args.profile, binary=args.reviewer,
-                           timeout=args.sample_timeout, reasoning=args.reasoning,
-                           stream=args.stream, idle_timeout=args.idle_timeout,
-                           sandbox=sandbox)
+    runner = _agent_runner(args)
     while True:
         request = _request(args, allow=allow)
         try:
@@ -359,9 +381,14 @@ def _setup(args: object) -> int:
 
 def _doctor(args: argparse.Namespace) -> int:
     """Report what this machine can do. A fail is exit 1; a warning is not."""
-    runner = hermes_runner(args.profile, binary=args.reviewer,
-                           timeout=args.probe_timeout)
-    checks = diagnostics.run(args.profile, runner=runner, binary=args.reviewer,
+    try:
+        adapter = resolve_agent(args.agent)
+    except ValueError as exc:
+        print(f"council: {_safe(exc)}", file=sys.stderr)
+        return EXIT_ERROR
+    runner = _agent_runner(args, timeout=args.probe_timeout)
+    binary = args.reviewer or adapter.default_binary
+    checks = diagnostics.run(args.agent, runner=runner, binary=binary,
                              probe_timeout=args.probe_timeout)
     if args.json:
         print(json.dumps([asdict(check) for check in checks], indent=2))
@@ -369,6 +396,25 @@ def _doctor(args: argparse.Namespace) -> int:
         for check in checks:
             print(check.line())
     return 1 if any(check.status == diagnostics.FAIL for check in checks) else 0
+
+
+def _agents(args: argparse.Namespace) -> int:
+    """List the adapters compiled into this build and whether they are runnable."""
+    rows: list[dict[str, object]] = []
+    for adapter in DEFAULT_REGISTRY.all():
+        options = AgentOptions(binary=adapter.default_binary)
+        available, detail = adapter.available(options)
+        rows.append({"name": adapter.name, "description": adapter.description,
+                     "available": available, "detail": detail,
+                     "default_binary": adapter.default_binary})
+    if args.json:
+        print(json.dumps(rows, indent=2))
+    else:
+        for row in rows:
+            status = "available" if row["available"] else "missing"
+            print(f"{row['name']:<10} {status:<10} {row['description']}")
+            print(f"           {row['detail']}")
+    return 0
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -387,6 +433,9 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     if args.command == "baseline":
         return _baseline(args)
+
+    if args.command == "agents":
+        return _agents(args)
 
     if args.command == "doctor":
         return _doctor(args)

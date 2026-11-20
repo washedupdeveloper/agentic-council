@@ -115,7 +115,7 @@ def test_mcp_doctor_reports_the_fake_reviewer(
         if isinstance(checks, dict) and isinstance(checks.get("result"), list):
             checks = checks["result"]
         assert isinstance(checks, list)
-        assert {check["name"] for check in checks} >= {"git", "reviewer", "profile"}
+        assert {check["name"] for check in checks} >= {"git", "reviewer", "agent"}
 
     asyncio.run(run())
 

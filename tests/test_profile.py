@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from council.runner import ProfileFingerprint, hermes_home, profile_fingerprint
+from council.agents.hermes import ProfileFingerprint, hermes_home, profile_fingerprint
 
 NAME = "council-generalist"
 
@@ -81,5 +81,5 @@ def test_a_host_without_a_home_has_no_fingerprint(monkeypatch: pytest.MonkeyPatc
     def boom() -> Path:
         raise RuntimeError("no home")
 
-    monkeypatch.setattr("council.runner.hermes_home", boom)
+    monkeypatch.setattr("council.agents.hermes.hermes_home", boom)
     assert profile_fingerprint(NAME) == ProfileFingerprint()

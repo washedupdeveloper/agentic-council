@@ -36,6 +36,7 @@ class ServerConfig:
 
     root: Path
     state_root: Path
+    agent: str = "hermes"
     reviewer: str | None = None
     profile: str | None = None
     no_sandbox: bool = False
@@ -142,6 +143,7 @@ def _append_review_args(config: ServerConfig, options: ReviewOptions,
     argv.extend(["--context-depth", str(options.context_depth)])
     if options.time_budget:
         argv.extend(["--time-budget", str(options.time_budget)])
+    argv.extend(["--agent", config.agent])
     if config.profile:
         argv.extend(["--profile", config.profile])
     if config.reviewer:
@@ -245,7 +247,8 @@ async def run_review(config: ServerConfig, options: ReviewOptions, *,
 async def run_doctor(config: ServerConfig, *,
                      on_event: EventHook | None = None) -> CommandResult:
     """Run `council doctor --json`; no repository and no review."""
-    argv = [*_base_command(config), "doctor", "--json"]
+    argv = [*_base_command(config), "doctor", "--json",
+            "--agent", config.agent]
     if config.profile:
         argv.extend(["--profile", config.profile])
     if config.reviewer:
@@ -271,9 +274,11 @@ def add_server_arguments(parser: Any) -> None:
     parser.add_argument("--state-root", type=Path, default=default_state_root(),
                         metavar="DIR", help="where retained evidence is written")
     parser.add_argument("--reviewer", default=None,
-                        help="reviewer binary (default: council's default)")
+                        help="executable for the selected adapter (default: adapter's default)")
+    parser.add_argument("--agent", default="hermes",
+                        help="reviewer adapter (default: hermes)")
     parser.add_argument("--profile", default=None,
-                        help="Hermes profile (default: council's default)")
+                        help="profile for an adapter that uses one (Hermes)")
     parser.add_argument("--no-sandbox", action="store_true",
                         help="pass --no-sandbox to council")
     parser.add_argument("--timeout", type=_positive_float, default=3600.0,
@@ -288,6 +293,6 @@ def config_from_args(args: Any) -> ServerConfig:
         raise SystemExit(f"--repo-root is not a directory: {root}")
     command = (args.council,) if args.council else ()
     return ServerConfig(root=root.resolve(), state_root=local_path(args.state_root),
-                        reviewer=args.reviewer, profile=args.profile,
+                        agent=args.agent, reviewer=args.reviewer, profile=args.profile,
                         no_sandbox=bool(args.no_sandbox), timeout=float(args.timeout),
                         command=command)

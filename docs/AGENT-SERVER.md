@@ -44,8 +44,9 @@ Both commands accept the same deployment options:
 |---|---|
 | `--repo-root DIR` | only repositories beneath this directory may be reviewed |
 | `--state-root DIR` | where retained evidence is written; default is a per-user cache |
-| `--reviewer BIN` | reviewer executable; default is council's default |
-| `--profile NAME` | Hermes profile; default is council's default |
+| `--agent NAME` | reviewer adapter; default is `hermes` |
+| `--reviewer BIN` | executable for the selected adapter; default is the adapter's default |
+| `--profile NAME` | profile for an adapter that uses one (Hermes) |
 | `--no-sandbox` | pass `--no-sandbox` to council |
 | `--timeout SECONDS` | whole review process timeout |
 | `--council BIN` | council executable override; default is PATH, then `python -m council` |
@@ -53,7 +54,9 @@ Both commands accept the same deployment options:
 The reviewer is a **server deployment choice**. It is not selected by an MCP
 client. The host editor's model is not automatically available to the server;
 council continues to use its configured reviewer. Host-model review would be a
-separate contract and is not part of this adapter.
+separate contract and is not part of this adapter. See
+[`AGENT-ADAPTERS.md`](AGENT-ADAPTERS.md) for the reviewer seam and how to add an
+adapter.
 
 ## MCP
 

@@ -38,6 +38,8 @@ def instrument_digest(template: str, *, profile: str,
                       dimensions: Sequence[str] = DIMENSIONS,
                       contract: str = CONTRACT,
                       reasoning: str | None = None,
+                      agent: str = "hermes",
+                      agent_fingerprint: str | None = None,
                       profile_fingerprint: str | None = None) -> str:
     """A short hash of everything that decides what a sample means.
 
@@ -45,16 +47,16 @@ def instrument_digest(template: str, *, profile: str,
     runs over different changes share it, and a prompt or profile change breaks
     it.
 
-    `profile_fingerprint` is the digest of the profile's own configuration. The
-    model, provider and reasoning default live there rather than in this tool, so
-    a sample from a different model is a different instrument. A caller that
-    cannot read that file passes `None`, and the digest records that it did not
-    know rather than treating it as unchanged.
+    `agent` names the adapter; `agent_fingerprint` is its configuration digest.
+    The Hermes adapter supplies the profile bytes through this field. A caller
+    that cannot read the configuration passes None, and the digest records that
+    it did not know rather than treating it as unchanged.
     """
     digest = hashlib.sha256()
-    for part in ("council-prompt-v2", contract, template, profile,
+    for part in ("council-prompt-v2", agent, contract, template, profile,
                  reasoning or "profile-default",
-                 profile_fingerprint or "profile-config:unknown", *dimensions):
+                 agent_fingerprint or profile_fingerprint or "profile-config:unknown",
+                 *dimensions):
         digest.update(part.encode("utf-8", "surrogatepass"))
         digest.update(b"\x00")
     return digest.hexdigest()[:16]

@@ -574,7 +574,7 @@ falsifier = "acp-prefixes-are-not-cleaned"
 [[claim]]
 id = "a-symlinked-reviewer-runs-in-the-sandbox"
 text = "A symlinked reviewer executable is resolved before bubblewrap mounts it."
-check = "python3 -m pytest tests/test_runner.py::test_a_symlinked_reviewer_runs_in_the_sandbox -q"
+check = "python3 -m pytest tests/test_runner.py::test_a_symlinked_reviewer_is_resolved_for_bwrap -q"
 falsifier = "sandbox-reviewer-keeps-symlink"
 
 [[claim]]
@@ -1185,3 +1185,45 @@ check = "python3 -m pytest tests/test_skill_install.py::test_installs_into_a_des
 id = "skill-install-refuses-to-overwrite"
 text = "An install refuses to replace a skill that differs, and says how to force it."
 check = "python3 -m pytest tests/test_skill_install.py::test_a_differing_skill_is_refused_without_force -q"
+
+[[claim]]
+id = "the-builtin-registry-is-hermes"
+text = "The shipped reviewer registry contains exactly the Hermes adapter."
+check = "python3 -m pytest tests/test_agents.py::test_the_builtin_registry_lists_hermes -q"
+falsifier = "registry-forgets-hermes"
+
+[[claim]]
+id = "an-unknown-agent-is-refused"
+text = "Selecting a reviewer adapter that is not registered is a start failure, not a fallback."
+check = "python3 -m pytest tests/test_agents.py::test_an_unknown_agent_is_refused -q"
+falsifier = "unknown-agent-falls-back"
+
+[[claim]]
+id = "a-registered-agent-is-recorded"
+text = "A registered adapter can run a review, and its name and identity are written into the verdict."
+check = "python3 -m pytest tests/test_agents.py::test_a_registered_adapter_runs_a_review_and_is_recorded -q"
+falsifier = "verdict-forgets-agent"
+
+[[claim]]
+id = "the-cli-passes-the-selected-agent"
+text = "The CLI carries the selected agent name and reviewer executable into the review request."
+check = "python3 -m pytest tests/test_agents.py::test_the_cli_passes_the_selected_agent_to_the_request -q"
+falsifier = "cli-ignores-agent"
+
+[[claim]]
+id = "the-adapter-supplies-its-default-executable"
+text = "With no --reviewer, the selected adapter's own default executable is used."
+check = "python3 -m pytest tests/test_agents.py::test_the_selected_adapter_supplies_its_default_executable -q"
+falsifier = "agent-default-is-hardcoded"
+
+[[claim]]
+id = "the-server-passes-the-selected-agent"
+text = "The ACP/MCP process boundary passes its configured reviewer adapter to the public CLI."
+check = "python3 -m pytest tests/test_server_cli.py::test_the_server_passes_its_selected_agent -q"
+falsifier = "server-ignores-agent"
+
+[[claim]]
+id = "the-digest-names-the-agent"
+text = "The instrument digest changes when the selected reviewer adapter changes."
+check = "python3 -m pytest tests/test_prompt.py::test_the_digest_changes_with_the_agent -q"
+falsifier = "digest-ignores-agent"

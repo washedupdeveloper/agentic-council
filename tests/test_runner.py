@@ -5,10 +5,11 @@ from __future__ import annotations
 import sys
 import shutil
 from pathlib import Path
+from typing import Any
 
 import pytest
 
-from council.runner import hermes_runner
+from council.agents.hermes import hermes_runner
 
 
 def script(tmp_path: Path, body: str, code: int = 0) -> Path:
@@ -159,6 +160,28 @@ def test_a_symlinked_reviewer_runs_in_the_sandbox(tmp_path: Path) -> None:
     linked.symlink_to(binary)
     answer = hermes_runner("p", binary=str(linked), timeout=20, sandbox=True)("q")
     assert answer.strip() == '{"sections": {}}'
+
+
+def test_a_symlinked_reviewer_is_resolved_for_bwrap(
+        tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    if shutil.which("bwrap") is None:
+        pytest.skip("bwrap is not available")
+    binary = py_script(tmp_path, 'print(json.dumps({"sections": {}}))')
+    linked = tmp_path / "reviewer"
+    linked.symlink_to(binary)
+    captured: dict[str, Any] = {}
+
+    def capture(argv: list[str], prompt_dir: Path, *, bwrap: str,
+                binary: str, home: str) -> list[str]:
+        captured["argv"] = argv
+        captured["binary"] = binary
+        return ["/bin/true"]
+
+    monkeypatch.setattr("council.runner.reviewer_argv", capture)
+    from council.runner import _sandbox_argv
+    _sandbox_argv([str(linked)], tmp_path)
+    assert captured["binary"] == str(binary.resolve())
+    assert captured["argv"][0] == str(binary.resolve())
 
 
 def test_the_sandbox_needs_bwrap(tmp_path: Path,

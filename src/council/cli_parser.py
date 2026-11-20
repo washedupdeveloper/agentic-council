@@ -12,6 +12,7 @@ import sys
 from pathlib import Path
 from typing import NoReturn
 
+from .agents import DEFAULT_AGENT
 from .request import DEFAULT_PROFILE, PROMPT_LIMIT, WINDOW_LIMIT
 from .runner import DEFAULT_IDLE_TIMEOUT
 from .version import current_version
@@ -87,9 +88,11 @@ def add_review_arguments(parser: argparse.ArgumentParser, *, advice: bool,
                         help="never review paths matching GLOB (repeatable; exclude wins)")
     parser.add_argument("--samples", type=samples, default=None,
                         help="samples: N, or auto (default: 1 clean, 2 to confirm, 3 to break a tie); per unit when sliced")
-    parser.add_argument("--profile", default=DEFAULT_PROFILE, help="Hermes profile to ask")
-    parser.add_argument("--reviewer", default="hermes",
-                        help="binary that answers a sample (default: hermes)")
+    parser.add_argument("--agent", default=DEFAULT_AGENT,
+                        help="reviewer adapter to use (default: hermes)")
+    parser.add_argument("--profile", default=DEFAULT_PROFILE, help="profile for an adapter that uses one (Hermes)")
+    parser.add_argument("--reviewer", default=None,
+                        help="executable for the selected adapter (default: the adapter's default)")
     parser.add_argument("--sample-timeout", type=positive, default=900, metavar="SECONDS",
                         help="give up on one sample after N seconds (default: 900)")
     parser.add_argument("--time-budget", type=non_negative, default=0, metavar="SECONDS",
@@ -191,10 +194,15 @@ def build_parser() -> argparse.ArgumentParser:
     init.add_argument("-C", "--repo", type=path, default=Path("."),
                       help="repository to initialize (default: the current directory)")
 
+    agents = sub.add_parser("agents", help="list reviewer adapters available in this build")
+    agents.add_argument("--json", action="store_true", help="print the adapter list as JSON")
+
     doctor = sub.add_parser("doctor", help="check that this machine can run a review")
-    doctor.add_argument("--profile", default=DEFAULT_PROFILE, help="Hermes profile to ask")
-    doctor.add_argument("--reviewer", default="hermes",
-                        help="binary that answers a sample (default: hermes)")
+    doctor.add_argument("--agent", default=DEFAULT_AGENT,
+                        help="reviewer adapter to check (default: hermes)")
+    doctor.add_argument("--profile", default=DEFAULT_PROFILE, help="profile for an adapter that uses one (Hermes)")
+    doctor.add_argument("--reviewer", default=None,
+                        help="executable for the selected adapter (default: the adapter's default)")
     doctor.add_argument("--probe-timeout", type=positive, default=60, metavar="SECONDS",
                         help="how long the profile has to answer the probe (default: 60)")
     doctor.add_argument("--json", action="store_true", help="print the checks as JSON")

@@ -15,6 +15,7 @@ from council_server.cli import (
     CouncilError,
     ReviewOptions,
     ServerConfig,
+    _append_review_args,
     local_path,
     run_plan,
     run_review,
@@ -86,3 +87,13 @@ def test_missing_council_is_a_clean_error(tmp_path: Path) -> None:
 @pytest.mark.skipif(os.name == "nt", reason="WSL path translation")
 def test_a_windows_workspace_path_is_translated_for_wsl() -> None:
     assert local_path(r"C:\Users\Storm\repo") == Path("/mnt/c/Users/Storm/repo")
+
+
+def test_the_server_passes_its_selected_agent(tmp_path: Path) -> None:
+    server = ServerConfig(root=tmp_path, state_root=tmp_path / "state",
+                          agent="example", profile="review", no_sandbox=True)
+    argv: list[str] = []
+    _append_review_args(server, ReviewOptions(), argv)
+    assert ["--agent", "example"] == argv[argv.index("--agent"):argv.index("--agent") + 2]
+    assert "--profile" in argv and "review" in argv
+    assert "--reviewer" not in argv

@@ -263,12 +263,11 @@ def test_verify_is_not_a_subcommand() -> None:
 def test_the_reviewer_binary_is_passed_through(monkeypatch: pytest.MonkeyPatch) -> None:
     seen: dict[str, Any] = {}
 
-    def fake_runner(profile: str, **kwargs: Any) -> Any:
-        seen["profile"] = profile
-        seen.update(kwargs)
+    def fake_runner(args: Any) -> Any:
+        seen["binary"] = args.reviewer
         return lambda prompt: "{}"
 
-    monkeypatch.setattr(cli, "hermes_runner", fake_runner)
+    monkeypatch.setattr(cli, "_agent_runner", fake_runner)
     stub(monkeypatch, report(Verdict.PASS))
     assert cli.main(["review", "--reviewer", "/bin/other"]) == 0
     assert seen["binary"] == "/bin/other"
@@ -277,11 +276,11 @@ def test_the_reviewer_binary_is_passed_through(monkeypatch: pytest.MonkeyPatch) 
 def test_the_sample_timeout_reaches_the_runner(monkeypatch: pytest.MonkeyPatch) -> None:
     seen: dict[str, Any] = {}
 
-    def fake_runner(profile: str, **kwargs: Any) -> Any:
-        seen.update(kwargs)
+    def fake_runner(args: Any) -> Any:
+        seen["timeout"] = args.sample_timeout
         return lambda prompt: "{}"
 
-    monkeypatch.setattr(cli, "hermes_runner", fake_runner)
+    monkeypatch.setattr(cli, "_agent_runner", fake_runner)
     stub(monkeypatch, report(Verdict.PASS))
     assert cli.main(["review", "--sample-timeout", "120"]) == 0
     assert seen["timeout"] == 120
@@ -290,11 +289,11 @@ def test_the_sample_timeout_reaches_the_runner(monkeypatch: pytest.MonkeyPatch) 
 def test_the_reasoning_level_reaches_the_runner(monkeypatch: pytest.MonkeyPatch) -> None:
     seen: dict[str, Any] = {}
 
-    def fake_runner(profile: str, **kwargs: Any) -> Any:
-        seen.update(kwargs)
+    def fake_runner(args: Any) -> Any:
+        seen["reasoning"] = args.reasoning
         return lambda prompt: "{}"
 
-    monkeypatch.setattr(cli, "hermes_runner", fake_runner)
+    monkeypatch.setattr(cli, "_agent_runner", fake_runner)
     stub(monkeypatch, report(Verdict.PASS))
     assert cli.main(["review", "--reasoning", "none"]) == 0
     assert seen["reasoning"] == "none"
@@ -304,11 +303,11 @@ def test_streaming_is_on_by_default_and_can_be_turned_off(
         monkeypatch: pytest.MonkeyPatch) -> None:
     seen: list[dict[str, Any]] = []
 
-    def fake_runner(profile: str, **kwargs: Any) -> Any:
-        seen.append(kwargs)
+    def fake_runner(args: Any) -> Any:
+        seen.append({"stream": args.stream, "idle_timeout": args.idle_timeout})
         return lambda prompt: "{}"
 
-    monkeypatch.setattr(cli, "hermes_runner", fake_runner)
+    monkeypatch.setattr(cli, "_agent_runner", fake_runner)
     stub(monkeypatch, report(Verdict.PASS))
     assert cli.main(["review", "--run-id", "one"]) == 0
     assert cli.main(["review", "--no-stream", "--run-id", "two"]) == 0
@@ -653,7 +652,7 @@ def test_a_bad_config_is_a_start_failure(tmp_path: Path,
     empty = json.dumps({"sections": {name: [] for name in ("security", "correctness",
                                                            "readability", "architecture",
                                                            "performance")}})
-    monkeypatch.setattr(cli, "hermes_runner", lambda *a, **k: (lambda prompt: empty))
+    monkeypatch.setattr(cli, "_agent_runner", lambda args: (lambda prompt: empty))
     assert cli.main(["review", "-C", str(repo), "--run-id", "cfg", "--report"]) == 3
 
 

@@ -33,7 +33,8 @@ not relabelled as architecture.
 |---|---|---|
 | The Nix sources hold to a standard, not to taste | `nix flake check` runs the checker, and every excused finding is written down with its reason. | `checks.nix-lint` (input `nix-best-practices`); `check-nix.allow`. |
 | The domain kernel is pure | No kernel module imports an adapter, and none calls a known effectful method. | `tests/test_architecture.py` parses each imported module; `tests/test_domain_kernel.py` calls the decisions with literals. |
-| A sample from another model is a different instrument | The digest covers the profile's configuration bytes, not only its name. | `prompt.instrument_digest`; `runner.profile_fingerprint`; `tests/test_profile.py`; claim `the-digest-covers-the-profile-configuration`. |
+| A sample from another model is a different instrument | The digest covers the reviewer adapter and its configuration bytes, not only its name. | `prompt.instrument_digest`; `agents.hermes.profile_fingerprint`; `tests/test_profile.py`; claim `the-digest-covers-the-profile-configuration`. |
+| A reviewer is replaceable without touching the engine | The review engine resolves an adapter and calls its runner; no engine module imports a specific agent. | `agents.AgentAdapter`; `agents.DEFAULT_REGISTRY`; `tests/test_agents.py`; `docs/AGENT-ADAPTERS.md`. |
 | Configuration parsing is a decision, not a file read | Text in, `Config` out; the path check lives in the adapter. | `domain.config.parse`; `council.config.load` only reads and delegates. |
 | Adjudication does not execute proofs | Outcomes in, findings and verdict out; the executor stays in the shell. | `domain.adjudication.decide`; `adjudicate.adjudicate` calls the one executor. |
 | A finding's place has one parser | `Finding.file`/`line` are structured; `location` is the derived wire form. | `domain.location.Location`; `Finding.__post_init__`; `test_location.py`. |
@@ -70,7 +71,7 @@ council.adjudicate, run, request, planning, prepare, sampling, runstore
                           application/orchestration; effects through calls
         ^
         | imports
-council.repo, runner, proofs, pr, doctor, config, baseline, paths, sample, sandbox,
+council.repo, runner, agents, proofs, pr, doctor, config, baseline, paths, sample, sandbox,
 council.cli, cli_parser, cli_output, version
                           effect adapters
 ```
@@ -109,7 +110,7 @@ adapter; `tests/test_architecture.py` enforces the direction.
 | Run id | empty, `.`/`..`, separators, reserved characters, Cc/Cf/Cs/Zl/Zp, overlong | `ValueError` from `domain.run_id.validate_run_id`, before any directory |
 | Configuration | malformed TOML, unknown key, wrong type, sandbox disabled by an untrusted repo | `ConfigError` from `domain.config.parse` |
 | Adjudication | a different number of outcome groups and findings | `ValueError`, not a silent `zip` |
-| Review request | samples < 1, bad depth, negative budget, empty profile/base, bad run id | `ReviewError`, exit 3, no run directory |
+| Review request | samples < 1, bad depth, negative budget, empty agent/profile/base, bad run id | `ReviewError`, exit 3, no run directory |
 | Proof | bad params, missing regular file, unsupported kind | `UNRUNNABLE`, never `REFUTED` and never a traceback |
 
 The distinction is deliberate: a **start failure** is exit 3 and has no

@@ -13,7 +13,7 @@ import pytest
 
 from council.baseline import from_run, write as write_baseline
 from council.domain.prompt import instrument_digest
-from council.runner import profile_fingerprint
+from council.agents.hermes import profile_fingerprint
 from council.repo import init
 from council.run import (DEFAULT_PROFILE, PromptTooLarge, ReviewError, ReviewRequest,
                          default_prompt, plan, review)
@@ -30,8 +30,8 @@ def instrument(template: str) -> str:
     (the configuration is part of the instrument) instead of a fixture.
     """
     fingerprint = profile_fingerprint(DEFAULT_PROFILE)
-    return instrument_digest(template, profile=DEFAULT_PROFILE,
-                             profile_fingerprint=fingerprint.sha256 or None)
+    return instrument_digest(template, agent="hermes", profile=DEFAULT_PROFILE,
+                             agent_fingerprint=fingerprint.sha256 or None)
 
 
 

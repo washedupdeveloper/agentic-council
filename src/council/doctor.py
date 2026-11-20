@@ -55,22 +55,22 @@ def check_sandbox() -> Check:
     return Check("bwrap", WARN, "not on PATH: command proofs will be UNRUNNABLE")
 
 
-def check_profile(profile: str, runner: Runner, probe_timeout: int) -> Check:
-    """Ask the profile a question it must answer quickly."""
+def check_agent(name: str, runner: Runner, probe_timeout: int) -> Check:
+    """Ask the selected agent a question it must answer quickly."""
     started = time.monotonic()
     try:
         answer = runner(PROBE)
     except Exception as exc:  # noqa: BLE001 - every failure is the finding here
-        return Check("profile", FAIL, f"{profile}: {type(exc).__name__}: {exc}")
+        return Check("agent", FAIL, f"{name}: {type(exc).__name__}: {exc}")
     seconds = time.monotonic() - started
     if not isinstance(answer, str) or not answer.strip():
-        return Check("profile", FAIL, f"{profile}: the probe returned nothing")
-    return Check("profile", OK,
-                 f"{profile} answered in {seconds:.1f}s (probe limit {probe_timeout}s)")
+        return Check("agent", FAIL, f"{name}: the probe returned nothing")
+    return Check("agent", OK,
+                 f"{name} answered in {seconds:.1f}s (probe limit {probe_timeout}s)")
 
 
-def run(profile: str, *, runner: Runner, binary: str = "hermes",
+def run(agent: str, *, runner: Runner, binary: str = "hermes",
         probe_timeout: int = 60) -> list[Check]:
     """Every check, in the order a failure matters most."""
     return [check_git(), check_reviewer(binary), check_sandbox(),
-            check_profile(profile, runner, probe_timeout)]
+            check_agent(agent, runner, probe_timeout)]

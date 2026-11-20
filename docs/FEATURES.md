@@ -56,10 +56,10 @@ review-specific form:
 | Pattern in adjacent tools | What council already has |
 |---|---|
 | A plan before spending model time | `council review --plan`, which prints units, prompt sizes, context depth, windows and skipped files without a model call |
-| Custom reviewer instructions | `--profile` selects a Hermes profile; `--prompt` selects a different shipped/experimental prompt; `[[rules]]` adds repository context documents to the prompt |
+| Custom reviewer instructions | `--agent` selects a reviewer adapter (Hermes is the reference); its `--profile` selects a Hermes profile; `--prompt` selects a different shipped/experimental prompt; `[[rules]]` adds repository context documents to the prompt |
 | Review scope control | `--include`, `--exclude` and `--staged`; the caller owns the scope |
 | Machine-readable review output | `--json` and `--sarif`; `council ci` always prints JSON |
-| A machine check before work starts | `council doctor` checks git, reviewer, bwrap and the profile probe |
+| A machine check before work starts | `council doctor` checks git, reviewer, bwrap and the selected agent probe |
 | Bounded execution | `--sample-timeout`, `--idle-timeout`, `--time-budget`, sample counts and prompt/window ceilings |
 | Sandboxing | bubblewrap for reviewer/proof execution; ephemeral run output |
 | A record of accepted risk | committed baselines with owner, reason, expiry and base-revision loading |

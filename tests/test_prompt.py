@@ -37,6 +37,11 @@ def test_the_digest_changes_with_the_profile() -> None:
     assert instrument_digest(TEMPLATE, profile="a") != instrument_digest(TEMPLATE, profile="b")
 
 
+def test_the_digest_changes_with_the_agent() -> None:
+    assert instrument_digest(TEMPLATE, profile="p", agent="hermes") != \
+        instrument_digest(TEMPLATE, profile="p", agent="example")
+
+
 def test_the_digest_changes_with_the_contract() -> None:
     assert instrument_digest(TEMPLATE, profile="p", contract="a") != \
         instrument_digest(TEMPLATE, profile="p", contract="b")

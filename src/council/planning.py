@@ -122,6 +122,14 @@ class Prepared:
     #: which makes the run's instrument unknown rather than assumed.
     profile_config: str = ""
     profile_config_sha256: str = ""
+    #: The selected adapter and its own configuration identity. The Hermes
+    #: adapter fills both; another adapter can supply its own source and hash.
+    agent: str = ""
+    agent_config: str = ""
+    agent_config_sha256: str = ""
+    #: The executable that will actually be invoked after the adapter's default
+    #: is applied. Empty only for an adapter that has no executable.
+    reviewer: str = ""
     #: The rules that governed this change, and the block they contributed to
     #: every prompt. Recorded so a reader can tell a judged diff from a guessed one.
     rules: tuple[RuleHit, ...] = ()

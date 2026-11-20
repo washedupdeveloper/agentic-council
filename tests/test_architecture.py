@@ -71,6 +71,9 @@ ADAPTERS = frozenset({
     "sandbox",
     "skill_install",
     "version",
+    "agents.__init__",
+    "agents.base",
+    "agents.hermes",
 })
 
 FORBIDDEN_IMPORTS = frozenset({
@@ -151,8 +154,11 @@ def test_every_module_that_acts_is_named_as_an_adapter() -> None:
     modules += sorted(path.stem for path in package.glob("*.py")
                       if path.stem not in {"__init__", "__main__"})
     modules += ["domain.__init__"]
-    modules += sorted(f"domain.{path.stem}" for path in (package / "domain").glob("*.py")
-                      if path.stem != "__init__")
+    modules += [f"domain.{path.stem}" for path in (package / "domain").glob("*.py")
+                if path.stem != "__init__"]
+    modules += [f"agents.{path.stem}" for path in (package / "agents").glob("*.py")
+                if path.stem != "__init__"]
+    modules.append("agents.__init__")
     acted: list[str] = []
     for module in modules:
         node = tree(module)
@@ -171,7 +177,8 @@ def test_every_module_is_either_kernel_or_adapter() -> None:
     kernel = {f"domain.{path.stem}" for path in (package / "domain").glob("*.py")}
     kernel |= {"domain.__init__", "__init__"}
     modules = {path.stem for path in package.glob("*.py")} | {
-        f"domain.{path.stem}" for path in (package / "domain").glob("*.py")}
+        f"domain.{path.stem}" for path in (package / "domain").glob("*.py")} | {
+        f"agents.{path.stem}" for path in (package / "agents").glob("*.py")}
     stray = sorted(modules - kernel - ADAPTERS)
     assert not stray, f"modules that are neither kernel nor named adapter: {stray}"
 

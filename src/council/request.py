@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
+from .agents import DEFAULT_AGENT
 from .domain.run_id import validate_run_id
 from .domain.scope import Scope, ScopeError
 from .domain.text import printable
@@ -37,6 +38,8 @@ class ReviewRequest:
     repo: Path
     base: str | None = None
     samples: int | None = None
+    agent: str = DEFAULT_AGENT
+    reviewer: str = ""
     profile: str = DEFAULT_PROFILE
     run_id: str | None = None
     prompt: Path | None = None
@@ -73,6 +76,14 @@ class ReviewRequest:
         _integer("the idle timeout", self.idle_timeout, minimum=1)
         if self.context_depth not in (0, 1, 2, 3):
             raise ValueError("context depth must be 0, 1, 2 or 3")
+        if not isinstance(self.agent, str) or not self.agent.strip():
+            raise ValueError("--agent must not be empty")
+        if not printable(self.agent):
+            raise ValueError("--agent must be printable text")
+        if not isinstance(self.reviewer, str):
+            raise ValueError("--reviewer must be text")
+        if self.reviewer and not printable(self.reviewer):
+            raise ValueError("--reviewer must be printable text")
         if not isinstance(self.profile, str) or not self.profile.strip():
             raise ValueError("--profile must not be empty")
         if not printable(self.profile):

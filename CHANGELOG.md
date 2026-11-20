@@ -16,6 +16,11 @@ public surface, the definitions, and the release procedure — is
   exposes `/plan`, `/review`, `/verdict` and `/help`. The core package remains
   free of protocol dependencies and unchanged; evidence is retained under the
   server's own state root. See [`docs/AGENT-SERVER.md`](docs/AGENT-SERVER.md).
+- Reviewer agents are now adapters. `--agent` selects one, `council agents` lists
+  the build, and `council doctor` probes the selected adapter. Hermes is the only
+  built-in adapter; the extension contract is
+  [`docs/AGENT-ADAPTERS.md`](docs/AGENT-ADAPTERS.md). The agent name and its
+  configuration identity are part of the instrument digest and the verdict.
 - `council pr` accepts a pull-request number, URL or branch. `gh pr view`
   resolves the target to the same base/head pair; the checkout and clean-worktree
   checks are unchanged. The decision is [`docs/M31.md`](docs/M31.md).

@@ -5,8 +5,8 @@ alternative it rejects, what would make it wrong, and where in the tree it
 lives. The last section is the list of things this page cannot defend, which is
 the part worth reading first if you are deciding whether to trust the tool.
 
-Numbers in this page are current for this checkout: 44 modules, 5,573 lines
-under `src/council`, 46 test files, 224 claims, 63 falsifiers, 54 mutations.
+Numbers in this page are current for this checkout: 48 modules, 6,111 lines
+under `src/council`, 48 test files, 231 claims, 70 falsifiers, 61 mutations.
 
 ---
 
@@ -121,8 +121,8 @@ answer, it is noise that makes every run look unique. The rule is: hash what
 changes the prompt or the decoding, nothing else. Transport (`stream`/`plain`)
 is deliberately excluded and recorded separately.
 
-**Where.** `domain/prompt.py:instrument_digest`, `runner.py:profile_fingerprint`,
-`prepare.py`, `verdict.json:digest`, `profile_config_sha256`.
+**Where.** `domain/prompt.py:instrument_digest`, `agents/hermes.py:profile_fingerprint`,
+`prepare.py`, `verdict.json:digest`, `agent_config_sha256`, `profile_config_sha256`.
 
 **The trail, per finding.** `findings[].evidence` names the sample files whose
 answers asserted the finding; open one and the claim is there. That chain —
@@ -157,8 +157,8 @@ what would work is a bug, not a stance.
 
 ## 7. The tool must be able to fail its own tests
 
-**Decision.** 224 claims, each naming a command that decides it, 63 of them
-naming a *falsifier*; 54 mutations of the rules the claims protect, run against a
+**Decision.** 231 claims, each naming a command that decides it, 70 of them
+naming a *falsifier*; 61 mutations of the rules the claims protect, run against a
 copy of the source, with the requirement that every mutation break at least one
 claim and every declared falsifier break its own.
 

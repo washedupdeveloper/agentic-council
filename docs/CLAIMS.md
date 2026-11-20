@@ -116,7 +116,7 @@ registry, so it cannot describe a claim that has no check.
 | `the-acp-agent-runs-the-core-gate` | The ACP agent returns the real council verdict from /review. | `python3 -m pytest tests/test_acp_agent.py::test_acp_review_returns_the_gate_verdict -q` |
 | `the-acp-agent-advertises-its-commands` | The ACP agent advertises its slash commands when a session starts. | `python3 -m pytest tests/test_acp_agent.py::test_acp_advertises_its_commands_on_session_start -q` |
 | `the-acp-agent-does-not-repeat-its-name` | ACP status and error messages are plain text, without a duplicate council: prefix. | `python3 -m pytest tests/test_acp_agent.py::test_acp_empty_change_is_a_clean_message -q` |
-| `a-symlinked-reviewer-runs-in-the-sandbox` | A symlinked reviewer executable is resolved before bubblewrap mounts it. | `python3 -m pytest tests/test_runner.py::test_a_symlinked_reviewer_runs_in_the_sandbox -q` |
+| `a-symlinked-reviewer-runs-in-the-sandbox` | A symlinked reviewer executable is resolved before bubblewrap mounts it. | `python3 -m pytest tests/test_runner.py::test_a_symlinked_reviewer_is_resolved_for_bwrap -q` |
 | `the-cli-prints-a-plan` | council review --plan prints the plan and exits 0. | `python3 -m pytest tests/test_cli.py::test_plan_prints_and_writes_nothing -q` |
 | `a-sandboxed-reviewer-cannot-write-to-the-host` | A sandboxed reviewer's writes to HOME and /tmp do not reach the host. | `python3 -m pytest tests/test_runner.py::test_a_sandboxed_reviewer_cannot_write_to_the_host -q` |
 | `the-reviewer-sandbox-needs-bwrap` | The sandbox fails rather than running unsandboxed when bwrap is absent. | `python3 -m pytest tests/test_runner.py::test_the_sandbox_needs_bwrap -q` |
@@ -232,3 +232,10 @@ registry, so it cannot describe a claim that has no check.
 | `ci-staged-reaches-the-reviewer` | The ci command runs a staged review through the real CLI into the reviewer prompt. | `python3 -m pytest tests/test_cli_scope.py::test_ci_runs_a_staged_review -q` |
 | `skill-installs-without-naming-an-agent` | A skill installs into any destination directory, with no agent named. | `python3 -m pytest tests/test_skill_install.py::test_installs_into_a_destination_with_no_agent_named -q` |
 | `skill-install-refuses-to-overwrite` | An install refuses to replace a skill that differs, and says how to force it. | `python3 -m pytest tests/test_skill_install.py::test_a_differing_skill_is_refused_without_force -q` |
+| `the-builtin-registry-is-hermes` | The shipped reviewer registry contains exactly the Hermes adapter. | `python3 -m pytest tests/test_agents.py::test_the_builtin_registry_lists_hermes -q` |
+| `an-unknown-agent-is-refused` | Selecting a reviewer adapter that is not registered is a start failure, not a fallback. | `python3 -m pytest tests/test_agents.py::test_an_unknown_agent_is_refused -q` |
+| `a-registered-agent-is-recorded` | A registered adapter can run a review, and its name and identity are written into the verdict. | `python3 -m pytest tests/test_agents.py::test_a_registered_adapter_runs_a_review_and_is_recorded -q` |
+| `the-cli-passes-the-selected-agent` | The CLI carries the selected agent name and reviewer executable into the review request. | `python3 -m pytest tests/test_agents.py::test_the_cli_passes_the_selected_agent_to_the_request -q` |
+| `the-adapter-supplies-its-default-executable` | With no --reviewer, the selected adapter's own default executable is used. | `python3 -m pytest tests/test_agents.py::test_the_selected_adapter_supplies_its_default_executable -q` |
+| `the-server-passes-the-selected-agent` | The ACP/MCP process boundary passes its configured reviewer adapter to the public CLI. | `python3 -m pytest tests/test_server_cli.py::test_the_server_passes_its_selected_agent -q` |
+| `the-digest-names-the-agent` | The instrument digest changes when the selected reviewer adapter changes. | `python3 -m pytest tests/test_prompt.py::test_the_digest_changes_with_the_agent -q` |
