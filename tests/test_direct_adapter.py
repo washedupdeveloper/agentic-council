@@ -69,6 +69,33 @@ class ConfigTests(unittest.TestCase):
             )
 
 
+    def test_temperature_is_configurable_and_validated(self) -> None:
+        parsed = config_from_env(
+            {
+                "COUNCIL_DIRECT_MODEL": "m",
+                "COUNCIL_DIRECT_API_KEY": "k",
+                "COUNCIL_DIRECT_TEMPERATURE": "0.7",
+            }
+        )
+        self.assertEqual(parsed.temperature, 0.7)
+        with self.assertRaises(ReviewerMissing):
+            config_from_env(
+                {
+                    "COUNCIL_DIRECT_MODEL": "m",
+                    "COUNCIL_DIRECT_API_KEY": "k",
+                    "COUNCIL_DIRECT_TEMPERATURE": "3",
+                }
+            )
+        with self.assertRaises(ReviewerMissing):
+            config_from_env(
+                {
+                    "COUNCIL_DIRECT_MODEL": "m",
+                    "COUNCIL_DIRECT_API_KEY": "k",
+                    "COUNCIL_DIRECT_TEMPERATURE": "hot",
+                }
+            )
+
+
 class IdentityTests(unittest.TestCase):
     def test_key_is_not_part_of_the_identity(self) -> None:
         adapter = DirectAdapter()

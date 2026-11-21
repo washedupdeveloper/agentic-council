@@ -68,11 +68,20 @@ def config_from_env(env: dict[str, str] | None = None) -> DirectConfig:
         max_tokens = int(source.get("COUNCIL_DIRECT_MAX_TOKENS") or DEFAULT_MAX_TOKENS)
     except ValueError as exc:
         raise ReviewerMissing("COUNCIL_DIRECT_MAX_TOKENS must be an integer") from exc
+    try:
+        temperature = float(
+            source.get("COUNCIL_DIRECT_TEMPERATURE") or DEFAULT_TEMPERATURE
+        )
+    except ValueError as exc:
+        raise ReviewerMissing("COUNCIL_DIRECT_TEMPERATURE must be a number") from exc
+    if not 0 <= temperature <= 2:
+        raise ReviewerMissing("COUNCIL_DIRECT_TEMPERATURE must be between 0 and 2")
     return DirectConfig(
         base_url=base_url,
         model=model,
         api_key=api_key,
         max_tokens=max_tokens,
+        temperature=temperature,
     )
 
 
