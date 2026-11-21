@@ -141,11 +141,11 @@ A role with no data is marked `uncalibrated` and falls back to the illustrative 
 
 The adapter implements the existing `AgentAdapter` protocol.
 
-- Reads `model.default` and the matching provider entry from the selected profile.
-- Resolves a literal key, `${VAR}` or `key_env`; never logs it.
+- Reads `COUNCIL_DIRECT_BASE_URL`, `COUNCIL_DIRECT_MODEL` and `COUNCIL_DIRECT_API_KEY`; it does not parse another program's profile.
+- The key never appears in the identity, the report or the CLI output.
 - One POST to `/v1/chat/completions` per sample; returns `choices[0].message.content`.
 - Missing profile or config: `ReviewerMissing`. Non-2xx, timeout or empty answer: `OSError`.
-- Identity: `agent="direct"`, `profile=<name>`, `source=profiles/<name>/config.yaml`, `sha256` over model, base URL and profile bytes.
+- Identity: `agent="direct"`, `profile=<model>`, `source=<base_url>`, `sha256` over model, base URL, prompt version and temperature.
 - No tools, no sandbox, no repository writes.
 
 ## Report contract

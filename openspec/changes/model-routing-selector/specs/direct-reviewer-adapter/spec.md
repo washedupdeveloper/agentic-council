@@ -1,13 +1,13 @@
 ## ADDED Requirements
 
-### Requirement: The adapter uses the selected profile
+### Requirement: The adapter uses explicit endpoint configuration
 
-The direct adapter SHALL resolve the model and endpoint from the reviewer profile selected for the run.
+The direct adapter SHALL resolve the model and endpoint from `COUNCIL_DIRECT_*` environment variables and SHALL NOT parse another program's profile.
 
-#### Scenario: A review selects a profile
+#### Scenario: A review selects the direct adapter
 
-- **WHEN** a review runs with a named reviewer profile
-- **THEN** the adapter reads that profile's model and provider endpoint and sends no request to any other model
+- **WHEN** a review runs with `--agent direct`
+- **THEN** the adapter reads `COUNCIL_DIRECT_MODEL` and `COUNCIL_DIRECT_BASE_URL` and sends no request to any other model
 
 ### Requirement: One request per sample
 
@@ -20,11 +20,11 @@ The adapter SHALL answer each sample with exactly one provider request and SHALL
 
 ### Requirement: Failures are distinguishable
 
-The adapter SHALL report a missing profile or model as `ReviewerMissing` and any other failure as `OSError`.
+The adapter SHALL report missing configuration as `ReviewerMissing` and any other failure as `OSError`.
 
-#### Scenario: The profile is missing
+#### Scenario: The configuration is missing
 
-- **WHEN** the selected profile or its model cannot be read
+- **WHEN** `COUNCIL_DIRECT_MODEL` or `COUNCIL_DIRECT_API_KEY` is absent
 - **THEN** the adapter raises `ReviewerMissing` and the review is a start failure
 
 #### Scenario: The provider fails
@@ -34,11 +34,11 @@ The adapter SHALL report a missing profile or model as `ReviewerMissing` and any
 
 ### Requirement: Identity covers the instrument
 
-The adapter SHALL include the model, the base URL and the selected profile's bytes in its identity hash.
+The adapter SHALL include the model, the base URL, the prompt version and the temperature in its identity hash, and SHALL exclude the API key.
 
-#### Scenario: Two profiles use different models
+#### Scenario: Two endpoints use different models
 
-- **WHEN** two profiles with different models are used for the same prompt
+- **WHEN** two configurations with different models are used for the same prompt
 - **THEN** their identity hashes differ
 
 ### Requirement: The adapter does not use tools

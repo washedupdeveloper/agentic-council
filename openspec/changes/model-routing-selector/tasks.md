@@ -49,9 +49,9 @@
 ## 7. Direct adapter
 
 - [ ] 7.1 Implement the `direct` adapter module against the `AgentAdapter` protocol.
-- [ ] 7.2 Resolve model, base URL and key from the selected profile; never log the key.
+- [ ] 7.2 Resolve model, base URL and key from `COUNCIL_DIRECT_*`; never log the key.
 - [ ] 7.3 Implement one request per sample and map failures to `ReviewerMissing` and `OSError`.
-- [ ] 7.4 Implement the identity hash over model, base URL and profile bytes.
+- [ ] 7.4 Implement the identity hash over model, base URL, prompt version and temperature.
 - [ ] 7.5 Register the adapter and add the `council[direct]` extra.
 - [ ] 7.6 Add protocol tests with a fake endpoint and a missing-profile case.
 

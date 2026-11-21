@@ -10,7 +10,7 @@ Model choice is manual and sticky today: the council reviewer profile pins one m
 - A provider-agnostic market snapshot with live-best and seven-day-realised prices, refreshed on a schedule and checked at first use.
 - A per-change routing map, drafted by the selector and approved by the owner before any task is routed.
 - HTML and versioned JSON reports with a mandatory generation timestamp, freshness badge, named price basis, callouts, numbered sources and a method section.
-- A direct OpenAI-compatible reviewer adapter in council that reads the selected profile and answers each sample with one provider request, without booting an agent.
+- A direct OpenAI-compatible reviewer adapter in council that reads explicit `COUNCIL_DIRECT_*` configuration and answers each sample with one provider request, without booting an agent.
 
 ## Capabilities
 
