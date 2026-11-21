@@ -1,6 +1,6 @@
 """The adapter registry.
 
-Only Hermes ships today. A new adapter is one module implementing
+Hermes and a direct OpenAI-compatible endpoint ship today. A new adapter is one module implementing
 ``AgentAdapter`` plus one entry in ``BUILTIN``; the CLI, the protocol servers and
 the review engine all resolve agents through this table.
 """
@@ -10,11 +10,12 @@ from __future__ import annotations
 from collections.abc import Iterable
 
 from .base import AgentAdapter, AgentIdentity, AgentOptions
+from .direct import DirectAdapter
 from .hermes import HermesAdapter
 
 __all__ = [
     "AgentAdapter", "AgentIdentity", "AgentOptions", "AgentRegistry",
-    "BUILTIN", "DEFAULT_AGENT", "DEFAULT_REGISTRY", "HermesAdapter",
+    "BUILTIN", "DEFAULT_AGENT", "DEFAULT_REGISTRY", "DirectAdapter", "HermesAdapter",
     "register", "resolve", "unregister",
 ]
 
@@ -22,7 +23,7 @@ DEFAULT_AGENT = "hermes"
 
 #: The shipped adapters. The tuple is deliberately explicit: a transport is not
 #: safe to discover from an arbitrary import path without a review.
-BUILTIN: tuple[AgentAdapter, ...] = (HermesAdapter(),)
+BUILTIN: tuple[AgentAdapter, ...] = (HermesAdapter(), DirectAdapter())
 
 
 class AgentRegistry:

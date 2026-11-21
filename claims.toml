@@ -1187,9 +1187,9 @@ text = "An install refuses to replace a skill that differs, and says how to forc
 check = "python3 -m pytest tests/test_skill_install.py::test_a_differing_skill_is_refused_without_force -q"
 
 [[claim]]
-id = "the-builtin-registry-is-hermes"
-text = "The shipped reviewer registry contains exactly the Hermes adapter."
-check = "python3 -m pytest tests/test_agents.py::test_the_builtin_registry_lists_hermes -q"
+id = "the-builtin-registry-lists-the-shipped-adapters"
+text = "The shipped reviewer registry contains exactly the Hermes and direct adapters."
+check = "python3 -m pytest tests/test_agents.py::test_the_builtin_registry_lists_the_shipped_adapters -q"
 falsifier = "registry-forgets-hermes"
 
 [[claim]]

@@ -45,9 +45,10 @@ class ExampleAdapter:
         return True, "example is test-only"
 
 
-def test_the_builtin_registry_lists_hermes() -> None:
-    assert [adapter.name for adapter in BUILTIN] == ["hermes"]
+def test_the_builtin_registry_lists_the_shipped_adapters() -> None:
+    assert [adapter.name for adapter in BUILTIN] == ["hermes", "direct"]
     assert resolve("hermes").name == "hermes"
+    assert resolve("direct").name == "direct"
 
 
 def test_an_unknown_agent_is_refused() -> None:

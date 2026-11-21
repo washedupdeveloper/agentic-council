@@ -4,8 +4,9 @@
 prompt, schema, proof execution and verdict; an adapter owns how one agent is
 invoked for each sample.
 
-Only the **Hermes** adapter ships today. The other editors and agent CLIs are
-examples of the contract, not shipped integrations. Add an adapter as a module
+Two adapters ship today: **Hermes** and **direct**, an OpenAI-compatible
+endpoint. The other editors and agent CLIs are examples of the contract, not
+shipped integrations. Add an adapter as a module
 and list it in `src/council/agents/__init__.py`; no review-engine file should
 need to know its name or command line.
 
@@ -139,6 +140,33 @@ verified against its real output is worse than no adapter.
   commands. Use the adapter's read-only mode and, where available, the existing
   bwrap sandbox; do not let a review write to the source tree.
 
+## The direct adapter
+
+`--agent direct` sends one Chat Completions request per sample, with no agent
+process and no profile. It is for a deployment that has pinned a model on an
+OpenAI-compatible endpoint and wants none of the agent boot cost.
+
+| variable | default | meaning |
+|---|---|---|
+| `COUNCIL_DIRECT_BASE_URL` | `https://api.surplusintelligence.ai/v1` | endpoint root; `/chat/completions` is appended |
+| `COUNCIL_DIRECT_MODEL` | — (required) | the model id sent in the request |
+| `COUNCIL_DIRECT_API_KEY` | — (required) | bearer token; never written to the run record |
+| `COUNCIL_DIRECT_MAX_TOKENS` | `8192` | response cap |
+
+```sh
+COUNCIL_DIRECT_MODEL=claude-fable-5.2 \
+COUNCIL_DIRECT_API_KEY=... \
+  council review --agent direct
+```
+
+The identity is a hash of the model, the endpoint and the prompt version. A key
+change does not change the identity; a model or endpoint change does. The key
+itself is not part of the identity and must not be logged.
+
+The adapter raises `ReviewerMissing` when the configuration is absent, and
+`OSError` for an HTTP error, a malformed response or an empty answer. It never
+falls back to another model.
+
 ## Use it
 
 ```sh
@@ -159,7 +187,7 @@ they pass `--agent` to the public CLI.
 
 ## Current boundary
 
-Only Hermes is in `BUILTIN`. The architecture is ready for Codex, Cursor,
+Hermes and direct are in `BUILTIN`. The architecture is ready for Codex, Cursor,
 DeepSeek Harness or another agent, but each needs its own adapter and a test of
 its real non-interactive output. Do not add a generic "run any command" adapter
 without deciding the prompt delivery, output format and read-only policy; those

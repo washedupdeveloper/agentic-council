@@ -74,6 +74,7 @@ ADAPTERS = frozenset({
     "version",
     "agents.__init__",
     "agents.base",
+    "agents.direct",
     "agents.hermes",
 })
 

@@ -15,8 +15,9 @@ SOURCE = Path(__file__).resolve().parent.parent / "src" / "council"
 
 #: Raise a ratchet deliberately, in the diff that needs the room.
 #: The adapter seam adds an explicit package boundary; the evidence sidecar
-#: adds one local-only module without touching the review loop.
-SOURCE_LIMIT = 6600
+#: adds one local-only module without touching the review loop. The direct
+#: reviewer adapter adds one effect module at the same seam.
+SOURCE_LIMIT = 6700
 MODULE_LIMIT = 50
 
 
