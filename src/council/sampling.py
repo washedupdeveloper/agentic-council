@@ -33,7 +33,7 @@ def blocking_key(sample: SampleResult) -> frozenset[tuple[str, str, int, str]] |
 
 def samples(prompt: str, runner: Runner,
             requested: int | None) -> tuple[tuple[SampleResult, ...], int, bool | None]:
-    """Fixed N, or auto: one clean sample, two to confirm a finding, three to break a tie."""
+    """Fixed N, or auto: two clean samples, two to confirm a finding, three to break a tie."""
     if requested is not None:
         fixed = tuple(run_sample(prompt, runner, index=index)
                       for index in range(1, requested + 1))
@@ -44,8 +44,22 @@ def samples(prompt: str, runner: Runner,
         # The retry inside `run_sample` already covered a flaky reviewer; asking
         # a missing binary two more times only multiplies the same error.
         return (first,), 1, None
+
     if not first.output.findings:
-        return (first,), 1, True
+        # A clean sample is the weakest evidence. Confirm it before calling the
+        # unit clean; a single miss must not become an uncontested PASS.
+        second = run_sample(prompt, runner, index=2)
+        results = [first, second]
+        if second.output is None:
+            return tuple(results), 2, None
+        if not second.output.findings:
+            return tuple(results), 2, True
+        third = run_sample(prompt, runner, index=3)
+        results.append(third)
+        if any(sample.output is None for sample in results):
+            return tuple(results), 3, None
+        keys = [blocking_key(sample) for sample in results]
+        return tuple(results), 3, len(set(keys)) == 1
 
     results = [first, run_sample(prompt, runner, index=2)]
     agreed: bool | None = (results[1].output is not None

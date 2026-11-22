@@ -1,4 +1,4 @@
-"""Merge by place: one line is one finding, and the most blocking dimension wins.
+"""Merge by claim: one normalized claim is one finding, and the most blocking dimension wins.
 
 The key used to be `(dimension, file, line)`. Two samples that agreed a line was
 defective but disagreed about its category produced two findings: two rows, two
@@ -6,9 +6,10 @@ SARIF results, and two answers to "is this blocking?". A label could not hide a
 defect — `high` blocks on severity, `low` `correctness` blocks on dimension — but
 it could split one defect in two.
 
-The key is the place. The dimension is adjudicated from what the samples said —
-the most blocking one wins — and severity is the highest any of them claimed, so
-disagreement can raise a finding but never lower it.
+The key is `(file, line, normalized claim)`: one place can carry two claims, and
+both must survive. Case and whitespace are formatting; a paraphrase is separate.
+The dimension is adjudicated from the samples — the most blocking one wins — and
+severity is the highest claimed, so disagreement can raise a finding, never lower.
 """
 
 from __future__ import annotations
@@ -21,6 +22,11 @@ from .schema import DIMENSIONS, RawFinding
 
 _RANK: dict[str, int] = {severity: index for index, severity in enumerate(SEVERITIES)}
 _ORDER: dict[str, int] = {dimension: index for index, dimension in enumerate(DIMENSIONS)}
+
+
+def _claim_key(claim: str) -> str:
+    """Case and whitespace are formatting; a different sentence is a different claim."""
+    return " ".join(claim.split()).casefold()
 
 
 def _dimension_rank(dimension: str) -> tuple[int, int]:
@@ -36,7 +42,7 @@ def _dimension_rank(dimension: str) -> tuple[int, int]:
 
 @dataclass(frozen=True, slots=True)
 class MergedFinding:
-    """One place in the change, as reported by one or more samples."""
+    """One claim at one place, as reported by one or more samples."""
 
     dimension: str
     file: str
@@ -63,10 +69,10 @@ def merge(samples: Sequence[Sequence[RawFinding]], *,
     the labels it came from, so nothing in the verdict has to be taken on trust:
     every finding points at the file that asserted it.
     """
-    buckets: dict[tuple[str, int], list[tuple[int, RawFinding]]] = {}
+    buckets: dict[tuple[str, int, str], list[tuple[int, RawFinding]]] = {}
     for number, findings in enumerate(samples, start=1):
         for finding in findings:
-            key = (finding.file, finding.line)
+            key = (finding.file, finding.line, _claim_key(finding.claim))
             buckets.setdefault(key, []).append((number, finding))
 
     merged: list[MergedFinding] = []

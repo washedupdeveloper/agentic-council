@@ -63,15 +63,23 @@ def judge(findings: Iterable[Finding], *, executed_only: bool = False) -> Result
     still visible in `findings`.
 
     A finding proven only by quotation is named in the reason whatever the rule
-    does with it, and `executed_only` lets a caller refuse to block on one. The
+    does with it. `executed_only` makes a blocking quotation-only finding
+    INCOMPLETE: it cannot fail, but it must not be discarded into a PASS. The
     default stays lenient because a quoted line is often the whole defect —
     a hard-coded secret, a missing guard — and a caller who wants more says so.
     """
     items = tuple(findings)
-    proven = [f for f in items if f.blocks and f.state is State.PROVEN]
-    quoted = [f for f in proven if not f.executed]
+    blocking_proven = [f for f in items if f.blocks and f.state is State.PROVEN]
+    quoted = [f for f in blocking_proven if not f.executed]
     if executed_only:
-        proven = [f for f in proven if f.executed]
+        # A quotation demonstrates text, not behaviour. It cannot fail a strict
+        # run, but it must not be discarded into a PASS either: the claim is
+        # unsettled by the selected proof, so the honest verdict is INCOMPLETE.
+        unsettled_quoted = [f for f in blocking_proven if not f.executed]
+        proven = [f for f in blocking_proven if f.executed]
+    else:
+        unsettled_quoted = []
+        proven = blocking_proven
     if proven:
         suffix = (f"; {len(quoted)} of them proven by quotation only"
                   if quoted and not executed_only else "")
@@ -82,6 +90,14 @@ def judge(findings: Iterable[Finding], *, executed_only: bool = False) -> Result
         )
 
     open_blocking = [f for f in items if f.blocks and f.state in OPEN_STATES]
+    if unsettled_quoted:
+        note = (f"{len(unsettled_quoted)} blocking finding(s) were proven by "
+                f"quotation only and cannot be settled without an executed "
+                f"proof: {_cite(unsettled_quoted)}")
+        if open_blocking:
+            note += (f"; {len(open_blocking)} blocking finding(s) could not be "
+                     f"settled: {_cite(open_blocking)}")
+        return Result(Verdict.INCOMPLETE, note, items)
     if open_blocking:
         return Result(
             Verdict.INCOMPLETE,
@@ -92,7 +108,11 @@ def judge(findings: Iterable[Finding], *, executed_only: bool = False) -> Result
     non_blocking = [f for f in items if not f.blocks and f.state is State.PROVEN]
     notes: list[str] = []
     if non_blocking:
-        notes.append(f"{len(non_blocking)} proven non-blocking finding(s)")
+        notes.append(f"{len(non_blocking)} proven non-blocking finding(s): "
+                     f"{_cite(non_blocking)}")
+        static = [f for f in non_blocking if not f.executed]
+        if static:
+            notes.append(f"{len(static)} of them proven by quotation only")
     if quoted:
         notes.append(f"{len(quoted)} proven by quotation only: {_cite(quoted)}")
     suffix = f" ({'; '.join(notes)})" if notes else ""

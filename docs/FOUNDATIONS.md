@@ -186,13 +186,14 @@ Listed because a foundations document that only lists strengths is marketing.
    runnable command — which on a TypeScript repository means `pnpm`, and on a
    repository with no test runner means nothing. The default still lets a
    quotation block a merge; `--require-executed-proofs` is the strict reading,
-   and it is not the default.
+   and it is not the default. Under strict mode a quotation-only blocker is
+   INCOMPLETE, not a silent pass.
 2. **Context is Python-only.** The context builder parses Python (`ast`,
    `python_files`). On any other language, depth silently collapses to 0: the
    reviewer sees the diff and nothing else. This is recorded in `context_depth`,
    but nothing warns that a run on a TypeScript tree is single-file by
    construction.
-3. **Dimension classification is unchecked, and bounded.** One place is now one
+3. **Dimension classification is unchecked, and bounded.** One claim is now one
    finding, labelled with the most blocking dimension any sample used, with the
    highest severity (M29) — a merge cannot duplicate a defect or weaken it. A
    single mislabelled finding still blocks, and no proof can independently

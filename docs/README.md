@@ -58,11 +58,12 @@ looks the way it does.
 | [`M25.md`](M25.md) | evidence that can fail: the proof kinds that a real review exposed as missing |
 | [`M26.md`](M26.md) | the third rung: line windows, so an added file is reviewable |
 | [`M28.md`](M28.md) | rules, proof strength, atomic publication, a bounded report |
-| [`M29.md`](M29.md) | one place is one finding: the merge keys on `(file, line)` |
+| [`M29.md`](M29.md) | one claim is one finding: the merge keys on `(file, line, claim)` |
 | [`M30.md`](M30.md) | every assertion carries its source: findings name their evidence, the skill declares the CLI |
 | [`M31.md`](M31.md) | a pull-request target may be a number, URL or branch, resolved by `gh` |
 | [`M32.md`](M32.md) | expose V2 to ACP and MCP hosts without changing the core |
 | [`M33.md`](M33.md) | one reviewer adapter seam; Hermes is the reference adapter, not the engine |
+| [`M34.md`](M34.md) | closing review breakpoints: the verdict on claim merge, two-clean sampling and strict proof mode |
 
 The series has gaps — `M21`–`M24` and `M27` have no record here. Those changes
 went in without a decision record; this page does not invent one after the fact.

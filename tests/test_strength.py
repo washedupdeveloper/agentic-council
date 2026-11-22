@@ -75,17 +75,31 @@ def test_a_quotation_only_finding_is_named_in_the_reason(tmp_path: Path) -> None
     assert "proven by quotation only" in report.reason
 
 
-def test_a_quotation_only_finding_does_not_block_a_strict_run(tmp_path: Path) -> None:
+def test_a_quotation_only_finding_is_incomplete_under_strict_mode(tmp_path: Path) -> None:
     repo = make_repo(tmp_path)
     report = review(ReviewRequest(repo=repo, samples=1, run_id="strict",
                                   require_executed_proofs=True),
                     lambda _: body({"security": [quoted()]}))
-    assert report.verdict is Verdict.PASS
-    assert "proven by quotation only: F-01" in report.reason
+    assert report.verdict is Verdict.INCOMPLETE
+    assert "proven by quotation only" in report.reason
+    assert "F-01" in report.reason
     payload = payload_of(report)
     assert payload["findings"][0]["proof_strength"] == "static"
     assert payload["findings"][0]["state"] == "proven"
     assert payload["require_executed_proofs"] is True
+
+
+def test_a_quotation_only_non_blocking_finding_passes_strict_mode(tmp_path: Path) -> None:
+    repo = make_repo(tmp_path)
+    finding = quoted()
+    finding.update({"severity": "low", "claim": "Style nit."})
+    report = review(ReviewRequest(repo=repo, samples=1, run_id="strict-note",
+                                  require_executed_proofs=True),
+                    lambda _: body({"readability": [finding]}))
+    assert report.verdict is Verdict.PASS
+    assert "F-01" in report.reason
+    assert "quotation only" in report.reason
+    assert payload_of(report)["findings"][0]["proof_strength"] == "static"
 
 
 def test_an_executed_proof_still_blocks_a_strict_run(tmp_path: Path) -> None:

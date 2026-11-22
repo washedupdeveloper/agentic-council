@@ -391,7 +391,7 @@ it always prints JSON and exits with the verdict.
 | `--allow-large-prompt` | off | send an oversized prompt without asking |
 | `--window-large-files` | off | split an oversized hunk into line windows |
 | `--max-windows N` | 200 | refuse a change needing more than N windows |
-| `--require-executed-proofs` | off | quotation-only findings cannot block |
+| `--require-executed-proofs` | off | quotation-only blockers make the run incomplete, never PASS |
 | `--autonomous` | off | never ask; refuse an oversized prompt with exit 3 |
 | `--plan` | off | show units and prompt sizes; no model call, no run |
 | `--report` | off | advice only; exit 0 whatever the verdict |

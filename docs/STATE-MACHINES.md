@@ -193,8 +193,8 @@ process, not a monkeypatched function.
 - A sample gets at most two attempts; each failed attempt is kept in
   `failures[]`.
 - `ReviewerMissing` is not retried: a missing binary cannot heal.
-- Auto sampling: one clean sample; two to confirm a finding; three to break a
-  tie.
+- Auto sampling: two clean samples to PASS; two to confirm a finding; three to
+  break a tie. A clean first sample is always confirmed.
 - `agreement` is true or false only when every sample in the set produced an
   output; if any sample is missing, it is `null`.
 - A failed sample cannot produce `PASS`; on `FAIL` it is named in `reason`.
@@ -210,8 +210,9 @@ process, not a monkeypatched function.
 | START | invalid JSON | attempts remain | ATTEMPT_2 | failure recorded |
 | ATTEMPT_2 | valid | — | PARSED | attempts = 2 |
 | ATTEMPT_2 | invalid/OSError | — | FAILED | `output=None` |
-| AUTO_1 | no findings | — | AGREED | one sample |
-| AUTO_1 | findings | — | AUTO_2 | confirm |
+| AUTO_1 | no findings | — | AUTO_2 | confirm clean |
+| AUTO_1 | findings | — | AUTO_2 | confirm finding |
+| AUTO_2 | no findings, first was clean | — | AGREED | two samples |
 | AUTO_2 | blocking key equal | — | AGREED | two samples |
 | AUTO_2 | differs/missing | — | AUTO_3 | tie-break |
 | AUTO_3 | all present, one key | — | AGREED | three samples |
@@ -287,7 +288,7 @@ failure. The race is narrow and recorded rather than hidden.
 - Any proven blocking finding → `FAIL`; otherwise any open blocking finding →
   `INCOMPLETE`; otherwise `PASS`. With `--require-executed-proofs` (M28) a
   blocking finding proven only by quotation is removed from the failing set and
-  named in `reason`; it cannot turn a run `PASS` into `FAIL`.
+  named in `reason`; it makes the run `INCOMPLETE`, never `PASS`.
 - A `FAIL` outranks missing evidence, but missing evidence is named in
   `reason`.
 - A failed sample or unreviewed unit cannot produce `PASS`.

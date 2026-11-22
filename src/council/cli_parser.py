@@ -143,8 +143,8 @@ def add_review_arguments(parser: argparse.ArgumentParser, *, advice: bool,
                         help="refuse a change that would need more than N windows "
                              "(default: 200)")
     parser.add_argument("--require-executed-proofs", action="store_true",
-                        help="a finding proven only by quotation cannot block the run "
-                             "(default: it blocks, and the reason says so)")
+                        help="a blocking finding proven only by quotation makes the run "
+                             "incomplete, never PASS (default: it blocks, and the reason says so)")
     if advice:
         parser.add_argument("--autonomous", action="store_true",
                             help="never ask: refuse an oversized prompt, exit 3")

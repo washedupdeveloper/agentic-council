@@ -360,9 +360,22 @@ text = "A reference larger than the limit is refused, not silently truncated."
 check = "python3 -m pytest tests/test_reference.py::test_a_reference_over_the_limit_is_refused -q"
 
 [[claim]]
-id = "auto-sampling-stops-when-clean"
-text = "A clean first sample is the only sample."
-check = "python3 -m pytest tests/test_run.py::test_auto_sampling_stops_after_one_clean_sample -q"
+id = "auto-sampling-confirms-a-clean-sample"
+text = "A clean first sample is confirmed by a second clean sample before automatic sampling may PASS."
+check = "python3 -m pytest tests/test_run.py::test_auto_sampling_confirms_a_clean_sample_with_a_second -q"
+falsifier = "auto-clean-returns-first-sample"
+
+[[claim]]
+id = "auto-sampling-does-not-pass-on-one-clean-sample"
+text = "A clean first sample followed by a finding asks a third sample instead of passing."
+check = "python3 -m pytest tests/test_run.py::test_auto_sampling_asks_a_third_after_a_clean_sample_then_a_finding -q"
+falsifier = "auto-second-finding-is-ignored"
+
+[[claim]]
+id = "auto-sampling-fails-closed-on-a-failed-confirmation"
+text = "A failed second sample makes an automatic review incomplete, not a pass."
+check = "python3 -m pytest tests/test_run.py::test_auto_sampling_marks_a_failed_confirmation_incomplete -q"
+falsifier = "auto-failed-confirmation-passes"
 
 [[claim]]
 id = "auto-sampling-confirms-a-finding"
@@ -772,16 +785,22 @@ check = "python3 -m pytest tests/test_merge.py::test_merging_never_weakens_a_fin
 falsifier = "merge-keys-on-dimension"
 
 [[claim]]
-id = "one-place-is-one-finding-in-the-verdict"
-text = "Two samples that report one defect under different dimensions produce one finding in verdict.json, and the run fails."
-check = "python3 -m pytest tests/test_run.py::test_two_samples_that_disagree_about_the_dimension_are_one_finding -q"
+id = "different-claims-at-one-place-are-two-findings"
+text = "Two samples that report different claims at one place produce two findings in verdict.json, and the run fails."
+check = "python3 -m pytest tests/test_run.py::test_different_claims_at_one_place_are_two_findings -q"
+falsifier = "merge-keys-on-place"
+
+[[claim]]
+id = "one-claim-is-one-finding"
+text = "One normalized claim is one finding whatever dimension its samples name it with."
+check = "python3 -m pytest tests/test_merge.py::test_one_claim_is_one_finding_whatever_the_dimension -q"
 falsifier = "merge-keys-on-dimension"
 
 [[claim]]
-id = "one-line-is-one-finding"
-text = "One changed line is one finding whatever dimension its samples name it with."
-check = "python3 -m pytest tests/test_merge.py::test_one_line_is_one_finding_whatever_the_dimension -q"
-falsifier = "merge-keys-on-dimension"
+id = "the-verdict-keeps-every-wording-of-one-claim"
+text = "Two case-or-whitespace variants of one claim keep both wordings in verdict.json."
+check = "python3 -m pytest tests/test_run.py::test_the_verdict_keeps_every_wording_of_one_claim -q"
+falsifier = "verdict-drops-claims"
 
 [[claim]]
 id = "the-source-stays-under-the-line-ratchet"
@@ -1123,10 +1142,15 @@ text = "A proven finding whose proof only quoted a line is counted in the verdic
 check = "python3 -m pytest tests/test_strength.py::test_a_quotation_only_finding_is_named_in_the_reason -q"
 
 [[claim]]
-id = "a-quotation-only-finding-does-not-block-a-strict-run"
-text = "With require_executed_proofs a finding proven only by quotation passes the run and is still named."
-check = "python3 -m pytest tests/test_strength.py::test_a_quotation_only_finding_does_not_block_a_strict_run -q"
+id = "a-quotation-only-finding-is-incomplete-under-strict-mode"
+text = "With require_executed_proofs a blocking finding proven only by quotation makes the run INCOMPLETE, never PASS."
+check = "python3 -m pytest tests/test_strength.py::test_a_quotation_only_finding_is_incomplete_under_strict_mode -q"
 falsifier = "executed-only-accepts-quotation"
+
+[[claim]]
+id = "a-quotation-only-non-blocking-finding-is-named"
+text = "With require_executed_proofs a non-blocking quotation is named and the run may PASS."
+check = "python3 -m pytest tests/test_strength.py::test_a_quotation_only_non_blocking_finding_passes_strict_mode -q"
 
 [[claim]]
 id = "an-executed-proof-still-blocks-a-strict-run"

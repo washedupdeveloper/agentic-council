@@ -53,7 +53,11 @@
           mkdir -p $out/bin
           makeWrapper ${base pkgs}/bin/council $out/bin/council \
             --prefix PATH : ${pkgs.bubblewrap}/bin
-          ln -s ${base pkgs}/bin/council-verify $out/bin/council-verify
+          # `council-verify` runs pytest and the claim registry; those are
+          # development inputs, not runtime dependencies. Shipping the plain
+          # application wrapper here made `council-verify` fail everywhere
+          # outside the devshell. The source-tree `./bin/council-verify` is the
+          # only supported entry point.
         '';
 
       # One interpreter with the tools the checks need. The protocol SDKs are
@@ -98,7 +102,7 @@
           }
           ''
             mkdir -p $out/bin
-            for name in council council-verify ${commands}; do
+            for name in council ${commands}; do
               makeWrapper ${serverBase pkgs deps}/bin/$name $out/bin/$name \
                 --prefix PATH : ${pkgs.bubblewrap}/bin
             done

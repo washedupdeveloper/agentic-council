@@ -91,8 +91,8 @@ def test_a_proven_finding_is_written_and_fails(tmp_path: Path) -> None:
     assert (report.run_dir / "sample-2.json").exists()
 
 
-def test_two_samples_that_disagree_about_the_dimension_are_one_finding(tmp_path: Path) -> None:
-    """The artefact has one row per place, and it fails the run.
+def test_different_claims_at_one_place_are_two_findings(tmp_path: Path) -> None:
+    """The artefact keeps distinct claims, and it fails the run.
 
     Unit-level merging is tested in `tests/test_merge.py`; this proves the
     property in `verdict.json`, which is what a reader acts on.
@@ -110,12 +110,15 @@ def test_two_samples_that_disagree_about_the_dimension_are_one_finding(tmp_path:
     assert report.verdict is Verdict.FAIL
 
     payload = json.loads((report.run_dir / "verdict.json").read_text(encoding="utf-8"))
-    assert len(payload["findings"]) == 1
-    assert payload["findings"][0]["dimension"] == "correctness"
-    assert payload["findings"][0]["state"] == "proven"
+    assert len(payload["findings"]) == 2
+    assert {item["dimension"] for item in payload["findings"]} == {"correctness", "readability"}
+    assert {item["claim"] for item in payload["findings"]} == {"Style nit.", "It is wrong."}
+    assert {tuple(item["evidence"]) for item in payload["findings"]} == {
+        ("sample-1.json",), ("sample-2.json",)}
+    assert all(item["state"] == "proven" for item in payload["findings"])
 
 
-def test_the_verdict_keeps_every_wording_at_one_place(tmp_path: Path) -> None:
+def test_the_verdict_keeps_every_wording_of_one_claim(tmp_path: Path) -> None:
     repo, _ = make_repo(tmp_path)
     calls = {"count": 0}
 
@@ -123,13 +126,13 @@ def test_the_verdict_keeps_every_wording_at_one_place(tmp_path: Path) -> None:
         calls["count"] += 1
         if calls["count"] == 1:
             return body({"correctness": [secret(claim="First wording.")]})
-        return body({"correctness": [secret(claim="Second wording.")]})
+        return body({"correctness": [secret(claim="  first   wording.  ")]})
 
     report = review(ReviewRequest(repo=repo, samples=2, run_id="wordings"), runner)
     payload = json.loads((report.run_dir / "verdict.json").read_text(encoding="utf-8"))
     assert len(payload["findings"]) == 1
     assert payload["findings"][0]["claim"] == "First wording."
-    assert payload["findings"][0]["claims"] == ["First wording.", "Second wording."]
+    assert payload["findings"][0]["claims"] == ["First wording.", "  first   wording.  "]
 
 
 def test_every_finding_points_at_the_sample_that_asserted_it(tmp_path: Path) -> None:
@@ -267,7 +270,7 @@ def test_a_caller_supplied_reference_reaches_the_prompt_and_the_verdict(tmp_path
     assert "REFERENCE TEXT" in seen[0]
 
 
-def test_auto_sampling_stops_after_one_clean_sample(tmp_path: Path) -> None:
+def test_auto_sampling_confirms_a_clean_sample_with_a_second(tmp_path: Path) -> None:
     repo, _ = make_repo(tmp_path)
     calls: list[str] = []
 
@@ -277,10 +280,46 @@ def test_auto_sampling_stops_after_one_clean_sample(tmp_path: Path) -> None:
 
     report = review(ReviewRequest(repo=repo, run_id="r-auto1"), runner)
     payload = json.loads((report.run_dir / "verdict.json").read_text(encoding="utf-8"))
-    assert len(calls) == 1
+    assert len(calls) == 2
     assert payload["samples_requested"] == "auto"
-    assert payload["samples_run"] == 1
+    assert payload["samples_run"] == 2
     assert payload["agreement"] is True
+    assert report.verdict is Verdict.PASS
+
+
+def test_auto_sampling_marks_a_failed_confirmation_incomplete(tmp_path: Path) -> None:
+    repo, _ = make_repo(tmp_path)
+    calls = {"n": 0}
+
+    def runner(prompt: str) -> str:
+        calls["n"] += 1
+        if calls["n"] == 1:
+            return body()
+        raise OSError("stalled")
+
+    report = review(ReviewRequest(repo=repo, run_id="r-auto-failed"), runner)
+    payload = json.loads((report.run_dir / "verdict.json").read_text(encoding="utf-8"))
+    assert payload["samples_run"] == 2
+    assert payload["agreement"] is None
+    assert report.verdict is Verdict.INCOMPLETE
+    assert "sample(s) 2 returned nothing usable" in report.reason
+
+
+def test_auto_sampling_asks_a_third_after_a_clean_sample_then_a_finding(tmp_path: Path) -> None:
+    repo, _ = make_repo(tmp_path)
+    answers = [body(), body({"security": [secret()]}), body()]
+    calls: list[str] = []
+
+    def runner(prompt: str) -> str:
+        calls.append(prompt)
+        return answers[len(calls) - 1]
+
+    report = review(ReviewRequest(repo=repo, run_id="r-auto-clean-finding"), runner)
+    payload = json.loads((report.run_dir / "verdict.json").read_text(encoding="utf-8"))
+    assert len(calls) == 3
+    assert payload["samples_run"] == 3
+    assert payload["agreement"] is False
+    assert report.verdict is Verdict.FAIL
 
 
 def test_auto_sampling_confirms_a_finding_with_a_second_sample(tmp_path: Path) -> None:

@@ -19,7 +19,7 @@ carries. A finding counts only once its proof holds.
     council review                        # gate: 0 pass, 1 fail, 2 incomplete, 3 could not start
     council review --plan                 # units, bytes, rules, samples: no model call, no run
     council review --include 'src/**' --exclude 'vendor/**'
-    council review --samples 3            # per unit; merged by file and line
+    council review --samples 3            # per unit; merged by file, line and claim
     council review --report               # advice only: always exits 0
     council ci --sarif council.sarif      # headless: JSON, exit code, SARIF
     council pr 1234                       # base and head come from `gh pr view`
@@ -103,7 +103,8 @@ does not exist, the run is broken, not merely incomplete.
 - `proof_strength: static` means the proof quoted code (`present`, `absent`,
   `json`, `diff`); `executed` means it ran something (`command`, `repro`). A
   quotation proves a line exists, not that the code misbehaves — say which one
-  you are relying on, and prefer `repro` for a behavioural claim.
+  you are relying on, and prefer `repro` for a behavioural claim. Under
+  `--require-executed-proofs` a quotation-only blocker is INCOMPLETE.
 - `--require-executed-proofs` is the strict reading when a merge turns on a
   claim about behaviour.
 - Do not weaken the prompt, the budget or the proof to clear a verdict; fix the

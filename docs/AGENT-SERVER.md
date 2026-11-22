@@ -26,8 +26,9 @@ nix build .#council-acp
 nix build .#council-server     # both protocols
 ```
 
-Each output contains `council`, `council-verify`, and the protocol command it
-provides. To put the ACP command on a stable path for Zed:
+Each output contains `council` and the protocol command it provides.
+`council-verify` is a source-tree development check, not a shipped server
+command. To put the ACP command on a stable path for Zed:
 
 ```sh
 nix profile install .#council-acp

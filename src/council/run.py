@@ -88,9 +88,9 @@ def plan(request: ReviewRequest) -> Plan:
                                    prepared.root, request, prepared.references,
                                    prepared.rules_text))
     windows = sum(1 for unit in units if unit.window)
-    # One sample per unit when it is clean, two to confirm a finding, three to
-    # break a tie: the plan states the span rather than a single number.
-    low = len(units) * (request.samples if request.samples is not None else 1)
+    # A clean unit is confirmed by a second sample; a finding may take a third.
+    # The plan states the span rather than a single number.
+    low = len(units) * (request.samples if request.samples is not None else 2)
     high = len(units) * (request.samples if request.samples is not None else 3)
     return Plan(prepared.base, prepared.head, prepared.prompt_bytes,
                 request.max_prompt_bytes, prepared.sliced, units,

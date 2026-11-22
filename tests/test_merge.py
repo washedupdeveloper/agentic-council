@@ -26,11 +26,22 @@ def failed() -> list[RawFinding]:
     return []
 
 
-def test_the_same_place_in_two_samples_is_one_finding() -> None:
-    merged = merge([sample(raw()), sample(raw(claim="It is wrong, again."))])
+def test_the_same_claim_in_two_samples_is_one_finding() -> None:
+    merged = merge([sample(raw(claim="It is Wrong.")),
+                    sample(raw(claim="  it is wrong.  "))])
     assert len(merged) == 1
     assert merged[0].samples == (1, 2)
-    assert merged[0].claims == ("It is wrong.", "It is wrong, again.")
+    assert merged[0].claims == ("It is Wrong.", "  it is wrong.  ")
+
+
+def test_different_claims_at_one_place_stay_separate() -> None:
+    merged = merge([sample(raw(claim="It is wrong.")),
+                    sample(raw(claim="It is wrong, again."))])
+    assert len(merged) == 2
+    assert {item.claims for item in merged} == {
+        ("It is wrong.",),
+        ("It is wrong, again.",),
+    }
 
 
 def test_the_highest_severity_wins() -> None:
@@ -49,8 +60,8 @@ def test_different_lines_stay_separate() -> None:
     assert [item.line for item in merged] == [3, 9]
 
 
-def test_one_line_is_one_finding_whatever_the_dimension() -> None:
-    """The place is the key: two labels for one defect are one defect."""
+def test_one_claim_is_one_finding_whatever_the_dimension() -> None:
+    """The claim is the key: two labels for one claim are one claim."""
     merged = merge([sample(raw(dimension="security"), raw(dimension="readability"))])
     assert len(merged) == 1
     assert merged[0].dimension == "security"
@@ -90,13 +101,13 @@ def test_different_files_at_one_line_stay_separate() -> None:
 
 def test_a_merged_finding_names_the_samples_it_came_from() -> None:
     """The trail: a finding points at the files whose answers asserted it."""
-    merged = merge([sample(raw(claim="First.")), sample(raw(claim="Second."))],
+    merged = merge([sample(raw()), sample(raw())],
                    labels=["sample-1.json", "sample-2.json"])
     assert merged[0].evidence == ("sample-1.json", "sample-2.json")
 
 
 def test_a_failed_sample_leaves_a_hole_in_the_labels() -> None:
-    merged = merge([sample(raw()), failed(), sample(raw(claim="Third."))],
+    merged = merge([sample(raw()), failed(), sample(raw())],
                    labels=["sample-1.json", "sample-2.json", "sample-3.json"])
     assert merged[0].samples == (1, 3)
     assert merged[0].evidence == ("sample-1.json", "sample-3.json")
@@ -110,7 +121,7 @@ def test_a_failed_sample_contributes_nothing() -> None:
 
 def test_a_failure_does_not_renumber_the_samples_after_it() -> None:
     """Sample 2 failed; the finding from the third sample is still sample 3."""
-    merged = merge([sample(raw()), failed(), sample(raw(claim="Third."))])
+    merged = merge([sample(raw()), failed(), sample(raw())])
     assert merged[0].samples == (1, 3)
 
 

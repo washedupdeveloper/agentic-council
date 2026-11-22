@@ -151,7 +151,7 @@ def test_the_plan_states_the_windows_and_their_samples(tmp_path: Path) -> None:
     repo, prompt = big_repo(tmp_path)
     planned = plan(wanted(repo, prompt, "planned", window_large_files=True, samples=None))
     assert planned.windows == len(planned.units) > 1
-    assert planned.estimated_samples == (len(planned.units), len(planned.units) * 3)
+    assert planned.estimated_samples == (len(planned.units) * 2, len(planned.units) * 3)
 
 
 def test_the_cli_passes_the_window_flags_into_the_request() -> None:
