@@ -82,7 +82,14 @@ Why: merge already kept every wording internally; dropping all but the first at
 the verdict boundary made the artifact less informative than the merge. This is
 additive and does not change the verdict.
 
-### D6. Deployment limits are not code claims
+### D6. The build requirement is satisfiable by the lock
+`pyproject.toml` requires `setuptools>=83`; the locked nixpkgs provides 83.0.0.
+Dependabot had raised the floor to 84.2.1, which no revision in this lock
+provides, so `nix build .#council-acp` failed before a test could run. A build
+constraint the flake cannot satisfy is a start failure, not a version
+preference.
+
+### D7. Deployment limits are not code claims
 
 The installed `council` on PATH is a separate build. The source listing and the
 installed listing can diverge; users must run the source/devshell build when
@@ -100,6 +107,7 @@ The three code choices all trade tidy output or latency for a stronger verdict:
 | Choice | Cost | Benefit | Verdict |
 |---|---|---|---|
 | Claim-level merge | More rows when samples paraphrase | No distinct finding is erased | Adopt |
+| Build on the locked setuptools | None beyond the lock | The Nix app can be built and installed | Adopt |
 | Two clean samples | One extra sample on clean units | No PASS from a single clean sample | Adopt |
 | Strict mode fails closed | More INCOMPLETE results | No blocking quotation-only finding passes | Adopt |
 | Semantic merge | Model dependency, non-determinism | Fewer paraphrase rows | Reject |

@@ -37,6 +37,7 @@
 - [x] 6.4 Record the deployment and cross-system limits in the design verdict.
 - [ ] 6.5 Validate `close-review-breakpoints --strict` and record the final evidence.
 - [ ] 6.6 Rebuild the installed Nix profile from HEAD and verify `council agents --json` lists `direct`.
+- [x] 6.7 Make the build requirement satisfiable by the locked nixpkgs and prove `nix build .#council-acp`.
 
 ## Evidence
 
@@ -49,4 +50,5 @@
 | Mutations | `nix develop -c python tools/mutation_check.py` | 69/69 |
 | Flake | `nix flake check` | pending |
 | OpenSpec | `nix shell nixpkgs#nodejs -c npx -y @fission-ai/openspec@1.15.0 validate close-review-breakpoints --strict` | valid |
+| Nix build | `nix build .#council-acp` | built; agents lists direct |
 | Installed adapter | `council agents --json` | pending |

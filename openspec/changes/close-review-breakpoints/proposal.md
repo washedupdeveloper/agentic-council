@@ -23,6 +23,8 @@ feature requests.
 - Treat unknown reviewer dimensions and missing proofs as failed samples, not
   as silently dropped findings.
 - Stop shipping the dev-only `council-verify` tool in the runtime application.
+- Relax the build requirement to the setuptools version the locked nixpkgs
+  provides, so the runtime package can be built.
 - Repair the stale adapter mutation and record the remaining deployment limits
   in the design record.
 
@@ -40,7 +42,8 @@ None.
 ## Impact
 
 - `domain/merge.py`, `domain/schema.py`, `domain/adjudication.py`,
-  `domain/verdict.py`, `domain/findings.py`, `run.py`, `runstore.py`.
+  `domain/verdict.py`, `domain/findings.py`, `run.py`, `runstore.py`,
+  `pyproject.toml`.
 - Existing tests and claims that describe one place as one finding; those
   become one claim as one finding.
 - No new runtime dependency, no new service, no panel or multi-agent run.
