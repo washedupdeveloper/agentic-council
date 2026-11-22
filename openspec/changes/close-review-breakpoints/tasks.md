@@ -32,13 +32,13 @@
 ## 6. Gate and close
 
 - [x] 6.1 Repair stale mutations so the merge and adapter claims remain falsifiable.
-- [ ] 6.2 Run the full test suite, mypy, ruff, claim verification and `nix flake check`.
+- [x] 6.2 Run the full test suite, mypy, ruff, claim verification and `nix flake check`.
 - [x] 6.3 Stop shipping the dev-only `council-verify` in the runtime application.
 - [x] 6.4 Record the deployment and cross-system limits in the design verdict.
-- [ ] 6.5 Validate `close-review-breakpoints --strict` and record the final evidence.
+- [x] 6.5 Validate `close-review-breakpoints --strict` and record the final evidence.
 - [x] 6.6 Rebuild the installed Nix profile from HEAD and verify `council agents --json` lists `direct`.
 - [x] 6.7 Make the build requirement satisfiable by the locked nixpkgs and prove `nix build .#council-acp`.
-- [ ] 6.8 Narrow the flake to the Linux systems the sandbox supports.
+- [x] 6.8 Narrow the flake to the Linux systems the sandbox supports.
 
 ## Evidence
 
@@ -49,7 +49,7 @@
 | Lint | `nix develop -c ruff check --select F,E9 src tools tests` | clean |
 | Claims | `nix develop -c ./bin/council-verify` | 241/241 |
 | Mutations | `nix develop -c python tools/mutation_check.py` | 69/69 |
-| Flake | `nix flake check` | pending |
+| Flake | `nix flake check` | 12 checks, all passed on x86_64-linux (aarch64 omitted) |
 | OpenSpec | `nix shell nixpkgs#nodejs -c npx -y @fission-ai/openspec@1.15.0 validate close-review-breakpoints --strict` | valid |
 | Nix build | `nix build .#council-acp` | built; agents lists direct |
 | Installed adapter | `council agents --json` | `direct` listed |
