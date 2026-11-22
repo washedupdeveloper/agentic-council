@@ -22,6 +22,7 @@
 - [x] 4.1 Make a quotation-only blocking finding INCOMPLETE under `--require-executed-proofs`.
 - [x] 4.2 Add tests for the strict quotation, executed blocker and non-blocking quotation cases.
 - [x] 4.3 Update the strict-mode claim and generated docs.
+- [x] 4.4 Name a quotation-only blocker in the reason even when another blocker was executed.
 
 ## 5. Malformed evidence and preservation
 
@@ -39,17 +40,21 @@
 - [x] 6.6 Rebuild the installed Nix profile from HEAD and verify `council agents --json` lists `direct`.
 - [x] 6.7 Make the build requirement satisfiable by the locked nixpkgs and prove `nix build .#council-acp`.
 - [x] 6.8 Narrow the flake to the Linux systems the sandbox supports.
+- [x] 6.9 Make the shipped review action use auto-sampling by default; pass `--samples` only when the caller supplies a count.
+- [x] 6.10 Expose `require-executed-proofs` as an action input, default off.
+- [x] 6.11 Add governance tests and claims for the action defaults and strict-mode reporting.
 
 ## Evidence
 
 | Check | Command | Result |
 |---|---|---|
-| Suite | `nix develop -c python -m pytest -p no:cacheprovider` | 788 passed |
+| Suite | `nix develop -c python -m pytest -p no:cacheprovider` | 792 passed |
 | Types | `nix develop -c mypy src` | 58 files clean |
 | Lint | `nix develop -c ruff check --select F,E9 src tools tests` | clean |
-| Claims | `nix develop -c ./bin/council-verify` | 241/241 |
-| Mutations | `nix develop -c python tools/mutation_check.py` | 69/69 |
+| Claims | `nix develop -c ./bin/council-verify` | 243/243 |
+| Mutations | `nix develop -c python tools/mutation_check.py` | 70/70 |
 | Flake | `nix flake check` | 12 checks, all passed on x86_64-linux (aarch64 omitted) |
+| Action default | `python3 -m pytest tests/test_governance.py -q` | auto sampling; strict proof input |
 | OpenSpec | `nix shell nixpkgs#nodejs -c npx -y @fission-ai/openspec@1.15.0 validate close-review-breakpoints --strict` | valid |
 | Nix build | `nix build .#council-acp` | built; agents lists direct |
 | Installed adapter | `council agents --json` | `direct` listed |

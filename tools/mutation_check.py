@@ -275,6 +275,10 @@ MUTATIONS: tuple[Mutation, ...] = (
              "runner.py",
              "binary = str(Path(located).resolve())",
              "binary = located"),
+    Mutation("strict-fail-hides-quotation",
+             "domain/verdict.py",
+             "if quoted and executed_only:",
+             "if False:"),
 )
 
 

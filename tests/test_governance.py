@@ -32,3 +32,25 @@ def test_agents_makes_the_openspec_change_the_brief() -> None:
     assert "openspec/changes/" in text
     assert "subagent" in text.lower()
     assert "chat is a short pointer" in text.lower()
+
+
+def test_the_review_action_defaults_to_auto_sampling() -> None:
+    text = read(".github/actions/council/action.yml")
+    samples = text.split("  samples:", 1)[1].split("  context-depth:", 1)[0]
+    assert 'default: ""' in samples
+    assert 'if [ -n "$SAMPLES" ]; then args+=(--samples "$SAMPLES"); fi' in text
+    assert '--samples "${{ inputs.samples }}"' not in text
+
+
+def test_the_review_action_exposes_strict_proofs() -> None:
+    text = read(".github/actions/council/action.yml")
+    assert "require-executed-proofs:" in text
+    assert "REQUIRE_EXECUTED: ${{ inputs.require-executed-proofs }}" in text
+    assert ('if [ "$REQUIRE_EXECUTED" = "true" ]; then '
+            'args+=(--require-executed-proofs); fi') in text
+
+
+def test_the_review_workflow_defaults_to_auto_sampling() -> None:
+    text = read(".github/workflows/council.yml")
+    samples = text.split("      samples:", 1)[1].split("      time-budget:", 1)[0]
+    assert 'default: ""' in samples

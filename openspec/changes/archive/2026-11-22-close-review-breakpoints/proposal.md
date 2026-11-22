@@ -17,6 +17,8 @@ feature requests.
 
 - Merge findings by file, line and **normalized claim**, not by place alone.
 - Require **two clean samples** before auto-sampling concludes PASS.
+- Make the shipped review action use automatic sampling unless the caller
+  supplies a count, and expose strict proof as an explicit input.
 - Make strict proof mode **fail closed**: a blocking finding proven only by a
   quotation is INCOMPLETE, never PASS.
 - Keep every merged claim, proof and evidence file in the verdict.
@@ -45,7 +47,8 @@ None.
 
 - `domain/merge.py`, `domain/schema.py`, `domain/adjudication.py`,
   `domain/verdict.py`, `domain/findings.py`, `run.py`, `runstore.py`,
-  `pyproject.toml`, `flake.nix`.
+  `pyproject.toml`, `flake.nix`, `.github/actions/council/action.yml`,
+  `.github/workflows/council.yml`.
 - Existing tests and claims that describe one place as one finding; those
   become one claim as one finding.
 - No new runtime dependency, no new service, no panel or multi-agent run.

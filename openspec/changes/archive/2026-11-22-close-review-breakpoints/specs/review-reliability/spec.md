@@ -39,6 +39,21 @@ A clean result MUST require two clean samples in automatic sampling.
 - **WHEN** any auto-sampled result has no usable output
 - **THEN** the run is INCOMPLETE and names the failed sample
 
+### Requirement: The shipped review gate does not pin one sample by default
+
+The shipped review gate MUST use the automatic sample policy unless the caller
+supplies an explicit sample count.
+
+#### Scenario: The gate runs without a sample count
+
+- **WHEN** the shipped gate is invoked without an explicit sample count
+- **THEN** it uses the automatic policy and does not pass a fixed count of one
+
+#### Scenario: The caller supplies a sample count
+
+- **WHEN** the caller supplies an explicit sample count
+- **THEN** the gate passes that count and the automatic policy is not used
+
 ### Requirement: Strict proof mode fails closed
 
 A blocking finding proven only by a static quotation MUST NOT produce PASS when
@@ -68,9 +83,14 @@ Unknown dimensions, missing proofs and empty proof outcomes MUST fail closed.
 - **WHEN** a reviewer section is not one of the five dimensions
 - **THEN** the sample is rejected by the schema and the run cannot PASS
 
-#### Scenario: A finding has no proof
+#### Scenario: A reviewer finding has no proof
 
-- **WHEN** a finding has no proof outcome
+- **WHEN** a reviewer finding omits the proof required by the contract
+- **THEN** the sample is rejected by the schema and the run cannot PASS
+
+#### Scenario: A finding has no attempted proof outcome
+
+- **WHEN** a finding reaches adjudication with no proof outcome
 - **THEN** the finding is UNSETTLED and a blocking run is INCOMPLETE
 
 ### Requirement: The verdict keeps every merged wording

@@ -1284,3 +1284,14 @@ check = "python3 -m pytest tests/test_adjudicate.py::test_a_finding_with_no_proo
 id = "a-merged-finding-keeps-every-wording"
 text = "A merged finding keeps every sample's wording in the verdict, not only the first."
 check = "python3 -m pytest tests/test_adjudicate.py::test_a_merged_finding_keeps_every_wording -q"
+
+[[claim]]
+id = "the-shipped-gate-uses-auto-sampling"
+text = "The shipped review action uses automatic sampling unless the caller supplies a count."
+check = "python3 -m pytest tests/test_governance.py::test_the_review_action_defaults_to_auto_sampling -q"
+
+[[claim]]
+id = "a-strict-fail-names-a-quotation-only-blocker"
+text = "A strict run names a quotation-only blocker even when another blocker was executed."
+check = "python3 -m pytest tests/test_strength.py::test_a_strict_run_names_a_quotation_only_finding_beside_an_executed_one -q"
+falsifier = "strict-fail-hides-quotation"

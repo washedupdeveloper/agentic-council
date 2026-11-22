@@ -106,9 +106,23 @@ dependency, and shipping the plain wrapper made every claim fail outside the
 devshell. Cross-system flake coverage remains host-dependent; this change makes
 no claim about systems the gate did not run on.
 
+### D9. The shipped gate cannot pin one sample
+
+The review action defaulted to `--samples 1`, which bypassed the automatic
+two-clean-sample rule in the path most likely to be trusted. The action now
+omits `--samples` unless the caller supplies a count; an explicit count remains
+available for a caller who deliberately accepts the cheaper risk. Strict proof
+is an input, default off, because it changes the label (INCOMPLETE) rather than
+the blocking outcome.
+
+Why: a guarantee that is absent from the shipped gate is not a guarantee. The
+cost is one extra sample on a clean CI unit; the benefit is that the gate cannot
+PASS a change from one clean sample. The action stays manual and self-hosted, so
+the extra sample is bounded by the existing time budget.
+
 ## Trade-off verdict
 
-The three code choices all trade tidy output or latency for a stronger verdict:
+The code choices all trade tidy output, latency or sample cost for a stronger verdict:
 
 | Choice | Cost | Benefit | Verdict |
 |---|---|---|---|
@@ -116,6 +130,7 @@ The three code choices all trade tidy output or latency for a stronger verdict:
 | Build on the locked setuptools | None beyond the lock | The Nix app can be built and installed | Adopt |
 | Linux-only systems | No Darwin package | No guaranteed Darwin evaluation failure | Adopt |
 | Two clean samples | One extra sample on clean units | No PASS from a single clean sample | Adopt |
+| Shipped gate uses auto | One extra sample on clean CI units | The gate cannot PASS from one clean sample | Adopt |
 | Strict mode fails closed | More INCOMPLETE results | No blocking quotation-only finding passes | Adopt |
 | Semantic merge | Model dependency, non-determinism | Fewer paraphrase rows | Reject |
 | Always three samples | Higher default cost | Slightly stronger clean evidence | Reject as default |
@@ -132,6 +147,8 @@ non-blocking evidence set is PASS.
   relationship explicit. Mitigation: display grouping by location, not a merge.
 - A clean unit costs one extra sample. Mitigation: fixed N remains available for
   callers who deliberately choose a cheaper review.
+- The shipped action now costs one extra sample on clean units. Mitigation: the
+  `samples` input remains for a caller who explicitly accepts the cheaper risk.
 - Strict mode can return more INCOMPLETE results. Mitigation: the reason names
   the static finding and the mode; the operator can rerun with an executed proof
   or accept the default lenient policy.

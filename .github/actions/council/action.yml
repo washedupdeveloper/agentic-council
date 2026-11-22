@@ -13,9 +13,13 @@ inputs:
     required: false
     default: ""
   samples:
-    description: Samples per unit
+    description: Samples per unit (empty means automatic: two clean, three on disagreement)
     required: false
-    default: "1"
+    default: ""
+  require-executed-proofs:
+    description: Treat a blocking finding proven only by quotation as incomplete
+    required: false
+    default: "false"
   context-depth:
     description: 0 diff only, 1 enclosing function, 2 +one call level, 3 +two
     required: false
@@ -73,6 +77,8 @@ runs:
       shell: bash
       env:
         BASE: ${{ inputs.base }}
+        SAMPLES: ${{ inputs.samples }}
+        REQUIRE_EXECUTED: ${{ inputs.require-executed-proofs }}
         REASONING: ${{ inputs.reasoning }}
         STREAM: ${{ inputs.stream }}
         IDLE: ${{ inputs.idle-timeout }}
@@ -81,10 +87,11 @@ runs:
       run: |
         set -uo pipefail
         args=(ci
-          --samples "${{ inputs.samples }}"
           --sample-timeout "${{ inputs.sample-timeout }}"
           --time-budget "${{ inputs.time-budget }}"
           --context-depth "${{ inputs.context-depth }}")
+        if [ -n "$SAMPLES" ]; then args+=(--samples "$SAMPLES"); fi
+        if [ "$REQUIRE_EXECUTED" = "true" ]; then args+=(--require-executed-proofs); fi
         if [ -n "$BASE" ]; then args+=(--base "$BASE"); fi
         if [ -n "$REASONING" ]; then args+=(--reasoning "$REASONING"); fi
         if [ "$STREAM" = "true" ]; then args+=(--stream); else args+=(--no-stream); fi

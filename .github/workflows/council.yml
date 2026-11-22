@@ -11,9 +11,13 @@ on:
         required: false
         default: ""
       samples:
-        description: Samples per unit
+        description: Samples per unit (empty means automatic)
         required: false
-        default: "1"
+        default: ""
+      require-executed-proofs:
+        description: Treat a blocking finding proven only by quotation as incomplete
+        required: false
+        default: "false"
       time-budget:
         description: Seconds after which no new unit is started
         required: false
@@ -46,6 +50,7 @@ jobs:
           dist: dist
           base: ${{ inputs.base }}
           samples: ${{ inputs.samples }}
+          require-executed-proofs: ${{ inputs.require-executed-proofs }}
           time-budget: ${{ inputs.time-budget }}
           reasoning: ${{ inputs.reasoning }}
 

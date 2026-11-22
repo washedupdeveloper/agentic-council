@@ -71,18 +71,18 @@ def judge(findings: Iterable[Finding], *, executed_only: bool = False) -> Result
     items = tuple(findings)
     blocking_proven = [f for f in items if f.blocks and f.state is State.PROVEN]
     quoted = [f for f in blocking_proven if not f.executed]
-    if executed_only:
-        # A quotation demonstrates text, not behaviour. It cannot fail a strict
-        # run, but it must not be discarded into a PASS either: the claim is
-        # unsettled by the selected proof, so the honest verdict is INCOMPLETE.
-        unsettled_quoted = [f for f in blocking_proven if not f.executed]
-        proven = [f for f in blocking_proven if f.executed]
-    else:
-        unsettled_quoted = []
-        proven = blocking_proven
+    # A quotation demonstrates text, not behaviour; strict mode leaves it unsettled.
+    unsettled_quoted = quoted if executed_only else []
+    proven = ([f for f in blocking_proven if f.executed] if executed_only
+              else blocking_proven)
     if proven:
-        suffix = (f"; {len(quoted)} of them proven by quotation only"
-                  if quoted and not executed_only else "")
+        if quoted and executed_only:
+            suffix = (f"; {len(quoted)} blocking finding(s) proven by quotation "
+                      f"only: {_cite(quoted)}")
+        elif quoted:
+            suffix = f"; {len(quoted)} of them proven by quotation only"
+        else:
+            suffix = ""
         return Result(
             Verdict.FAIL,
             f"{len(proven)} proven blocking finding(s): {_cite(proven)}{suffix}",

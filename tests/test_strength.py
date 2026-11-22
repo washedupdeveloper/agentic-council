@@ -160,3 +160,15 @@ def test_bounded_names_the_limit_and_counts_the_rest() -> None:
     assert listed[0] == "0" and listed[-1] == "199"
     assert omitted == 100
     assert bounded(["one"], limit=200) == (["one"], 0)
+
+
+def test_a_strict_run_names_a_quotation_only_finding_beside_an_executed_one(
+        tmp_path: Path) -> None:
+    repo = make_repo(tmp_path)
+    report = review(ReviewRequest(repo=repo, samples=1, run_id="strict-both",
+                                  require_executed_proofs=True),
+                    lambda _: body({"security": [executed(), quoted()]}))
+    assert report.verdict is Verdict.FAIL
+    assert "F-01" in report.reason
+    assert "F-02" in report.reason
+    assert "proven by quotation only" in report.reason
