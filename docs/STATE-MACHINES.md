@@ -175,8 +175,8 @@ process, not a monkeypatched function.
 - A finding reported outside its unit’s ranges is attributed to the unit that
   reported it, not to a unit whose ranges happen to contain the line: `units[]`
   counts what each unit said, and the merge keeps the finding under
-  place, `(file, line)`, with the most blocking dimension any sample used
-  (M29). It stays visible in `findings[]` either way.
+  claim, `(file, line, normalized claim)`, with the most blocking dimension any
+  sample used (M29). It stays visible in `findings[]` either way.
 
 **Evidence:** `tests/test_run.py::test_a_plan_is_one_prompt_when_it_fits`,
 `test_a_plan_names_the_units_and_writes_nothing`,

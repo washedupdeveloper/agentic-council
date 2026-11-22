@@ -90,9 +90,10 @@ of.
 - *Misclassification.* Nothing checks that a finding's `dimension` is apt: a model
   that files a style nit under `correctness` makes it blocking, and the proof
   cannot help — it settles existence, not category. The merge cannot fix that for
-  a single finding, but it no longer compounds it: one place is one finding, and
-  its label is the most blocking dimension any sample used (M29), so a second
-  opinion can neither duplicate nor weaken a defect.
+  a single finding, but it no longer compounds it by label: one claim is one
+  finding, and its label is the most blocking dimension any sample used (M29).
+  A paraphrase is a separate row, so the merge does not hide it; it also cannot
+  weaken a claim by relabelling it.
 - *Severity inflation by omission.* A model that never writes `low` for a
   correctness finding turns every typo into a gate failure.
 

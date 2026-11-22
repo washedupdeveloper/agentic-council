@@ -261,7 +261,7 @@ check = "python3 -m pytest tests/test_run.py::test_a_user_diff_prefix_cannot_hid
 
 [[claim]]
 id = "a-finding-keeps-every-proof"
-text = "When samples report one place with different proofs, every proof is kept and run."
+text = "When samples report one claim at one place with different proofs, every proof is kept and run."
 check = "python3 -m pytest tests/test_merge.py::test_every_samples_proof_is_kept -q"
 
 [[claim]]
