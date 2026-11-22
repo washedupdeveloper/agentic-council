@@ -124,3 +124,27 @@ def test_a_unit_that_never_ran_is_incomplete_and_a_failure_stays_a_failure() -> 
 def test_a_clean_run_with_no_findings_passes(tmp_path: Path) -> None:
     adj = adjudicate([], ctx(repo_with(tmp_path)))
     assert verdict(adj).verdict is Verdict.PASS
+
+
+def test_a_finding_with_no_proof_is_unsettled_not_refuted(tmp_path: Path) -> None:
+    """No attempt is not a refutation; the documented state vocabulary keeps them apart."""
+    item = MergedFinding(
+        dimension="correctness", file="a.py", line=2, severity="high",
+        claims=("It is wrong.",), samples=(1,), proofs=(),
+    )
+    adj = adjudicate([item], ctx(repo_with(tmp_path)))
+    assert adj.findings[0].state is State.UNSETTLED
+    result = verdict(adj)
+    assert result.verdict is Verdict.INCOMPLETE
+    assert result.exit_code == 2
+    assert "could not be settled" in result.reason
+
+def test_a_merged_finding_keeps_every_wording(tmp_path: Path) -> None:
+    item = MergedFinding(
+        dimension="correctness", file="a.py", line=2, severity="high",
+        claims=("First wording.", "Second wording."), samples=(1, 2),
+        proofs=(("present", {"path": "a.py", "line": 2, "text": "two"}),),
+    )
+    finding = adjudicate([item], ctx(repo_with(tmp_path))).findings[0]
+    assert finding.claim == "First wording."
+    assert finding.claims == ("First wording.", "Second wording.")

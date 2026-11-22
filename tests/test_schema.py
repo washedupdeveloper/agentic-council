@@ -46,6 +46,13 @@ def test_a_missing_section_is_named() -> None:
         parse_reviewer_output(json.dumps(body))
 
 
+def test_an_unknown_section_is_refused() -> None:
+    body = {name: [] for name in DIMENSIONS}
+    body["securty"] = []
+    with pytest.raises(SchemaError, match="unknown dimension.*securty"):
+        parse_reviewer_output(json.dumps({"sections": body}))
+
+
 def test_a_finding_without_a_proof_is_refused() -> None:
     bad = {k: v for k, v in finding().items() if k != "proof"}
     with pytest.raises(SchemaError, match="proof: missing"):

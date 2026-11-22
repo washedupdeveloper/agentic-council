@@ -115,6 +115,23 @@ def test_two_samples_that_disagree_about_the_dimension_are_one_finding(tmp_path:
     assert payload["findings"][0]["state"] == "proven"
 
 
+def test_the_verdict_keeps_every_wording_at_one_place(tmp_path: Path) -> None:
+    repo, _ = make_repo(tmp_path)
+    calls = {"count": 0}
+
+    def runner(_: str) -> str:
+        calls["count"] += 1
+        if calls["count"] == 1:
+            return body({"correctness": [secret(claim="First wording.")]})
+        return body({"correctness": [secret(claim="Second wording.")]})
+
+    report = review(ReviewRequest(repo=repo, samples=2, run_id="wordings"), runner)
+    payload = json.loads((report.run_dir / "verdict.json").read_text(encoding="utf-8"))
+    assert len(payload["findings"]) == 1
+    assert payload["findings"][0]["claim"] == "First wording."
+    assert payload["findings"][0]["claims"] == ["First wording.", "Second wording."]
+
+
 def test_every_finding_points_at_the_sample_that_asserted_it(tmp_path: Path) -> None:
     """No finding in the verdict is asserted without a file to open."""
     repo, _ = make_repo(tmp_path)

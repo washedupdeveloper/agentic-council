@@ -80,6 +80,10 @@ class Finding:
     #: The sample files that asserted this finding, relative to the run directory.
     #: Empty only when a caller built the finding by hand.
     evidence: tuple[str, ...] = ()
+    #: Every distinct wording merged into this place. `claim` remains the
+    #: representative first wording for existing consumers; `claims` preserves
+    #: the others instead of dropping them at the verdict boundary.
+    claims: tuple[str, ...] = ()
 
     @property
     def blocks(self) -> bool:
@@ -89,6 +93,8 @@ class Finding:
     def __post_init__(self) -> None:
         if not self.id:
             raise ValueError("a finding needs an id: the verdict cites it")
+        if not self.claims and self.claim:
+            object.__setattr__(self, "claims", (self.claim,))
         if self.severity not in SEVERITIES:
             raise ValueError(f"unknown severity {self.severity!r}; expected one of {SEVERITIES}")
         if self.file:

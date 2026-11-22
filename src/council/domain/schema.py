@@ -94,6 +94,11 @@ def parse_reviewer_output(text: str) -> ReviewerOutput:
     missing = [name for name in DIMENSIONS if name not in sections]
     if missing:
         raise SchemaError(f"sections: missing {', '.join(missing)}")
+    unknown = [name for name in sections if name not in DIMENSIONS]
+    if unknown:
+        raise SchemaError(
+            f"sections: unknown dimension(s) {', '.join(sorted(unknown))}"
+        )
 
     findings: list[RawFinding] = []
     for dimension in DIMENSIONS:

@@ -213,6 +213,7 @@ def write_verdict(document: VerdictDocument) -> None:
             {"id": finding.id, "dimension": finding.dimension,
              "severity": finding.severity, "state": finding.state.value,
              "location": finding.location, "claim": finding.claim,
+             "claims": list(finding.claims),
              "detail": finding.detail, "proof": finding.proof,
              "proof_strength": "executed" if finding.executed else "static",
              "evidence": list(finding.evidence)}

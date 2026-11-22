@@ -56,13 +56,18 @@ def decide(merged: Sequence[MergedFinding],
     for number, (item, item_outcomes) in enumerate(zip(merged, outcomes), start=1):
         proven = [o for o in item_outcomes if o.state is State.PROVEN]
         unrunnable = [o for o in item_outcomes if o.state is State.UNRUNNABLE]
-        if proven:
+        if not item_outcomes:
+            # A finding with no attempted proof is not disproved. The schema
+            # requires a proof from a reviewer, but the domain API and the
+            # documented state vocabulary still distinguish "no attempt" from
+            # "ran and failed"; keep that distinction at the boundary.
+            state, detail = State.UNSETTLED, "no proof was attempted"
+        elif proven:
             state, detail = State.PROVEN, proven[0].detail
         elif unrunnable:
             state, detail = State.UNRUNNABLE, unrunnable[0].detail
         else:
-            state, detail = State.REFUTED, (
-                item_outcomes[0].detail if item_outcomes else "no proof")
+            state, detail = State.REFUTED, item_outcomes[0].detail
         findings.append(Finding(
             id=f"F-{number:02d}",
             dimension=item.dimension,
@@ -75,6 +80,7 @@ def decide(merged: Sequence[MergedFinding],
             proof=canonical_proof(item.proofs),
             executed=any(o.kind in EXECUTED_PROOF_KINDS for o in proven),
             evidence=item.evidence,
+            claims=item.claims,
         ))
     return Adjudication(tuple(findings), tuple(sorted(failed_samples)))
 
