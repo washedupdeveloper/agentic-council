@@ -89,7 +89,13 @@ provides, so `nix build .#council-acp` failed before a test could run. A build
 constraint the flake cannot satisfy is a start failure, not a version
 preference.
 
-### D7. Deployment limits are not code claims
+### D7. Support is what the sandbox can run on
+The flake declares `x86_64-linux` and `aarch64-linux`. The Darwin entries were
+removed: the app wraps `bubblewrap`, which is Linux-only, so a Darwin evaluation
+was a guaranteed failure disguised as a supported platform. CI proves x86_64;
+aarch64 shares the Linux sandbox but is not claimed by this gate.
+
+### D8. Deployment limits are not code claims
 
 The installed `council` on PATH is a separate build. The source listing and the
 installed listing can diverge; users must run the source/devshell build when
@@ -108,6 +114,7 @@ The three code choices all trade tidy output or latency for a stronger verdict:
 |---|---|---|---|
 | Claim-level merge | More rows when samples paraphrase | No distinct finding is erased | Adopt |
 | Build on the locked setuptools | None beyond the lock | The Nix app can be built and installed | Adopt |
+| Linux-only systems | No Darwin package | No guaranteed Darwin evaluation failure | Adopt |
 | Two clean samples | One extra sample on clean units | No PASS from a single clean sample | Adopt |
 | Strict mode fails closed | More INCOMPLETE results | No blocking quotation-only finding passes | Adopt |
 | Semantic merge | Model dependency, non-determinism | Fewer paraphrase rows | Reject |

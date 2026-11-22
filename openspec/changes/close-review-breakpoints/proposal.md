@@ -25,6 +25,8 @@ feature requests.
 - Stop shipping the dev-only `council-verify` tool in the runtime application.
 - Relax the build requirement to the setuptools version the locked nixpkgs
   provides, so the runtime package can be built.
+- Stop advertising Darwin in the flake: `bubblewrap` is Linux-only, so the
+  package cannot evaluate there.
 - Repair the stale adapter mutation and record the remaining deployment limits
   in the design record.
 
@@ -43,7 +45,7 @@ None.
 
 - `domain/merge.py`, `domain/schema.py`, `domain/adjudication.py`,
   `domain/verdict.py`, `domain/findings.py`, `run.py`, `runstore.py`,
-  `pyproject.toml`.
+  `pyproject.toml`, `flake.nix`.
 - Existing tests and claims that describe one place as one finding; those
   become one claim as one finding.
 - No new runtime dependency, no new service, no panel or multi-agent run.

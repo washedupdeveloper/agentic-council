@@ -17,11 +17,11 @@
       nix-best-practices,
     }:
     let
+      # bubblewrap is Linux-only. Darwin has no sandbox here, so it must not be
+      # advertised as a supported system.
       systems = [
         "x86_64-linux"
         "aarch64-linux"
-        "x86_64-darwin"
-        "aarch64-darwin"
       ];
       each = f: nixpkgs.lib.genAttrs systems (system: f nixpkgs.legacyPackages.${system});
 
