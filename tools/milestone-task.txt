@@ -1,0 +1,27 @@
+# Milestone task
+
+You are implementing OpenSpec change `<<change>>`, task `<<identifier>>`: <<title>>.
+
+Read the change before editing:
+
+- `openspec/changes/<<change>>/proposal.md`
+- `openspec/changes/<<change>>/design.md`
+- `openspec/changes/<<change>>/tasks.md`
+- `openspec/changes/<<change>>/specs/`
+
+The change is the brief. Do not edit `tasks.md`; the runner owns the checkboxes.
+Do not run `git commit`, `git push` or `hermes profile`.
+
+Write `openspec/changes/<<change>>/collab/<<identifier>>.md` with:
+
+- the files changed,
+- the commands you ran,
+- the evidence that the predicate passed,
+- any residual or blocker.
+
+Acceptance predicate:
+
+<<predicates>>
+
+Stop when the predicate passes. If it cannot pass, write the evidence and say
+why; do not claim success.

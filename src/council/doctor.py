@@ -5,11 +5,13 @@ from __future__ import annotations
 import os
 import shutil
 import time
+import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 
 from .domain.text import sanitize
 from .sample import Runner
+from .version import SOURCE_VERSION, current_version
 
 PROBE = "Reply with the single word: ok"
 OK = "ok"
@@ -69,8 +71,32 @@ def check_agent(name: str, runner: Runner, probe_timeout: int) -> Check:
                  f"{name} answered in {seconds:.1f}s (probe limit {probe_timeout}s)")
 
 
+def check_source(source: Path | None) -> Check | None:
+    """Compare the installed version with the source tree's declared version."""
+    if source is None:
+        return None
+    pyproject = source / "pyproject.toml"
+    try:
+        data = tomllib.loads(pyproject.read_text(encoding="utf-8"))
+        source_version = data["project"]["version"]
+    except (OSError, KeyError, TypeError, tomllib.TOMLDecodeError) as exc:
+        return Check("source", FAIL, f"{source}: cannot read project.version ({exc})")
+    installed = current_version()
+    if installed == SOURCE_VERSION:
+        return Check("source", WARN,
+                     "running from source; no installed version to compare")
+    if installed == source_version:
+        return Check("source", OK, f"installed {installed} matches {source}")
+    return Check("source", FAIL,
+                 f"installed {installed}, source {source_version} at {source}")
+
+
 def run(agent: str, *, runner: Runner, binary: str = "hermes",
-        probe_timeout: int = 60) -> list[Check]:
+        probe_timeout: int = 60, source: Path | None = None) -> list[Check]:
     """Every check, in the order a failure matters most."""
-    return [check_git(), check_reviewer(binary), check_sandbox(),
-            check_agent(agent, runner, probe_timeout)]
+    checks = [check_git(), check_reviewer(binary), check_sandbox(),
+              check_agent(agent, runner, probe_timeout)]
+    extra = check_source(source)
+    if extra is not None:
+        checks.append(extra)
+    return checks

@@ -69,7 +69,7 @@ def payload_of(report: Any) -> dict[str, Any]:
 
 def test_a_quotation_only_finding_is_named_in_the_reason(tmp_path: Path) -> None:
     repo = make_repo(tmp_path)
-    report = review(ReviewRequest(repo=repo, samples=1, run_id="lenient"),
+    report = review(ReviewRequest(repo=repo, samples=1, allow_single_sample=True, run_id="lenient"),
                     lambda _: body({"security": [quoted()]}))
     assert report.verdict is Verdict.FAIL
     assert "proven by quotation only" in report.reason
@@ -77,7 +77,7 @@ def test_a_quotation_only_finding_is_named_in_the_reason(tmp_path: Path) -> None
 
 def test_a_quotation_only_finding_is_incomplete_under_strict_mode(tmp_path: Path) -> None:
     repo = make_repo(tmp_path)
-    report = review(ReviewRequest(repo=repo, samples=1, run_id="strict",
+    report = review(ReviewRequest(repo=repo, samples=1, allow_single_sample=True, run_id="strict",
                                   require_executed_proofs=True),
                     lambda _: body({"security": [quoted()]}))
     assert report.verdict is Verdict.INCOMPLETE
@@ -93,7 +93,7 @@ def test_a_quotation_only_non_blocking_finding_passes_strict_mode(tmp_path: Path
     repo = make_repo(tmp_path)
     finding = quoted()
     finding.update({"severity": "low", "claim": "Style nit."})
-    report = review(ReviewRequest(repo=repo, samples=1, run_id="strict-note",
+    report = review(ReviewRequest(repo=repo, samples=1, allow_single_sample=True, run_id="strict-note",
                                   require_executed_proofs=True),
                     lambda _: body({"readability": [finding]}))
     assert report.verdict is Verdict.PASS
@@ -104,7 +104,7 @@ def test_a_quotation_only_non_blocking_finding_passes_strict_mode(tmp_path: Path
 
 def test_an_executed_proof_still_blocks_a_strict_run(tmp_path: Path) -> None:
     repo = make_repo(tmp_path)
-    report = review(ReviewRequest(repo=repo, samples=1, run_id="executed",
+    report = review(ReviewRequest(repo=repo, samples=1, allow_single_sample=True, run_id="executed",
                                   require_executed_proofs=True),
                     lambda _: body({"security": [executed()]}))
     assert report.verdict is Verdict.FAIL
@@ -113,7 +113,7 @@ def test_an_executed_proof_still_blocks_a_strict_run(tmp_path: Path) -> None:
 
 def test_the_verdict_names_its_format(tmp_path: Path) -> None:
     repo = make_repo(tmp_path)
-    report = review(ReviewRequest(repo=repo, samples=1, run_id="format"),
+    report = review(ReviewRequest(repo=repo, samples=1, allow_single_sample=True, run_id="format"),
                     lambda _: body())
     assert payload_of(report)["format"] == VERDICT_FORMAT
 
@@ -128,7 +128,7 @@ def test_a_verdict_that_cannot_be_published_leaves_no_partial_file(
 
     monkeypatch.setattr("council.runstore.os.replace", refuse)
     with pytest.raises(ReviewError, match="cannot write"):
-        review(ReviewRequest(repo=repo, samples=1, run_id="atomic"), lambda _: body())
+        review(ReviewRequest(repo=repo, samples=1, allow_single_sample=True, run_id="atomic"), lambda _: body())
     run_dir = repo / ".council" / "runs" / "atomic"
     assert not (run_dir / "verdict.json").exists()
     assert not list(run_dir.glob("*.tmp"))
@@ -142,7 +142,7 @@ def test_the_scope_report_is_bounded_and_counts_the_rest(tmp_path: Path) -> None
     git(repo, "add", "-A")
     git(repo, "commit", "-qm", "extras")
 
-    report = review(ReviewRequest(repo=repo, samples=1, run_id="bounded",
+    report = review(ReviewRequest(repo=repo, samples=1, allow_single_sample=True, run_id="bounded",
                                   include=("a.py",)), lambda _: body())
     payload = payload_of(report)
     listed = len(payload["scope_ignored"])
@@ -165,7 +165,7 @@ def test_bounded_names_the_limit_and_counts_the_rest() -> None:
 def test_a_strict_run_names_a_quotation_only_finding_beside_an_executed_one(
         tmp_path: Path) -> None:
     repo = make_repo(tmp_path)
-    report = review(ReviewRequest(repo=repo, samples=1, run_id="strict-both",
+    report = review(ReviewRequest(repo=repo, samples=1, allow_single_sample=True, run_id="strict-both",
                                   require_executed_proofs=True),
                     lambda _: body({"security": [executed(), quoted()]}))
     assert report.verdict is Verdict.FAIL

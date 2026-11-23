@@ -2,7 +2,7 @@
 name: council
 description: Use when a change needs a blocking-defect verdict. Runs `council review` and reports the states behind the verdict.
 commands: [review, ci, pr, baseline, init, agents, evidence, doctor, setup]
-flags: [--plan, --include, --exclude, --samples, --report, --json, --sarif, --no-ephemeral, --keep, --require-executed-proofs, --base, --library, --dest, --agent, --list, --force, --dry-run, --label, --state-root]
+flags: [--plan, --include, --exclude, --samples, --allow-single-sample, --report, --json, --sarif, --no-ephemeral, --keep, --require-executed-proofs, --base, --library, --dest, --agent, --list, --force, --dry-run, --label, --state-root, --source]
 artefacts: [verdict.json, sample-N.json, artifacts.json]
 ---
 
@@ -20,12 +20,14 @@ carries. A finding counts only once its proof holds.
     council review --plan                 # units, bytes, rules, samples: no model call, no run
     council review --include 'src/**' --exclude 'vendor/**'
     council review --samples 3            # per unit; merged by file, line and claim
+    council review --samples 1 --allow-single-sample  # deliberate one-sample review
     council review --report               # advice only: always exits 0
     council ci --sarif council.sarif      # headless: JSON, exit code, SARIF
     council pr 1234                       # base and head come from `gh pr view`
     council pr https://github.com/o/r/pull/1234  # URL or branch also work
     council agents                        # reviewer adapters in this build
     council doctor                        # can this machine produce evidence at all?
+    council doctor --source .             # installed version vs this source tree
 
 A review is **ephemeral by default**: the run directory is removed after the
 verdict. Pass `--no-ephemeral` to keep `.council/runs/<id>/`, or `--keep DIR` to
@@ -107,6 +109,8 @@ does not exist, the run is broken, not merely incomplete.
   `--require-executed-proofs` a quotation-only blocker is INCOMPLETE.
 - `--require-executed-proofs` is the strict reading when a merge turns on a
   claim about behaviour.
+- A one-sample review is refused unless `--allow-single-sample` is passed;
+  the automatic policy is two clean samples, and the shipped gate uses it.
 - Do not weaken the prompt, the budget or the proof to clear a verdict; fix the
   code, add the proof, or report `INCOMPLETE` honestly.
 - There is no score. Do not invent a threshold, an average, or a percentage.

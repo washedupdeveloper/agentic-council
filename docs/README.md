@@ -23,6 +23,7 @@ fails the gate when one exists.
 |---|---|
 | [`SCOPE.md`](SCOPE.md) | what a review looks at, and that only the caller can change it |
 | [`PORTABILITY.md`](PORTABILITY.md) | ephemeral execution beyond NixOS, host by host |
+| [`SHELLS.md`](SHELLS.md) | bash, fish and PowerShell: how to invoke the scripts, and the shell a predicate runs under |
 | [`BASELINE.md`](BASELINE.md) | accepting a proven blocking finding without hiding the evidence |
 | [`VERSIONING.md`](VERSIONING.md) | the public surface, the semantic-version policy, the release procedure |
 | [`COMPARISON.md`](COMPARISON.md) | how council differs from coding agents, harnesses, workspaces and PR review tools, with dated sources |
@@ -64,6 +65,7 @@ looks the way it does.
 | [`M32.md`](M32.md) | expose V2 to ACP and MCP hosts without changing the core |
 | [`M33.md`](M33.md) | one reviewer adapter seam; Hermes is the reference adapter, not the engine |
 | [`M34.md`](M34.md) | closing review breakpoints: the verdict on claim merge, two-clean sampling and strict proof mode |
+| [`M35.md`](M35.md) | closing the residual breakpoints: both Linux systems, the installed/source doctor, the single-sample opt-in, selector emission and the milestone runner |
 
 The series has gaps — `M21`–`M24` and `M27` have no record here. Those changes
 went in without a decision record; this page does not invent one after the fact.

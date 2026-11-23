@@ -18,6 +18,10 @@ on:
         description: Treat a blocking finding proven only by quotation as incomplete
         required: false
         default: "false"
+      allow-single-sample:
+        description: Allow one sample; the two-clean rule does not apply
+        required: false
+        default: "false"
       time-budget:
         description: Seconds after which no new unit is started
         required: false
@@ -51,6 +55,7 @@ jobs:
           base: ${{ inputs.base }}
           samples: ${{ inputs.samples }}
           require-executed-proofs: ${{ inputs.require-executed-proofs }}
+          allow-single-sample: ${{ inputs.allow-single-sample }}
           time-budget: ${{ inputs.time-budget }}
           reasoning: ${{ inputs.reasoning }}
 

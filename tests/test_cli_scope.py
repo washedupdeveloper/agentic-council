@@ -51,6 +51,7 @@ def _review(repo: Path, base: str, binary: Path, capture: Path,
     code = cli.main([
         command, "-C", str(repo), "--base", base, "--reviewer", str(binary),
         "--no-stream", "--no-sandbox", "--no-ephemeral", "--samples", "1",
+        "--allow-single-sample",
         "--context-depth", "0", "--run-id", run_id, *extra,
     ])
     assert code == 0

@@ -281,6 +281,14 @@ MUTATIONS: tuple[Mutation, ...] = (
              "domain/verdict.py",
              "if quoted and executed_only:",
              "if False:"),
+    Mutation("doctor-source-version-ignored",
+             "doctor.py",
+             "if installed == source_version:",
+             "if True:"),
+    Mutation("single-sample-opt-in-ignored",
+             "request.py",
+             "if self.samples == 1 and not self.allow_single_sample:",
+             "if False:"),
 )
 
 

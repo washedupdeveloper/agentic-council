@@ -88,6 +88,8 @@ def add_review_arguments(parser: argparse.ArgumentParser, *, advice: bool,
                         help="never review paths matching GLOB (repeatable; exclude wins)")
     parser.add_argument("--samples", type=samples, default=None,
                         help="samples: N, or auto (default: 1 clean, 2 to confirm, 3 to break a tie); per unit when sliced")
+    parser.add_argument("--allow-single-sample", action="store_true",
+                        help="allow --samples 1: a deliberate one-sample review (default: refused)")
     parser.add_argument("--agent", default=DEFAULT_AGENT,
                         help="reviewer adapter to use (default: hermes)")
     parser.add_argument("--profile", default=DEFAULT_PROFILE, help="profile for an adapter that uses one (Hermes)")
@@ -222,6 +224,8 @@ def build_parser() -> argparse.ArgumentParser:
                         help="executable for the selected adapter (default: the adapter's default)")
     doctor.add_argument("--probe-timeout", type=positive, default=60, metavar="SECONDS",
                         help="how long the profile has to answer the probe (default: 60)")
+    doctor.add_argument("--source", type=path, default=None, metavar="DIR",
+                        help="source tree whose declared version the installed build is compared with")
     doctor.add_argument("--json", action="store_true", help="print the checks as JSON")
 
     setup = sub.add_parser("setup", help="install this tool's skills from a skill library")

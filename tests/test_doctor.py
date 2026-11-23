@@ -83,3 +83,46 @@ def test_doctor_exits_0_when_every_check_passes(monkeypatch: pytest.MonkeyPatch,
     out = capsys.readouterr().out
     assert "fail" not in out
     assert out.count("ok") >= 4
+
+
+def test_doctor_reports_a_matching_source_version(
+        tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    (tmp_path / "pyproject.toml").write_text('[project]\nversion = "2.0.0"\n',
+                                              encoding="utf-8")
+    monkeypatch.setattr(doctor, "current_version", lambda: "2.0.0")
+    check = doctor.check_source(tmp_path)
+    assert check is not None
+    assert check.status == "ok"
+
+
+def test_doctor_reports_a_source_version_mismatch(
+        tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    (tmp_path / "pyproject.toml").write_text('[project]\nversion = "2.0.0"\n',
+                                              encoding="utf-8")
+    monkeypatch.setattr(doctor, "current_version", lambda: "1.9.0")
+    check = doctor.check_source(tmp_path)
+    assert check is not None
+    assert check.status == "fail"
+    assert "1.9.0" in check.detail and "2.0.0" in check.detail
+
+
+def test_doctor_refuses_a_source_without_a_version(
+        tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    (tmp_path / "pyproject.toml").write_text("[project]\nname = \"council\"\n",
+                                              encoding="utf-8")
+    monkeypatch.setattr(doctor, "current_version", lambda: "2.0.0")
+    check = doctor.check_source(tmp_path)
+    assert check is not None
+    assert check.status == "fail"
+    assert "cannot read project.version" in check.detail
+
+
+def test_doctor_does_not_claim_a_source_run_matches(
+        tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    (tmp_path / "pyproject.toml").write_text('[project]\nversion = "2.0.0"\n',
+                                              encoding="utf-8")
+    monkeypatch.setattr(doctor, "current_version", lambda: doctor.SOURCE_VERSION)
+    check = doctor.check_source(tmp_path)
+    assert check is not None
+    assert check.status == "warn"
+    assert "no installed version" in check.detail

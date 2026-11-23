@@ -137,7 +137,7 @@ def test_a_review_can_be_scoped_and_names_what_it_dropped(tmp_path: Path) -> Non
         seen.append(prompt)
         return _body()
 
-    request = ReviewRequest(repo=repo, base=base, samples=1, run_id="scope",
+    request = ReviewRequest(repo=repo, base=base, samples=1, allow_single_sample=True, run_id="scope",
                             state_dir=tmp_path / "state",
                             include=("src/**",))
     report = review(request, runner)
@@ -180,7 +180,7 @@ def test_staged_review_records_the_index_source(tmp_path: Path) -> None:
         seen.append(prompt)
         return _body()
 
-    report = review(ReviewRequest(repo=repo, base=base, samples=1, run_id="staged",
+    report = review(ReviewRequest(repo=repo, base=base, samples=1, allow_single_sample=True, run_id="staged",
                                   state_dir=tmp_path / "state", staged=True), runner)
     payload = json.loads((report.run_dir / "verdict.json").read_text(encoding="utf-8"))
     assert payload["staged"] is True

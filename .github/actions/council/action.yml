@@ -20,6 +20,10 @@ inputs:
     description: Treat a blocking finding proven only by quotation as incomplete
     required: false
     default: "false"
+  allow-single-sample:
+    description: Allow one sample; the two-clean rule does not apply
+    required: false
+    default: "false"
   context-depth:
     description: 0 diff only, 1 enclosing function, 2 +one call level, 3 +two
     required: false
@@ -79,6 +83,7 @@ runs:
         BASE: ${{ inputs.base }}
         SAMPLES: ${{ inputs.samples }}
         REQUIRE_EXECUTED: ${{ inputs.require-executed-proofs }}
+        ALLOW_SINGLE_SAMPLE: ${{ inputs.allow-single-sample }}
         REASONING: ${{ inputs.reasoning }}
         STREAM: ${{ inputs.stream }}
         IDLE: ${{ inputs.idle-timeout }}
@@ -91,6 +96,7 @@ runs:
           --time-budget "${{ inputs.time-budget }}"
           --context-depth "${{ inputs.context-depth }}")
         if [ -n "$SAMPLES" ]; then args+=(--samples "$SAMPLES"); fi
+        if [ "$ALLOW_SINGLE_SAMPLE" = "true" ] && [ "$SAMPLES" = "1" ]; then args+=(--allow-single-sample); fi
         if [ "$REQUIRE_EXECUTED" = "true" ]; then args+=(--require-executed-proofs); fi
         if [ -n "$BASE" ]; then args+=(--base "$BASE"); fi
         if [ -n "$REASONING" ]; then args+=(--reasoning "$REASONING"); fi

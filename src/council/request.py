@@ -38,6 +38,7 @@ class ReviewRequest:
     repo: Path
     base: str | None = None
     samples: int | None = None
+    allow_single_sample: bool = False
     agent: str = DEFAULT_AGENT
     reviewer: str = ""
     profile: str = DEFAULT_PROFILE
@@ -67,8 +68,12 @@ class ReviewRequest:
 
     def validate(self) -> None:
         """Reject a malformed request before any repository or model work."""
+        if not isinstance(self.allow_single_sample, bool):
+            raise ValueError("allow_single_sample must be a boolean")
         if self.samples is not None:
             _integer("samples", self.samples, minimum=1)
+            if self.samples == 1 and not self.allow_single_sample:
+                raise ValueError("a one-sample review requires --allow-single-sample")
         _integer("the prompt limit", self.max_prompt_bytes, minimum=1)
         _integer("the window limit", self.max_windows, minimum=1)
         _integer("context depth", self.context_depth)

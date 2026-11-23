@@ -22,9 +22,15 @@ concurrency:
 
 jobs:
   gate:
-    name: nix flake check
-    runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    name: nix flake check (${{ matrix.system }})
+    # Both declared Linux systems run the same gate. A local run reports the
+    # systems it omitted; this matrix is where aarch64 is actually checked.
+    strategy:
+      fail-fast: false
+      matrix:
+        system: [ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.system }}
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
         with:

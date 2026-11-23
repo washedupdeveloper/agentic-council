@@ -1295,3 +1295,40 @@ id = "a-strict-fail-names-a-quotation-only-blocker"
 text = "A strict run names a quotation-only blocker even when another blocker was executed."
 check = "python3 -m pytest tests/test_strength.py::test_a_strict_run_names_a_quotation_only_finding_beside_an_executed_one -q"
 falsifier = "strict-fail-hides-quotation"
+
+[[claim]]
+id = "the-doctor-detects-a-stale-install"
+text = "The doctor check fails when the installed version and the source version differ."
+check = "python3 -m pytest tests/test_doctor.py::test_doctor_reports_a_source_version_mismatch -q"
+falsifier = "doctor-source-version-ignored"
+
+[[claim]]
+id = "a-single-sample-run-needs-an-explicit-opt-in"
+text = "A one-sample review is refused unless the caller allows it."
+check = "python3 -m pytest tests/test_run.py::test_one_sample_without_the_opt_in_is_refused -q"
+falsifier = "single-sample-opt-in-ignored"
+
+[[claim]]
+id = "the-shipped-gate-checks-both-linux-systems"
+text = "The CI gate names both declared Linux systems."
+check = "python3 -m pytest tests/test_governance.py::test_the_gate_matrix_names_both_declared_linux_systems -q"
+
+[[claim]]
+id = "the-shipped-gate-exposes-the-single-sample-opt-in"
+text = "The shipped review action can pass the single-sample opt-in."
+check = "python3 -m pytest tests/test_governance.py::test_the_review_action_exposes_the_single_sample_opt_in -q"
+
+[[claim]]
+id = "the-milestone-runner-ticks-only-a-passing-task"
+text = "The milestone runner ticks a task only after its acceptance predicate passes."
+check = "python3 -m pytest tests/test_milestone.py::test_a_failing_predicate_leaves_the_task_unticked -q"
+
+[[claim]]
+id = "the-milestone-runner-refuses-a-commit"
+text = "The milestone runner refuses git commit to its worker."
+check = "python3 -m pytest tests/test_milestone.py::test_the_worker_cannot_git_commit -q"
+
+[[claim]]
+id = "shell-scripts-declare-and-parse-as-bash"
+text = "Every shipped shell script declares bash and parses under bash."
+check = "python3 -m pytest tests/test_shell_scripts.py -q"

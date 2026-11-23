@@ -67,7 +67,7 @@ RULE = '[[rules]]\nglob = "a.py"\ndoc = "docs/rule.md"\n'
 def test_a_rule_document_reaches_the_prompt(tmp_path: Path) -> None:
     repo = make_repo(tmp_path, RULE)
     seen, runner = prompts()
-    report = review(ReviewRequest(repo=repo, samples=1, run_id="rules"), runner)
+    report = review(ReviewRequest(repo=repo, samples=1, allow_single_sample=True, run_id="rules"), runner)
 
     assert SENTINEL in seen[0]
     assert "## Repository rules" in seen[0]
@@ -80,7 +80,7 @@ def test_a_rule_document_reaches_the_prompt(tmp_path: Path) -> None:
 def test_a_rule_that_matches_nothing_is_not_recorded(tmp_path: Path) -> None:
     repo = make_repo(tmp_path, '[[rules]]\nglob = "other/**"\ndoc = "docs/rule.md"\n')
     seen, runner = prompts()
-    report = review(ReviewRequest(repo=repo, samples=1, run_id="unused"), runner)
+    report = review(ReviewRequest(repo=repo, samples=1, allow_single_sample=True, run_id="unused"), runner)
 
     assert SENTINEL not in seen[0]
     assert "## Repository rules" not in seen[0]
@@ -92,14 +92,14 @@ def test_a_rule_document_that_cannot_be_read_is_a_start_failure(tmp_path: Path) 
     repo = make_repo(tmp_path, '[[rules]]\nglob = "a.py"\ndoc = "docs/gone.md"\n')
     seen, runner = prompts()
     with pytest.raises(ReviewError, match="docs/gone.md"):
-        review(ReviewRequest(repo=repo, samples=1, run_id="missing"), runner)
+        review(ReviewRequest(repo=repo, samples=1, allow_single_sample=True, run_id="missing"), runner)
     assert seen == []
 
 
 def test_a_large_rule_document_is_capped_and_marked(tmp_path: Path) -> None:
     repo = make_repo(tmp_path, RULE, doc="zq" * 12500)
     seen, runner = prompts()
-    report = review(ReviewRequest(repo=repo, samples=1, run_id="capped"), runner)
+    report = review(ReviewRequest(repo=repo, samples=1, allow_single_sample=True, run_id="capped"), runner)
 
     assert "truncated at 20000 bytes" in seen[0]
     # The document, not the whole prompt, is what the cap bounds: 20,000 bytes
@@ -114,7 +114,7 @@ def test_two_rules_naming_one_document_read_it_once(tmp_path: Path) -> None:
              '[[rules]]\nglob = "*.py"\ndoc = "docs/rule.md"\n')
     repo = make_repo(tmp_path, rules)
     seen, runner = prompts()
-    report = review(ReviewRequest(repo=repo, samples=1, run_id="twice"), runner)
+    report = review(ReviewRequest(repo=repo, samples=1, allow_single_sample=True, run_id="twice"), runner)
 
     assert seen[0].count(SENTINEL) == 1
     payload = json.loads((report.run_dir / "verdict.json").read_text(encoding="utf-8"))
@@ -127,7 +127,7 @@ def test_a_rule_document_is_counted_in_every_window(tmp_path: Path) -> None:
     (repo / "a.py").write_text("".join(f"line {index} = {index}\n" for index in range(200)),
                                encoding="utf-8")
     seen, runner = prompts()
-    report = review(ReviewRequest(repo=repo, samples=1, run_id="windowed-rules",
+    report = review(ReviewRequest(repo=repo, samples=1, allow_single_sample=True, run_id="windowed-rules",
                                   max_prompt_bytes=6000, window_large_files=True), runner)
     payload = json.loads((report.run_dir / "verdict.json").read_text(encoding="utf-8"))
     assert payload["verdict"] == "pass"
@@ -138,7 +138,7 @@ def test_a_rule_document_is_counted_in_every_window(tmp_path: Path) -> None:
 
 def test_the_plan_names_the_rules_a_review_would_use(tmp_path: Path) -> None:
     repo = make_repo(tmp_path, RULE)
-    planned = plan(ReviewRequest(repo=repo, samples=1, run_id="planned"))
+    planned = plan(ReviewRequest(repo=repo, samples=1, allow_single_sample=True, run_id="planned"))
     assert [hit.doc for hit in planned.rules] == ["docs/rule.md"]
     assert planned.rules[0].paths == ("a.py",)
 

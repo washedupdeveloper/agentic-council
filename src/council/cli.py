@@ -139,6 +139,7 @@ def _request(args: argparse.Namespace, *, allow: bool | None = None) -> ReviewRe
     """The request the CLI's parsed arguments describe."""
     return ReviewRequest(
         repo=args.repo, base=getattr(args, "base", None), samples=args.samples,
+        allow_single_sample=args.allow_single_sample,
         agent=args.agent, reviewer=args.reviewer or "",
         profile=args.profile, prompt=args.prompt, run_id=args.run_id,
         context_urls=tuple(args.context_url),
@@ -390,7 +391,7 @@ def _doctor(args: argparse.Namespace) -> int:
     runner = _agent_runner(args, timeout=args.probe_timeout)
     binary = args.reviewer or adapter.default_binary
     checks = diagnostics.run(args.agent, runner=runner, binary=binary,
-                             probe_timeout=args.probe_timeout)
+                             probe_timeout=args.probe_timeout, source=args.source)
     if args.json:
         print(json.dumps([asdict(check) for check in checks], indent=2))
     else:

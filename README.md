@@ -143,7 +143,8 @@ to the repository's `.gitignore`. Reviewing does not require it.
 What each step does:
 
 - **`council doctor`** checks `git`, the reviewer binary, `bwrap`, and whether
-  the profile answers a short probe. Fix the reported prerequisite before
+  the profile answers a short probe. With `--source DIR` it also compares the
+  installed version with that source tree. Fix the reported prerequisite before
   spending a model call.
 - **`council review --plan`** resolves the change and prints the units, prompt
   sizes, context depth and skipped files. It calls no reviewer and writes no run
@@ -291,7 +292,8 @@ that is too large. The main levers are:
   own unit. This costs one sample per window; `--max-windows N` caps it at 200
   by default.
 - `--samples N` — explicit sample count; `--samples auto` asks once for a clean
-  unit, twice to confirm a finding, and three times to break a tie.
+  unit, twice to confirm a finding, and three times to break a tie. A count of
+  1 is refused unless `--allow-single-sample` is also passed.
 
 Windows are disjoint: a defect spanning a window boundary can be missed. That
 trade-off is recorded in the run rather than hidden. `council ci` never asks an
@@ -367,6 +369,7 @@ it always prints JSON and exits with the verdict.
 | `--include GLOB` | all paths | keep only matching paths (repeatable) |
 | `--exclude GLOB` | none | drop matching paths (repeatable; exclude wins) |
 | `--samples N` | auto | samples per unit: N, or auto (1/2/3 policy) |
+| `--allow-single-sample` | off | allow `--samples 1`; refused without it |
 | `--agent NAME` | `hermes` | reviewer adapter; `council agents` lists the build |
 | `--profile NAME` | `council-generalist` | profile for adapters that use one (Hermes) |
 | `--reviewer BIN` | adapter default | executable for the selected adapter |
@@ -409,7 +412,7 @@ it always prints JSON and exits with the verdict.
 | `council agents` | `--json` |
 | `council evidence add RUN_ID IMAGE…` | `--label TEXT`, `-C, --repo PATH`, `--state-root DIR`, `--json` |
 | `council evidence list RUN_ID` | `-C, --repo PATH`, `--state-root DIR`, `--json` |
-| `council doctor` | `--agent NAME`, `--profile NAME`, `--reviewer BIN`, `--probe-timeout N`, `--json` |
+| `council doctor` | `--agent NAME`, `--profile NAME`, `--reviewer BIN`, `--probe-timeout N`, `--source DIR`, `--json` |
 | `council setup skill NAME…` | `--library DIR`, `--dest DIR`, `--agent NAME`, `--list`, `--force`, `--dry-run` |
 | `council --version` | print the installed version |
 | `council -h` / `council --help` | command overview |

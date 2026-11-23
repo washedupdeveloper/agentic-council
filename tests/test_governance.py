@@ -54,3 +54,19 @@ def test_the_review_workflow_defaults_to_auto_sampling() -> None:
     text = read(".github/workflows/council.yml")
     samples = text.split("      samples:", 1)[1].split("      time-budget:", 1)[0]
     assert 'default: ""' in samples
+
+
+def test_the_gate_matrix_names_both_declared_linux_systems() -> None:
+    gate = read(".github/workflows/gate.yml")
+    assert "ubuntu-24.04-arm" in gate
+    assert "matrix:" in gate
+    flake = read("flake.nix")
+    assert '"x86_64-linux"' in flake
+    assert '"aarch64-linux"' in flake
+
+
+def test_the_review_action_exposes_the_single_sample_opt_in() -> None:
+    text = read(".github/actions/council/action.yml")
+    assert "allow-single-sample:" in text
+    assert "ALLOW_SINGLE_SAMPLE" in text
+    assert 'if [ "$ALLOW_SINGLE_SAMPLE" = "true" ] && [ "$SAMPLES" = "1" ]; then' in text

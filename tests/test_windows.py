@@ -55,7 +55,7 @@ def body() -> str:
 
 
 def wanted(repo: Path, prompt: Path, run_id: str, **overrides: Any) -> ReviewRequest:
-    options: dict[str, Any] = {"repo": repo, "base": "HEAD", "samples": 1,
+    options: dict[str, Any] = {"repo": repo, "base": "HEAD", "samples": 1, "allow_single_sample": True,
                                "run_id": run_id, "prompt": prompt,
                                "max_prompt_bytes": BUDGET}
     options.update(overrides)

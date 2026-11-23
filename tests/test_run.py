@@ -151,7 +151,7 @@ def test_every_finding_points_at_the_sample_that_asserted_it(tmp_path: Path) -> 
 
 def test_a_baseline_suppresses_an_accepted_finding(tmp_path: Path) -> None:
     repo, _ = make_repo(tmp_path)
-    first = review(ReviewRequest(repo=repo, samples=1, run_id="before"),
+    first = review(ReviewRequest(repo=repo, samples=1, allow_single_sample=True, run_id="before"),
                    lambda _: body({"security": [secret()]}))
     assert first.verdict is Verdict.FAIL
     path = Path("baseline.json")
@@ -160,7 +160,7 @@ def test_a_baseline_suppresses_an_accepted_finding(tmp_path: Path) -> None:
                                         created=created,
                                         expires=created + timedelta(days=90)))
 
-    second = review(ReviewRequest(repo=repo, samples=1, run_id="after",
+    second = review(ReviewRequest(repo=repo, samples=1, allow_single_sample=True, run_id="after",
                                   baseline=path),
                     lambda _: body({"security": [secret()]}))
     assert second.verdict is Verdict.PASS
@@ -171,18 +171,19 @@ def test_a_baseline_suppresses_an_accepted_finding(tmp_path: Path) -> None:
     assert payload["verdict"] == "pass"
     assert payload["evidence_verdict"] == "fail"
     assert payload["baseline"]["suppressed"] == ["F-01"]
+    assert payload["sample_policy"] == "single-sample allowed by --allow-single-sample"
 
 
 def test_a_baseline_does_not_suppress_a_new_finding(tmp_path: Path) -> None:
     repo, _ = make_repo(tmp_path)
-    first = review(ReviewRequest(repo=repo, samples=1, run_id="before2"),
+    first = review(ReviewRequest(repo=repo, samples=1, allow_single_sample=True, run_id="before2"),
                    lambda _: body({"security": [secret()]}))
     path = repo / "baseline.json"
     created = date.today()
     write_baseline(path, from_run(first.run_dir, owner="team", reason="old issue",
                                   created=created, expires=created + timedelta(days=90)))
 
-    second = review(ReviewRequest(repo=repo, samples=1, run_id="after2", baseline=path),
+    second = review(ReviewRequest(repo=repo, samples=1, allow_single_sample=True, run_id="after2", baseline=path),
                     lambda _: body({"security": [secret(claim="A different issue.")]}))
     assert second.verdict is Verdict.FAIL
     assert second.gate is not None
@@ -639,7 +640,7 @@ def make_two_changes(tmp_path: Path) -> tuple[Path, Path]:
 def test_a_change_too_large_for_one_prompt_is_sliced_by_file(tmp_path: Path) -> None:
     repo, prompt = make_two_changes(tmp_path)
     report = review(
-        ReviewRequest(repo=repo, base="HEAD", samples=1, run_id="sliced", prompt=prompt,
+        ReviewRequest(repo=repo, base="HEAD", samples=1, allow_single_sample=True, run_id="sliced", prompt=prompt,
                       max_prompt_bytes=200),
         lambda _: body())
 
@@ -662,7 +663,7 @@ def test_a_finding_in_one_unit_fails_the_run(tmp_path: Path) -> None:
         return body()
 
     report = review(
-        ReviewRequest(repo=repo, base="HEAD", samples=1, run_id="slice-fail", prompt=prompt,
+        ReviewRequest(repo=repo, base="HEAD", samples=1, allow_single_sample=True, run_id="slice-fail", prompt=prompt,
                       max_prompt_bytes=200),
         runner)
 
@@ -681,7 +682,7 @@ def test_an_unreviewed_unit_makes_the_run_incomplete(tmp_path: Path) -> None:
         return body()
 
     report = review(
-        ReviewRequest(repo=repo, base="HEAD", samples=1, run_id="slice-hole", prompt=prompt,
+        ReviewRequest(repo=repo, base="HEAD", samples=1, allow_single_sample=True, run_id="slice-hole", prompt=prompt,
                       max_prompt_bytes=200),
         runner)
 
@@ -695,7 +696,7 @@ def test_a_unit_row_has_the_documented_keys(tmp_path: Path) -> None:
     """`verdict.json`'s unit row is a contract; this is the list of its keys."""
     repo, prompt = make_two_changes(tmp_path)
     report = review(
-        ReviewRequest(repo=repo, base="HEAD", samples=1, run_id="row-keys", prompt=prompt,
+        ReviewRequest(repo=repo, base="HEAD", samples=1, allow_single_sample=True, run_id="row-keys", prompt=prompt,
                       max_prompt_bytes=200),
         lambda _: body())
     payload = json.loads((report.run_dir / "verdict.json").read_text(encoding="utf-8"))
@@ -723,7 +724,7 @@ def test_a_file_too_large_is_split_by_hunk_and_keeps_its_name(tmp_path: Path) ->
     prompt.write_text(SLICE_PROMPT, encoding="utf-8")
 
     report = review(
-        ReviewRequest(repo=repo, base="HEAD", samples=1, run_id="hunks", prompt=prompt,
+        ReviewRequest(repo=repo, base="HEAD", samples=1, allow_single_sample=True, run_id="hunks", prompt=prompt,
                       max_prompt_bytes=230),
         lambda _: body())
 
@@ -738,7 +739,7 @@ def test_the_same_place_reported_by_two_units_is_merged_once(tmp_path: Path) -> 
     repo, prompt = make_two_changes(tmp_path)
 
     report = review(
-        ReviewRequest(repo=repo, base="HEAD", samples=1, run_id="slice-dupe", prompt=prompt,
+        ReviewRequest(repo=repo, base="HEAD", samples=1, allow_single_sample=True, run_id="slice-dupe", prompt=prompt,
                       max_prompt_bytes=200),
         lambda _: body({"security": [secret()]}))
 
@@ -759,7 +760,7 @@ def test_a_unit_keeps_a_finding_that_cites_another_file(tmp_path: Path) -> None:
         return body()
 
     report = review(
-        ReviewRequest(repo=repo, base="HEAD", samples=1, run_id="slice-callee",
+        ReviewRequest(repo=repo, base="HEAD", samples=1, allow_single_sample=True, run_id="slice-callee",
                       prompt=prompt, max_prompt_bytes=200),
         runner)
 
@@ -774,7 +775,7 @@ def test_a_spent_time_budget_leaves_the_remaining_units_unreviewed(
     monkeypatch.setattr(time, "monotonic", lambda: next(clock))
 
     report = review(
-        ReviewRequest(repo=repo, base="HEAD", samples=1, run_id="budget", prompt=prompt,
+        ReviewRequest(repo=repo, base="HEAD", samples=1, allow_single_sample=True, run_id="budget", prompt=prompt,
                       max_prompt_bytes=200, time_budget=10),
         lambda _: body())
 
@@ -790,9 +791,9 @@ def test_a_spent_time_budget_leaves_the_remaining_units_unreviewed(
 def test_the_reasoning_level_is_recorded_and_changes_the_instrument(
         tmp_path: Path) -> None:
     repo, _ = make_repo(tmp_path)
-    plain = review(ReviewRequest(repo=repo, samples=1, run_id="plain"),
+    plain = review(ReviewRequest(repo=repo, samples=1, allow_single_sample=True, run_id="plain"),
                    lambda _: body())
-    quiet = review(ReviewRequest(repo=repo, samples=1, run_id="quiet",
+    quiet = review(ReviewRequest(repo=repo, samples=1, allow_single_sample=True, run_id="quiet",
                                  reasoning="none"),
                    lambda _: body())
     payload = json.loads((quiet.run_dir / "verdict.json").read_text(encoding="utf-8"))
@@ -803,7 +804,7 @@ def test_the_reasoning_level_is_recorded_and_changes_the_instrument(
 def test_an_ephemeral_run_writes_only_to_its_state_directory(tmp_path: Path) -> None:
     repo, _ = make_repo(tmp_path)
     state = tmp_path / "ephemeral-run"
-    report = review(ReviewRequest(repo=repo, samples=1, run_id="eph",
+    report = review(ReviewRequest(repo=repo, samples=1, allow_single_sample=True, run_id="eph",
                                   state_dir=state),
                     lambda _: body())
     assert report.run_dir == state
@@ -844,7 +845,7 @@ def test_a_tracked_file_with_invalid_utf8_is_reviewable(tmp_path: Path) -> None:
         seen.append(prompt)
         return body()
 
-    report = review(ReviewRequest(repo=repo, base="HEAD", samples=1, run_id="raw"),
+    report = review(ReviewRequest(repo=repo, base="HEAD", samples=1, allow_single_sample=True, run_id="raw"),
                     runner)
     assert report.verdict is Verdict.PASS
     assert "\ufffd" in seen[0]
@@ -916,7 +917,7 @@ def test_a_plan_names_the_units_and_writes_nothing(tmp_path: Path) -> None:
 
 def test_the_transport_and_idle_timeout_are_recorded(tmp_path: Path) -> None:
     repo, _ = make_repo(tmp_path)
-    report = review(ReviewRequest(repo=repo, samples=1, run_id="streamed",
+    report = review(ReviewRequest(repo=repo, samples=1, allow_single_sample=True, run_id="streamed",
                                   stream=True, idle_timeout=77),
                     lambda _: body())
     payload = json.loads((report.run_dir / "verdict.json").read_text(encoding="utf-8"))
@@ -950,7 +951,7 @@ def test_a_missing_unit_is_named_even_when_a_finding_is_unsettled(
         "argv": ["sh", "-c", "true"], "expect": {"exit": "zero"}}})
 
     report = review(
-        ReviewRequest(repo=repo, base="HEAD", samples=1, run_id="budget-unsettled",
+        ReviewRequest(repo=repo, base="HEAD", samples=1, allow_single_sample=True, run_id="budget-unsettled",
                       prompt=prompt, max_prompt_bytes=200, time_budget=10),
         lambda _: body({"security": [finding]}))
 
@@ -980,3 +981,20 @@ def test_a_unit_that_cannot_fit_at_depth_zero_is_refused_with_its_name(
                lambda _: body())
 
     assert "for a.py" in str(raised.value)
+
+
+def test_one_sample_without_the_opt_in_is_refused(tmp_path: Path) -> None:
+    repo, _ = make_repo(tmp_path)
+    with pytest.raises(ReviewError, match="allow-single-sample"):
+        review(ReviewRequest(repo=repo, samples=1, run_id="one-no"), lambda _: body())
+
+
+def test_one_sample_with_the_opt_in_is_recorded(tmp_path: Path) -> None:
+    repo, _ = make_repo(tmp_path)
+    report = review(ReviewRequest(repo=repo, samples=1, allow_single_sample=True,
+                                  run_id="one-yes"), lambda _: body())
+    payload = json.loads((report.run_dir / "verdict.json").read_text(encoding="utf-8"))
+    assert payload["samples_requested"] == 1
+    assert payload["samples_run"] == 1
+    assert payload["allow_single_sample"] is True
+    assert report.verdict is Verdict.PASS

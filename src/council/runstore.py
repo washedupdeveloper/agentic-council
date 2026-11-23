@@ -174,6 +174,8 @@ def write_verdict(document: VerdictDocument) -> None:
             "head": request.pull_request.head,
         },
         "samples_requested": request.samples if request.samples is not None else "auto",
+        "allow_single_sample": request.allow_single_sample,
+        "sample_policy": "single-sample allowed by --allow-single-sample" if request.allow_single_sample else ("fixed count" if request.samples is not None else "automatic"),
         "samples_run": document.samples_run,
         "agreement": document.agreement,
         "samples": [

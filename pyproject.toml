@@ -20,6 +20,7 @@ dev = [
 ]
 mcp = ["mcp>=2.3.0,<3"]
 acp = ["agent-client-protocol>=1.0.0,<2"]
+direct = []
 server = ["mcp>=2.3.0,<3", "agent-client-protocol>=1.0.0,<2"]
 
 [project.scripts]
