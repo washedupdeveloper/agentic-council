@@ -28,7 +28,8 @@ def test_the_sandbox_wrapper_leaves_no_writes() -> None:
     assert not tmp_marker.exists()
 
 
-def test_a_repo_under_tmp_binds_only_the_repo(tmp_path: Path) -> None:
+def test_a_repo_under_tmp_binds_only_the_repo(
+        tmp_path: Path, request: pytest.FixtureRequest) -> None:
     fake = tmp_path / "bin" / "bwrap"
     fake.parent.mkdir()
     capture = tmp_path / "args.txt"
@@ -40,6 +41,9 @@ def test_a_repo_under_tmp_binds_only_the_repo(tmp_path: Path) -> None:
     if not os.path.isdir("/tmp") or not os.access("/tmp", os.W_OK):
         pytest.skip("no writable /tmp here")
     under_tmp = Path(tempfile.mkdtemp(dir="/tmp"))
+    # The workspace must live under the real /tmp for this test, so it cannot
+    # use tmp_path; remove it so a run leaves nothing behind.
+    request.addfinalizer(lambda: shutil.rmtree(under_tmp, ignore_errors=True))
     repo = under_tmp / "repo"
     repo.mkdir()
     home = tmp_path / "home"
@@ -58,3 +62,13 @@ def test_a_repo_under_tmp_binds_only_the_repo(tmp_path: Path) -> None:
     index = args.index("--dir")
     assert args[index + 1] == str(repo.parent)
     assert args[index + 2:index + 5] == ["--ro-bind", str(repo), str(repo)]
+
+
+def test_a_repository_under_any_masked_directory_is_bound_back() -> None:
+    from council.domain.sandbox import command
+
+    argv = command(["true"], Path("/srv/work/repo"), bwrap="bwrap",
+                   masked=("/home", "/root", "/srv"))
+    assert "--tmpfs" in argv and "/srv" in argv
+    assert str(Path("/srv/work/repo")) in argv
+    assert "--ro-bind" in argv

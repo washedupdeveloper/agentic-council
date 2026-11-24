@@ -43,11 +43,14 @@ def command(argv: Sequence[str], repo: Path, *, bwrap: str,
     target = Path(repo)
     # A repo under /tmp lives under the tmpfs; create its mountpoint first.
     mountpoint = ["--dir", str(target.parent)] if target.is_relative_to("/tmp") else []
-    # The user home directories are masked after the host root bind. A repo
-    # living under one of them is bound back read-only before the overlay.
+    # The masked directories are masked after the host root bind. A repo living
+    # under one of them is bound back read-only before the overlay, so masking
+    # does not hide the work the command was asked to do.
     home_mounts: list[str] = []
-    if target.is_relative_to("/home") or target.is_relative_to("/root"):
-        home_mounts = ["--dir", str(target.parent), "--ro-bind", str(target), str(target)]
+    for name in masked:
+        if target.is_relative_to(name):
+            home_mounts = ["--dir", str(target.parent), "--ro-bind", str(target), str(target)]
+            break
     return [
         bwrap,
         "--unshare-all",        # net, pid, ipc, uts, cgroup, user

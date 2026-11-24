@@ -205,13 +205,14 @@ def test_a_mixed_inline_list_keeps_every_predicate(tmp_path: Path) -> None:
     (change / "routing.yaml").write_text(
         'schema: 1\nchange: demo\ntasks:\n'
         '  "1.1":\n    type: feature\n'
-        '    verify: ["test -f done.txt", test -f done.txt]\n'
-        '  "1.2":\n    type: feature\n    verify:\n      - test -f done.txt\n',
+        '    verify: ["test -f quoted.txt", test -f unquoted.txt]\n'
+        '  "1.2":\n    type: feature\n    verify:\n      - test -f other.txt\n',
         encoding="utf-8",
     )
     result = run_tool(root, change, fake, home, command="plan")
     assert result.returncode == 0, result.stderr
-    assert result.stdout.count("test -f done.txt") >= 2
+    first = result.stdout.split("1.2", 1)[0]
+    assert "quoted.txt" in first and "unquoted.txt" in first
 
 
 def test_a_quoted_hash_is_not_a_comment(tmp_path: Path) -> None:
@@ -246,3 +247,47 @@ def test_a_doubled_apostrophe_is_literal_in_a_single_quoted_item() -> None:
     import runpy
     parse = runpy.run_path(str(ROOT / "tools" / "milestone.py"))["_inline_list"]
     assert parse("['it''s here']") == ["it's here"]
+
+
+def test_a_yaml_unicode_escape_is_decoded() -> None:
+    import runpy
+    parse = runpy.run_path(str(ROOT / "tools" / "milestone.py"))["_inline_list"]
+    assert parse(r'["test\u0020-f done"]') == ["test -f done"]
+
+
+def test_a_yaml_tab_escape_is_decoded() -> None:
+    import runpy
+    parse = runpy.run_path(str(ROOT / "tools" / "milestone.py"))["_inline_list"]
+    assert parse(r'["echo a\tb"]') == ["echo a\tb"]
+
+
+def test_a_backslash_that_is_not_an_escape_is_literal() -> None:
+    import runpy
+    parse = runpy.run_path(str(ROOT / "tools" / "milestone.py"))["_inline_list"]
+    assert parse(r'["echo \d"]') == [r"echo \d"]
+
+
+def test_the_yaml_line_and_paragraph_escapes_are_decoded() -> None:
+    import runpy
+    parse = runpy.run_path(str(ROOT / "tools" / "milestone.py"))["_inline_list"]
+    assert parse(r'["a\Lb\Pc"]') == ["a\u2028b\u2029c"]
+
+
+def test_a_quoted_trailing_space_is_kept() -> None:
+    import runpy
+    parse = runpy.run_path(str(ROOT / "tools" / "milestone.py"))["_inline_list"]
+    command = "test -f report\\ "
+    assert parse("['" + command + "', true]") == [command, "true"]
+
+
+def test_unquoted_surrounding_space_is_not_part_of_the_item() -> None:
+    import runpy
+    parse = runpy.run_path(str(ROOT / "tools" / "milestone.py"))["_inline_list"]
+    assert parse("[  test -f a  ,  true  ]") == ["test -f a", "true"]
+
+
+def test_space_between_a_closing_quote_and_the_comma_is_syntax() -> None:
+    import runpy
+    parse = runpy.run_path(str(ROOT / "tools" / "milestone.py"))["_inline_list"]
+    command = "test -f report\\ "
+    assert parse("['" + command + "' , true]") == [command, "true"]

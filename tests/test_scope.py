@@ -241,3 +241,22 @@ def test_scope_is_applied_before_slicing(tmp_path: Path,
     assert seen
     assert "src/a.py" in seen[0]
     assert "docs/b.md" not in seen[0]
+
+
+def test_an_unreadable_staged_config_is_an_error_not_a_default(tmp_path: Path) -> None:
+    """A path in the index that cannot be read must not fall back to policy."""
+    from council.prepare import _staged_config
+
+    def git(*args: str) -> None:
+        subprocess.run(["git", *args], cwd=tmp_path, check=True,
+                       capture_output=True, text=True)
+
+    git("init", "-q", "-b", "main")
+    git("config", "user.email", "council@example.invalid")
+    git("config", "user.name", "Council")
+    (tmp_path / "council.toml").write_text("not a valid config\n", encoding="utf-8")
+    git("add", "council.toml")
+    git("commit", "-qm", "config")
+
+    with pytest.raises(ReviewError, match="is not usable"):
+        _staged_config(tmp_path)

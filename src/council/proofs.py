@@ -191,10 +191,55 @@ def _argv_param(params: Mapping[str, Any]) -> list[str]:
     return argv
 
 
-#: A proof that could not import its own dependency is not evidence about the
-#: claim. `python` is commonly the name a reviewer writes while the sandbox has
-#: only `python3`; the allowlist decides whether either is permitted.
-_MISSING_DEPENDENCY = ("ModuleNotFoundError",)
+#: A proof whose command could not load its own dependency did not test the
+#: claim. Two shapes occur, and both begin the line: the exception itself, and
+#: the interpreter's own diagnostic. `-m` adds "Error while finding module
+#: specification" to the second.
+#:
+#: The line must *start* with one of them. A test that prints the exception text
+#: A diagnostic is an interpreter line, so it is classified at a line start.
+#:
+#: Stderr is read as it is. Stdout is read only for a line carrying pytest's own
+#: `E   ` report marker: that is pytest reporting an exception, not a proof
+#: printing. A bare stdout line is never a diagnostic, so a proof that prints
+#: without a trailing newline cannot glue itself onto one, and a test asserting
+#: on a quoted exception stays a test result.
+_DEPENDENCY_LINE = re.compile(
+    r"^(?:ModuleNotFoundError:|(?:[^:\s]*/)?python[0-9.]*: )")
+#: The only thing an import failure says. `-m` wraps it in a "finding module
+#: specification" clause, but a bug inside an installed package reports that
+#: same clause without any missing import, so the clause is not a signal.
+_DEPENDENCY_TEXT = ("No module named",)
+
+
+def _missing_dependency(stdout: str, stderr: str) -> str | None:
+    """The import diagnostic, if the proof environment lacked a dependency.
+
+    Stderr is classified at a line start, which is where an interpreter writes
+    it. Stdout is classified only when a line carries pytest's own `E   ` report
+    marker *and* starts with the diagnostic after it: that is pytest reporting
+    an exception, not a proof quoting one. Anything else on stdout is the
+    proof's own text, so a proof that prints without a trailing newline cannot
+    glue itself onto a diagnostic, and an assertion that quotes one is ignored.
+    """
+    def diagnostic(line: str) -> str | None:
+        if not _DEPENDENCY_LINE.match(line):
+            return None
+        if any(part in line for part in _DEPENDENCY_TEXT):
+            return line
+        return None
+
+    for line in stderr.splitlines():
+        found = diagnostic(line.strip())
+        if found is not None:
+            return found
+    for line in stdout.splitlines():
+        if not re.match(r"^E {2,}", line):
+            continue
+        found = diagnostic(re.sub(r"^E {2,}", "", line).strip())
+        if found is not None:
+            return found
+    return None
 
 
 def _normalise_argv(argv: list[str], ctx: ProofContext) -> list[str]:
@@ -204,23 +249,35 @@ def _normalise_argv(argv: list[str], ctx: ProofContext) -> list[str]:
 
 
 def _dependency_failure(ran: _Ran) -> ProofOutcome | None:
+    """Did the command fail because the proof environment lacked a dependency?
+
+    `contains` decides whether a failure is the claimed one, so a repro that
+    names the exact import error is evidence even when the module is missing:
+    the finding is *about* that absence. Only an unnamed failure is ambiguous,
+    and only an unnamed one is deferred to the classifier.
+    """
     if ran.returncode == 0:
         return None
-    for line in ran.output.splitlines():
-        stripped = line.lstrip("E ").strip()
-        missing = re.match(r"^ModuleNotFoundError:\s", stripped) or re.match(
-            r"^(?:[^:]*/)?python[0-9.]*: No module named", stripped)
-        if missing:
-            return _cannot(f"the proof could not import a dependency: {stripped}")
+    found = _missing_dependency(ran.stdout, ran.stderr)
+    if found is not None:
+        return _cannot(f"the proof could not import a dependency: {found}")
     return None
 
 
 @dataclass(frozen=True, slots=True)
 class _Ran:
-    """A command that ran: its exit code and everything it printed."""
+    """A command that ran: its exit code, all its output, and its stderr.
+
+    `output` is stdout followed by stderr, which is what a `contains` expectation
+    matches against: a reviewer names the failure, not the stream it came on.
+    `stderr` is kept apart because a diagnostic is classified there, so a proof
+    that prints without a newline cannot disguise one.
+    """
 
     returncode: int
     output: str
+    stdout: str = ""
+    stderr: str = ""
 
 
 def _attempt(argv: list[str], ctx: ProofContext) -> _Ran | ProofOutcome:
@@ -268,7 +325,8 @@ def _attempt(argv: list[str], ctx: ProofContext) -> _Ran | ProofOutcome:
         return _cannot("the command needed to write outside the repository and /tmp, "
                        f"which the sandbox keeps read-only: {tail[-1] if tail else 'EROFS'}")
 
-    return _Ran(proc.returncode, (proc.stdout or "") + stderr)
+    return _Ran(proc.returncode, (proc.stdout or "") + stderr,
+                proc.stdout or "", stderr)
 
 
 def proof_command(params: Mapping[str, Any], ctx: ProofContext) -> ProofOutcome:
@@ -310,14 +368,23 @@ def proof_repro(params: Mapping[str, Any], ctx: ProofContext) -> ProofOutcome:
     ran = _attempt(argv, ctx)
     if isinstance(ran, ProofOutcome):
         return ran
-    dependency = _dependency_failure(ran)
-    if dependency is not None:
-        return dependency
     if ran.returncode == 0:
         return _failed(f"{' '.join(argv)} exited 0: the defect did not reproduce")
-    if contains is not None and contains not in ran.output:
-        return _failed(f"{' '.join(argv)} exited {ran.returncode} without {contains!r}: "
-                       "not the failure the finding claims")
+    diagnostic = _missing_dependency(ran.stdout, ran.stderr)
+    if diagnostic is not None:
+        # A missing import means the check could not run. It is evidence only
+        # when the finding is *about* that absence: `contains` must name the
+        # diagnostic itself. A match anywhere else in the output — a progress
+        # line, say — says nothing about why the command stopped.
+        if contains is not None and contains in diagnostic:
+            return _held(f"{' '.join(argv)} exited {ran.returncode}, "
+                         "reproducing the missing import the finding names")
+        return _cannot(f"the proof could not import a dependency: {diagnostic}")
+    if contains is not None:
+        if contains not in ran.output:
+            return _failed(f"{' '.join(argv)} exited {ran.returncode} without "
+                           f"{contains!r}: not the failure the finding claims")
+        return _held(f"{' '.join(argv)} exited {ran.returncode}, reproducing the defect")
     return _held(f"{' '.join(argv)} exited {ran.returncode}, reproducing the defect")
 
 

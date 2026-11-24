@@ -50,13 +50,42 @@ def read_tasks(path: Path) -> list[Task]:
     return tasks
 
 
+#: The escapes YAML defines inside a double-quoted scalar. Anything else after
+#: a backslash is kept as written: a predicate is shell text, and a stray
+#: backslash is likelier to be a literal than a typo.
+_YAML_ESCAPES = {
+    "0": "\0", "a": "\a", "b": "\b", "t": "\t", "n": "\n", "v": "\v",
+    "f": "\f", "r": "\r", "e": "\x1b", " ": " ", '"': '"', "/": "/",
+    "\\": "\\", "N": "\x85", "_": "\xa0", "L": "\u2028", "P": "\u2029",
+}
+
+
+def _yaml_escape(body: str, index: int) -> tuple[str, int] | None:
+    """One escape at `body[index]`, or None when the backslash is literal."""
+    if index + 1 >= len(body):
+        return None
+    marker = body[index + 1]
+    if marker in _YAML_ESCAPES:
+        return _YAML_ESCAPES[marker], index + 2
+    if marker in ("x", "u", "U"):
+        width = {"x": 2, "u": 4, "U": 8}[marker]
+        digits = body[index + 2:index + 2 + width]
+        if len(digits) == width:
+            try:
+                return chr(int(digits, 16)), index + 2 + width
+            except ValueError:
+                return None
+    return None
+
+
 def _inline_list(value: str) -> list[str]:
     """Read a YAML-ish inline list without dropping an unquoted neighbour.
 
     A quoted item keeps its own quoting: a predicate such as
     `test -f 'release notes'` must reach the shell with the quote intact, or the
-    filename becomes two arguments. A doubled apostrophe inside a single-quoted
-    YAML scalar is a literal apostrophe.
+    filename becomes two arguments. Inside a double-quoted item the YAML escapes
+    are decoded, because `\u0020` and `\t` change the command the shell runs;
+    inside a single-quoted item a doubled apostrophe is a literal apostrophe.
     """
     value = value.strip()
     if not value.startswith("["):
@@ -67,41 +96,68 @@ def _inline_list(value: str) -> list[str]:
     items: list[str] = []
     token: list[str] = []
     quote: str | None = None
+    #: Whether the last character came from inside a quote, or was a visible
+    #: character outside one. Trailing whitespace is only insignificant when it
+    #: was written outside every quote.
+    protected = False
+    #: Whether the token is a finished quoted item. It is then taken literally:
+    #: no trailing whitespace outside the quote can revise it.
+    closed = False
     index = 0
     while index < len(body):
         char = body[index]
-        if quote is not None and quote == '"' and char == "\\":
-            if index + 1 < len(body):
-                escapes = {"n": "\n", "t": "\t", "\\": "\\", '"': '"'}
-                token.append(escapes.get(body[index + 1], body[index + 1]))
-                index += 2
+        if quote == '"' and char == "\\":
+            decoded = _yaml_escape(body, index)
+            if decoded is not None:
+                text, index = decoded
+                token.append(text)
+                protected = True
                 continue
-        if quote is not None:
+            token.append(char)
+            protected = True
+        elif quote is not None:
             if char == quote:
                 if char == "'" and body[index + 1:index + 2] == "'":
                     token.append("'")
                     index += 2
+                    protected = True
                     continue
                 quote = None
+                # The item is complete as written. Whitespace before the comma
+                # is syntax; drop it without touching what the quote held.
+                closed = True
             else:
                 token.append(char)
-        elif not token and char.isspace():
+                protected = True
+        elif char.isspace() and (closed or not token):
+            # Whitespace outside a finished quote, or before the item starts, is
+            # syntax: skip it. `closed` survives, so a quoted predicate is taken
+            # literally even with a space after its closing quote.
             index += 1
             continue
         elif char in ("'", '"') and not token:
             quote = char
         elif char == ",":
-            item = "".join(token).strip()
+            item = _item(token, protected or closed)
             if item:
                 items.append(item)
             token = []
+            protected = False
+            closed = False
         else:
             token.append(char)
+            protected = not char.isspace()
         index += 1
-    item = "".join(token).strip()
+    item = _item(token, protected or closed)
     if item:
         items.append(item)
     return items
+
+
+def _item(token: list[str], protected: bool) -> str:
+    """One item, keeping whitespace that was written inside a quote."""
+    text = "".join(token)
+    return text if protected else text.strip()
 
 
 def _strip_comment(line: str) -> str:

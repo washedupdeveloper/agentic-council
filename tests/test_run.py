@@ -1045,3 +1045,19 @@ def test_a_rule_configuration_change_cannot_remove_its_own_guard(tmp_path: Path)
     with pytest.raises(ReviewError, match="rule configuration"):
         review(ReviewRequest(repo=repo, base=base, run_id="rules-config-edit"),
                lambda _: body())
+
+
+def test_a_skipped_file_named_by_a_rule_is_still_protected(tmp_path: Path) -> None:
+    repo, _ = make_repo(tmp_path)
+    (repo / "council.toml").write_text(
+        '[[rules]]\nglob = "*.bin"\ndoc = "RULES.md"\n', encoding="utf-8")
+    (repo / "RULES.md").write_text("the rule\n", encoding="utf-8")
+    git(repo, "add", "council.toml", "RULES.md")
+    git(repo, "commit", "-qm", "rules")
+    base = git(repo, "rev-parse", "HEAD")
+    (repo / "RULES.md").write_bytes(b"\x00\x01binary edit")
+    (repo / "asset.bin").write_bytes(b"\x00\x01")
+
+    with pytest.raises(ReviewError, match="governing rule"):
+        review(ReviewRequest(repo=repo, base=base, run_id="rules-skipped"),
+               lambda _: body())

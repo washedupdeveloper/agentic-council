@@ -460,8 +460,123 @@ def test_a_test_name_mentioning_module_not_found_is_not_infrastructure(
 def test_a_pytest_prefixed_module_error_is_unrunnable(tmp_path: Path) -> None:
     outcome = run_proof(
         "repro",
-        {"argv": ["sh", "-c", "echo 'E   ModuleNotFoundError: No module named x'; exit 1"],
+        {"argv": ["sh", "-c", "printf 'E   ModuleNotFoundError: No module named x\\n'; exit 1"],
          "contains": "claimed failure"},
         ctx(tmp_path),
     )
+    assert outcome.state is State.UNRUNNABLE
+
+
+def test_a_repro_that_matches_a_missing_module_is_evidence(
+        tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import council.proofs as proofs
+
+    message = "ModuleNotFoundError: No module named 'reviewed_package.required'"
+    monkeypatch.setattr(proofs, "_attempt",
+                        lambda argv, context: proofs._Ran(1, message, "", message))
+    outcome = proofs.proof_repro({"argv": ["python3", "-m", "reviewed_package"],
+                                 "contains": message}, ctx(tmp_path))
+    assert outcome.state is State.PROVEN
+
+
+def test_a_repro_without_contains_does_not_treat_a_missing_module_as_proof(
+        tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import council.proofs as proofs
+
+    monkeypatch.setattr(
+        proofs, "_attempt",
+        lambda argv, context: proofs._Ran(
+            1, "ModuleNotFoundError: No module named 'reviewed_package'",
+            "", "ModuleNotFoundError: No module named 'reviewed_package'"))
+    outcome = proofs.proof_repro({"argv": ["python3", "-m", "reviewed_package"]},
+                                 ctx(tmp_path))
+    assert outcome.state is State.UNRUNNABLE
+
+
+def test_a_dotted_module_without_its_parent_is_unrunnable(
+        tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import council.proofs as proofs
+
+    message = ("/usr/bin/python3: Error while finding module specification for "
+               "'alpha.beta' (ModuleNotFoundError: No module named 'alpha')")
+    monkeypatch.setattr(proofs, "_attempt",
+                        lambda argv, context: proofs._Ran(1, message, "", message))
+    outcome = proofs.proof_repro({"argv": ["python3", "-m", "alpha.beta"]},
+                                 ctx(tmp_path))
+    assert outcome.state is State.UNRUNNABLE
+
+
+def test_a_test_failure_that_quotes_the_exception_is_not_a_missing_dependency(
+        tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import council.proofs as proofs
+
+    quoted = ("AssertionError: the guard raised ModuleNotFoundError: "
+              "No module named 'reviewed_package' but it should not have")
+    # The quote is on stdout; stderr carries only pytest's own summary.
+    monkeypatch.setattr(
+        proofs, "_attempt",
+        lambda argv, context: proofs._Ran(
+            1, quoted, quoted,
+            "FAILED tests/test_guard.py::test_the_guard - AssertionError"))
+    outcome = proofs.proof_repro({"argv": ["python3", "tests/test_guard.py"]},
+                                 ctx(tmp_path))
+    assert outcome.state is State.PROVEN
+
+
+def test_a_module_bug_is_not_a_missing_dependency(
+        tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """`-m` reports the same clause when the package itself raises."""
+    import council.proofs as proofs
+
+    message = ("/usr/bin/python3: Error while finding module specification for "
+               "'reviewed_package.cli' (AttributeError: module 'reviewed_package' "
+               "has no attribute 'cli')")
+    monkeypatch.setattr(proofs, "_attempt",
+                        lambda argv, context: proofs._Ran(1, message, "", message))
+    outcome = proofs.proof_repro({"argv": ["python3", "-m", "reviewed_package.cli"]},
+                                 ctx(tmp_path))
+    assert outcome.state is State.PROVEN
+
+
+def test_stdout_without_a_newline_cannot_hide_a_dependency_diagnostic(
+        tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import council.proofs as proofs
+
+    diagnostic = "/usr/bin/python3: No module named 'reviewed_package'"
+    monkeypatch.setattr(
+        proofs, "_attempt",
+        lambda argv, context: proofs._Ran(
+            1, "partial output" + diagnostic, "partial output", diagnostic))
+    outcome = proofs.proof_repro({"argv": ["python3", "-m", "reviewed_package"]},
+                                 ctx(tmp_path))
+    assert outcome.state is State.UNRUNNABLE
+
+
+def test_a_progress_message_cannot_prove_a_run_that_lacked_a_dependency(
+        tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A match in stdout is not evidence when the run died on an import."""
+    import council.proofs as proofs
+
+    monkeypatch.setattr(
+        proofs, "_attempt",
+        lambda argv, context: proofs._Ran(
+            1, "starting...\n", "starting...\n",
+            "ModuleNotFoundError: No module named 'reviewed_package'"))
+    outcome = proofs.proof_repro({"argv": ["python3", "-m", "reviewed_package"],
+                                 "contains": "starting..."}, ctx(tmp_path))
+    assert outcome.state is State.UNRUNNABLE
+
+
+def test_the_explanation_text_is_never_matched_against_contains(
+        tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """`contains` describes the command's output, not Council's own prose."""
+    import council.proofs as proofs
+
+    message = "ModuleNotFoundError: No module named 'example'"
+    monkeypatch.setattr(
+        proofs, "_attempt",
+        lambda argv, context: proofs._Ran(1, message, "", message))
+    outcome = proofs.proof_repro(
+        {"argv": ["python3"], "contains": "the proof could not import a dependency"},
+        ctx(tmp_path))
     assert outcome.state is State.UNRUNNABLE

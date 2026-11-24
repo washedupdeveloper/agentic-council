@@ -8,5 +8,11 @@ work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 
 tar -xf "$image" -C "$work"
-here=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+self=${BASH_SOURCE[0]}
+while [[ -L $self ]]; do
+  target=$(readlink -- "$self")
+  [[ $target == /* ]] || target=$(dirname -- "$self")/$target
+  self=$target
+done
+here=$(cd -- "$(dirname -- "$self")" && pwd)
 "${PYTHON:-python3}" "$here/materialise_image.py" "$work" "$root"

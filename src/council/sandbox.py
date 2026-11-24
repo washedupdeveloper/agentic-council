@@ -36,5 +36,23 @@ def argv(argv: Sequence[str], repo: Path) -> list[str] | None:
         repo.resolve(),
         bwrap=bwrap,
         path=os.environ.get("PATH", "/usr/bin:/bin"),
-        masked=tuple(name for name in ("/home", "/root") if os.path.isdir(name)),
+        masked=masked(),
     )
+
+
+def masked() -> tuple[str, ...]:
+    """Every directory that must not be readable: the homes, then `$HOME`.
+
+    The conventional trees cover most hosts. `$HOME` covers a home placed
+    elsewhere (a service account under `/srv`, `/var/lib`, an exported mount),
+    which the host-root bind would otherwise expose.
+    """
+    names = ["/home", "/root"]
+    home = os.environ.get("HOME", "")
+    if home.startswith("/") and not Path(home).is_relative_to("/tmp"):
+        names.append(home)
+    seen: list[str] = []
+    for name in names:
+        if name not in seen and os.path.isdir(name):
+            seen.append(name)
+    return tuple(seen)

@@ -71,3 +71,28 @@
 | OpenSpec | `npx @fission-ai/openspec@1.15.0 validate --all --strict` | 8 items passed |
 | Targeted Astra review | `council review --agent direct --base 84ad62d --samples 1 --allow-single-sample` | six passes; every critical/high finding fixed and covered |
 | `nix flake check` | `nix flake check --keep-going` | every check passed on x86_64-linux; aarch64 is gated by CI |
+## The medium and low tail
+
+- [x] The image materialiser resolves paths against the rootfs on disk, with no
+      symlink cache to invalidate.
+- [x] A whiteout removes the entry and leaves no stale destination behind it,
+      including beneath an opaque whiteout.
+- [x] A member that would replace the image root is refused; a `.` directory
+      header is accepted and keeps its mode and mtime.
+- [x] Directory modes and mtimes are applied after extraction, deepest first,
+      through a descriptor walked from the root with `O_NOFOLLOW` at every step.
+- [x] A FIFO is materialised with its own mode; any other entry type is refused.
+- [x] An archive carrying both a Docker manifest and an OCI index uses the
+      digest-verified OCI description.
+- [x] A malformed manifest — wrong encoding, nested index of the wrong shape —
+      reports a materialise error rather than a traceback.
+- [x] `setuid`/`setgid` bits are dropped and reported, because ownership is not
+      preserved.
+- [x] The proof classifier reads a forbidden-free stderr at line starts, and
+      stdout only through pytest's `E   ` report marker.
+- [x] A missing import is `UNRUNNABLE` unless the finding's `contains` names that
+      diagnostic; a match elsewhere in the output is never evidence.
+- [x] A skipped path counts toward the rule guard.
+- [x] The milestone parser decodes YAML escapes (`\t`, `\n`, `\uXXXX`, `\L`,
+      `\P`), preserves shell quoting, keeps a quoted trailing space, and treats
+      whitespace after a closing quote as syntax.

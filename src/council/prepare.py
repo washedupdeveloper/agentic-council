@@ -23,7 +23,7 @@ from .domain.scope import Scope, ScopeError
 from .planning import Prepared, prompt_for, reader, rules_block
 from .domain.prompt import PromptError, instrument_digest
 from .reference import FetchError, fetch
-from .repo import ReviewError, diff, output
+from .repo import ReviewError, diff, git, output
 from .repo import root as repo_root
 from .request import ReviewRequest
 
@@ -59,12 +59,21 @@ def _baseline_changed(request: ReviewRequest, patch: str) -> bool:
 
 
 def _staged_config(root: Path) -> Config | None:
-    """The index copy of council.toml, so a staged review judges its own rules."""
+    """The index copy of council.toml, so a staged review judges its own rules.
+
+    `None` means the index has no such path. A path that is in the index but
+    cannot be read is an error: silently falling back to the defaults would let
+    a staged review proceed under policy nobody wrote.
+    """
     rel = CONFIG_NAME
-    try:
-        text = output(root, "show", f":{rel}")
-    except ReviewError:
+    listed = git(root, "ls-files", "-z", "--", rel)
+    if listed.returncode != 0:
+        raise ReviewError(
+            f"cannot read the index to find {rel}: {listed.stderr.strip()}")
+    staged = [part for part in listed.stdout.split("\0") if part]
+    if rel not in staged:
         return None
+    text = output(root, "show", f":{rel}")
     try:
         return parse_config(text, name=rel)
     except ConfigError as exc:
@@ -105,6 +114,7 @@ def prepare(request: ReviewRequest) -> Prepared:
             "only for a deliberate maintenance change)")
     rule_docs = {rule.doc for rule in config.rules}
     changed_docs = {section.path for section in file_sections(change.patch)}
+    changed_docs.update(item.path for item in change.skipped)
     protected = set(rule_docs & changed_docs)
     if CONFIG_NAME in changed_docs:
         protected.add(CONFIG_NAME)
