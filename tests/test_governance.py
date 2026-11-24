@@ -58,8 +58,10 @@ def test_the_review_workflow_defaults_to_auto_sampling() -> None:
     assert 'default: ""' in samples
 
 
-def test_the_gate_matrix_names_both_declared_linux_systems() -> None:
+def test_the_gate_runs_x86_64_and_documents_how_to_add_arm() -> None:
+    """One gated system, with the arm leg named and one edit away."""
     gate = read(".github/workflows/gate.yml")
+    assert "system: [ubuntu-24.04]" in gate
     assert "ubuntu-24.04-arm" in gate
     assert "matrix:" in gate
     flake = read("flake.nix")

@@ -70,7 +70,7 @@
 | pyright | `nix develop -c pyright` | 0 errors |
 | OpenSpec | `npx @fission-ai/openspec@1.15.0 validate --all --strict` | 8 items passed |
 | Targeted Astra review | `council review --agent direct --base 84ad62d --samples 1 --allow-single-sample` | six passes; every critical/high finding fixed and covered |
-| `nix flake check` | `nix flake check --keep-going` | every check passed on x86_64-linux; aarch64 is gated by CI |
+| `nix flake check` | `nix flake check --keep-going` | every check passed on x86_64-linux; aarch64 stays declared and unevaluated locally |
 ## The medium and low tail
 
 - [x] The image materialiser resolves paths against the rootfs on disk, with no
@@ -96,3 +96,4 @@
 - [x] The milestone parser decodes YAML escapes (`\t`, `\n`, `\uXXXX`, `\L`,
       `\P`), preserves shell quoting, keeps a quoted trailing space, and treats
       whitespace after a closing quote as syntax.
+

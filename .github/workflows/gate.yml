@@ -23,12 +23,17 @@ concurrency:
 jobs:
   gate:
     name: nix flake check (${{ matrix.system }})
-    # Both declared Linux systems run the same gate. A local run reports the
-    # systems it omitted; this matrix is where aarch64 is actually checked.
+    # x86_64 only. `aarch64-linux` stays declared in `flake.nix` because the
+    # package must still evaluate for a Pi, but it is not gated here: add
+    # `ubuntu-24.04-arm` back to this one list to turn the leg on. The runner
+    # label is the whole switch; nothing else in this file changes.
+    #
+    # The gate is a matrix of one today. It stays a matrix so re-adding a system
+    # is a one-word edit and not a rewrite of the job.
     strategy:
       fail-fast: false
       matrix:
-        system: [ubuntu-24.04, ubuntu-24.04-arm]
+        system: [ubuntu-24.04]
     runs-on: ${{ matrix.system }}
     timeout-minutes: 60
     steps:

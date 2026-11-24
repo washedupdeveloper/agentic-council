@@ -19,6 +19,11 @@
     let
       # bubblewrap is Linux-only. Darwin has no sandbox here, so it must not be
       # advertised as a supported system.
+      #
+      # `aarch64-linux` is declared so the package evaluates for it, which is a
+      # build contract, not a CI leg: `.github/workflows/gate.yml` gates
+      # x86_64-linux only. A declared system must still evaluate, so leaving it
+      # here costs nothing and keeps the arm build one matrix entry away.
       systems = [
         "x86_64-linux"
         "aarch64-linux"

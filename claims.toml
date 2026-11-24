@@ -1309,9 +1309,9 @@ check = "python3 -m pytest tests/test_run.py::test_one_sample_without_the_opt_in
 falsifier = "single-sample-opt-in-ignored"
 
 [[claim]]
-id = "the-shipped-gate-checks-both-linux-systems"
-text = "The CI gate names both declared Linux systems."
-check = "python3 -m pytest tests/test_governance.py::test_the_gate_matrix_names_both_declared_linux_systems -q"
+id = "the-shipped-gate-runs-the-one-gated-system"
+text = "The CI gate runs x86_64-linux, keeps aarch64-linux declared, and names the edit that enables the arm leg."
+check = "python3 -m pytest tests/test_governance.py::test_the_gate_runs_x86_64_and_documents_how_to_add_arm -q"
 
 [[claim]]
 id = "the-shipped-gate-exposes-the-single-sample-opt-in"
