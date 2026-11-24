@@ -23,6 +23,14 @@ home=${HOME:-/root}
 bind=()
 case "$cwd" in
   "$home"|"$home"/*) ;;
+  /tmp)
+    # The private tmpfs is the whole workspace; there is no repository to bind.
+    ;;
+  /tmp/*)
+    # The private tmpfs hides the caller's repository; bind only that
+    # repository back, never the whole host /tmp.
+    bind=(--dir "$(dirname "$cwd")" --ro-bind "$cwd" "$cwd")
+    ;;
   *) bind=(--ro-bind "$cwd" "$cwd") ;;
 esac
 

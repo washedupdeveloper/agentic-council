@@ -51,16 +51,77 @@ def read_tasks(path: Path) -> list[Task]:
 
 
 def _inline_list(value: str) -> list[str]:
+    """Read a YAML-ish inline list without dropping an unquoted neighbour.
+
+    A quoted item keeps its own quoting: a predicate such as
+    `test -f 'release notes'` must reach the shell with the quote intact, or the
+    filename becomes two arguments. A doubled apostrophe inside a single-quoted
+    YAML scalar is a literal apostrophe.
+    """
     value = value.strip()
     if not value.startswith("["):
         return [value.strip("\"'")] if value else []
     body = value[1:-1].strip()
     if not body:
         return []
-    quoted = re.findall(r'"([^"]*)"|\'([^\']*)\'', body)
-    if quoted:
-        return [left or right for left, right in quoted]
-    return [part.strip() for part in body.split(",") if part.strip()]
+    items: list[str] = []
+    token: list[str] = []
+    quote: str | None = None
+    index = 0
+    while index < len(body):
+        char = body[index]
+        if quote is not None and quote == '"' and char == "\\":
+            if index + 1 < len(body):
+                escapes = {"n": "\n", "t": "\t", "\\": "\\", '"': '"'}
+                token.append(escapes.get(body[index + 1], body[index + 1]))
+                index += 2
+                continue
+        if quote is not None:
+            if char == quote:
+                if char == "'" and body[index + 1:index + 2] == "'":
+                    token.append("'")
+                    index += 2
+                    continue
+                quote = None
+            else:
+                token.append(char)
+        elif not token and char.isspace():
+            index += 1
+            continue
+        elif char in ("'", '"') and not token:
+            quote = char
+        elif char == ",":
+            item = "".join(token).strip()
+            if item:
+                items.append(item)
+            token = []
+        else:
+            token.append(char)
+        index += 1
+    item = "".join(token).strip()
+    if item:
+        items.append(item)
+    return items
+
+
+def _strip_comment(line: str) -> str:
+    """Remove a YAML comment only when the hash is outside a quoted value."""
+    quote: str | None = None
+    index = 0
+    while index < len(line):
+        char = line[index]
+        if quote is not None and quote == '"' and char == "\\":
+            index += 2
+            continue
+        if quote is not None:
+            if char == quote:
+                quote = None
+        elif char in ("'", '"'):
+            quote = char
+        elif char == "#" and (index == 0 or line[index - 1].isspace()):
+            return line[:index]
+        index += 1
+    return line
 
 
 def load_routing(change: Path) -> dict[str, dict[str, Any]]:
@@ -74,7 +135,7 @@ def load_routing(change: Path) -> dict[str, dict[str, Any]]:
     collecting = False
     in_tasks = False
     for raw in path.read_text(encoding="utf-8").splitlines():
-        line = raw.split("#", 1)[0].rstrip()
+        line = _strip_comment(raw).rstrip()
         if not line.strip() or line.strip() == "---":
             continue
         if line.strip() == "tasks:":
@@ -307,7 +368,7 @@ def run(args: argparse.Namespace) -> int:
                 print(f"task {task.identifier} stopped: {evidence} is missing or empty")
                 return 1
             for predicate in verify:
-                code, detail = _run(predicate, repo, base_env, args.predicate_timeout)
+                code, detail = _run(predicate, repo, env, args.predicate_timeout)
                 if detail:
                     print(detail)
                 if code != 0:

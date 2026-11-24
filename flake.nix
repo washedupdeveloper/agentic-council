@@ -74,6 +74,7 @@
           ps.wheel
           ps.mcp
           ps.agent-client-protocol
+          ps.pyyaml
         ]);
 
       # The optional protocol servers use the same source and version. Their

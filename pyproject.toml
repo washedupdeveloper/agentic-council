@@ -13,6 +13,7 @@ dependencies = []
 [project.optional-dependencies]
 dev = [
   "hypothesis>=6.170.15",
+  "PyYAML>=6.0",
   "mypy>=2.4.1",
   "pytest>=9.2.0",
   "mcp>=2.3.0,<3",

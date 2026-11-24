@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import yaml
+
 ROOT = Path(__file__).resolve().parent.parent
 
 
@@ -70,3 +72,25 @@ def test_the_review_action_exposes_the_single_sample_opt_in() -> None:
     assert "allow-single-sample:" in text
     assert "ALLOW_SINGLE_SAMPLE" in text
     assert 'if [ "$ALLOW_SINGLE_SAMPLE" = "true" ] && [ "$SAMPLES" = "1" ]; then' in text
+
+
+
+def test_the_review_action_manifest_is_valid_yaml() -> None:
+    data = yaml.safe_load(read(".github/actions/council/action.yml"))
+    assert isinstance(data, dict)
+    assert data["runs"]["using"] == "composite"
+    assert data["inputs"]["samples"]["default"] == ""
+
+
+def test_the_review_action_passes_inputs_as_data() -> None:
+    data = yaml.safe_load(read(".github/actions/council/action.yml"))
+    for index, step in enumerate(data["runs"]["steps"]):
+        script = step.get("run", "")
+        assert "${{ inputs." not in script, f"step {index} interpolates an input into Bash"
+
+
+def test_the_review_action_exposes_the_rule_change_opt_in() -> None:
+    text = read(".github/actions/council/action.yml")
+    assert "allow-rules-change:" in text
+    assert "ALLOW_RULES_CHANGE" in text
+    assert 'args+=(--allow-rules-change)' in text

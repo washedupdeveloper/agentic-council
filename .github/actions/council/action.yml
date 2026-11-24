@@ -13,7 +13,7 @@ inputs:
     required: false
     default: ""
   samples:
-    description: Samples per unit (empty means automatic: two clean, three on disagreement)
+    description: "Samples per unit (empty means automatic: one clean, two to confirm, three on disagreement)"
     required: false
     default: ""
   require-executed-proofs:
@@ -56,6 +56,10 @@ inputs:
     description: Committed baseline path, relative to the repository (empty disables it)
     required: false
     default: ""
+  allow-rules-change:
+    description: Allow the reviewed diff to edit a governing rule document
+    required: false
+    default: "false"
   python:
     description: Interpreter used to create the private environment
     required: false
@@ -66,16 +70,20 @@ runs:
   steps:
     - name: Install the wheel into a private environment
       shell: bash
+      env:
+        COUNCIL_PYTHON: ${{ inputs.python }}
+        COUNCIL_DIST: ${{ inputs.dist }}
       run: |
         set -euo pipefail
-        "${{ inputs.python }}" -m venv "$RUNNER_TEMP/council-venv"
+        "$COUNCIL_PYTHON" -m venv "$RUNNER_TEMP/council-venv"
         "$RUNNER_TEMP/council-venv/bin/python" -m pip install --disable-pip-version-check \
-          "${{ inputs.dist }}"/*.whl
-        echo "$RUNNER_TEMP/council-venv/bin" >> "$GITHUB_PATH"
+          "$COUNCIL_DIST"/*.whl
 
     - name: Check the reviewer before asking it anything
       shell: bash
-      run: council doctor --json
+      run: |
+        set -euo pipefail
+        "$RUNNER_TEMP/council-venv/bin/council" doctor --json
 
     - name: Review the change
       shell: bash
@@ -89,12 +97,16 @@ runs:
         IDLE: ${{ inputs.idle-timeout }}
         SARIF: ${{ inputs.sarif }}
         BASELINE: ${{ inputs.baseline }}
+        ALLOW_RULES_CHANGE: ${{ inputs.allow-rules-change }}
+        SAMPLE_TIMEOUT: ${{ inputs.sample-timeout }}
+        TIME_BUDGET: ${{ inputs.time-budget }}
+        CONTEXT_DEPTH: ${{ inputs.context-depth }}
       run: |
         set -uo pipefail
         args=(ci
-          --sample-timeout "${{ inputs.sample-timeout }}"
-          --time-budget "${{ inputs.time-budget }}"
-          --context-depth "${{ inputs.context-depth }}")
+          --sample-timeout "$SAMPLE_TIMEOUT"
+          --time-budget "$TIME_BUDGET"
+          --context-depth "$CONTEXT_DEPTH")
         if [ -n "$SAMPLES" ]; then args+=(--samples "$SAMPLES"); fi
         if [ "$ALLOW_SINGLE_SAMPLE" = "true" ] && [ "$SAMPLES" = "1" ]; then args+=(--allow-single-sample); fi
         if [ "$REQUIRE_EXECUTED" = "true" ]; then args+=(--require-executed-proofs); fi
@@ -104,4 +116,5 @@ runs:
         if [ -n "$IDLE" ]; then args+=(--idle-timeout "$IDLE"); fi
         if [ -n "$SARIF" ]; then args+=(--sarif "$SARIF"); fi
         if [ -n "$BASELINE" ]; then args+=(--baseline "$BASELINE"); fi
-        council "${args[@]}"
+        if [ "$ALLOW_RULES_CHANGE" = "true" ]; then args+=(--allow-rules-change); fi
+        "$RUNNER_TEMP/council-venv/bin/council" "${args[@]}"

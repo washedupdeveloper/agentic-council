@@ -168,7 +168,19 @@ def proof_present(params: Mapping[str, Any], ctx: ProofContext) -> ProofOutcome:
     # the line does not support.
     if actual.strip() == expected.strip():
         return _held(f"{path.name}:{line} says {actual.strip()!r}")
-    return _failed(f"{path.name}:{line} says {actual.strip()!r}, not {expected.strip()!r}")
+    wanted = expected.strip()
+    hits: list[int] = []
+    for index, candidate in enumerate(lines):
+        if candidate.strip() == wanted:
+            hits.append(index + 1)
+            if len(hits) == 3:
+                break
+    if hits:
+        where = ", ".join(str(item) for item in hits)
+        return _cannot(
+            f"{path.name}:{line} does not contain the quote; the same text occurs at line {where}: "
+            "the cited line is stale")
+    return _failed(f"{path.name}:{line} says {actual.strip()!r}, not {wanted!r}")
 
 
 def _argv_param(params: Mapping[str, Any]) -> list[str]:
@@ -177,6 +189,30 @@ def _argv_param(params: Mapping[str, Any]) -> list[str]:
             isinstance(item, str) and item for item in argv):
         raise _BadParams("params.argv: expected a non-empty list of strings")
     return argv
+
+
+#: A proof that could not import its own dependency is not evidence about the
+#: claim. `python` is commonly the name a reviewer writes while the sandbox has
+#: only `python3`; the allowlist decides whether either is permitted.
+_MISSING_DEPENDENCY = ("ModuleNotFoundError",)
+
+
+def _normalise_argv(argv: list[str], ctx: ProofContext) -> list[str]:
+    if argv[0] == "python" and "python" not in ctx.allow and "python3" in ctx.allow:
+        return ["python3", *argv[1:]]
+    return argv
+
+
+def _dependency_failure(ran: _Ran) -> ProofOutcome | None:
+    if ran.returncode == 0:
+        return None
+    for line in ran.output.splitlines():
+        stripped = line.lstrip("E ").strip()
+        missing = re.match(r"^ModuleNotFoundError:\s", stripped) or re.match(
+            r"^(?:[^:]*/)?python[0-9.]*: No module named", stripped)
+        if missing:
+            return _cannot(f"the proof could not import a dependency: {stripped}")
+    return None
 
 
 @dataclass(frozen=True, slots=True)
@@ -195,6 +231,7 @@ def _attempt(argv: list[str], ctx: ProofContext) -> _Ran | ProofOutcome:
     invent a weaker way to start a process: same allowlist, same overlay, same
     refusals.
     """
+    argv = _normalise_argv(argv, ctx)
     binary = argv[0]
     if "/" in binary or "\\" in binary:
         return _cannot(f"{binary!r} is a path; a proof names an allowlisted executable, not a path")
@@ -246,6 +283,9 @@ def proof_command(params: Mapping[str, Any], ctx: ProofContext) -> ProofOutcome:
     ran = _attempt(argv, ctx)
     if isinstance(ran, ProofOutcome):
         return ran
+    dependency = _dependency_failure(ran)
+    if dependency is not None:
+        return dependency
     passed = ran.returncode == 0 if mode == "zero" else ran.returncode != 0
     if passed:
         return _held(f"{' '.join(argv)} exited {ran.returncode} (expected {mode})")
@@ -270,6 +310,9 @@ def proof_repro(params: Mapping[str, Any], ctx: ProofContext) -> ProofOutcome:
     ran = _attempt(argv, ctx)
     if isinstance(ran, ProofOutcome):
         return ran
+    dependency = _dependency_failure(ran)
+    if dependency is not None:
+        return dependency
     if ran.returncode == 0:
         return _failed(f"{' '.join(argv)} exited 0: the defect did not reproduce")
     if contains is not None and contains not in ran.output:

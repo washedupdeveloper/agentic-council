@@ -998,3 +998,50 @@ def test_one_sample_with_the_opt_in_is_recorded(tmp_path: Path) -> None:
     assert payload["samples_run"] == 1
     assert payload["allow_single_sample"] is True
     assert report.verdict is Verdict.PASS
+
+
+def test_a_governing_rule_cannot_be_edited_by_the_diff_it_judges(tmp_path: Path) -> None:
+    repo, _ = make_repo(tmp_path)
+    (repo / "council.toml").write_text(
+        '[[rules]]\nglob = "*.py"\ndoc = "RULES.md"\n', encoding="utf-8")
+    (repo / "RULES.md").write_text("the rule\n", encoding="utf-8")
+    git(repo, "add", "council.toml", "RULES.md", "a.py")
+    git(repo, "commit", "-qm", "rules")
+    base = git(repo, "rev-parse", "HEAD")
+    (repo / "RULES.md").write_text("the weakened rule\n", encoding="utf-8")
+
+    with pytest.raises(ReviewError, match="governing rule"):
+        review(ReviewRequest(repo=repo, base=base, run_id="rules-edit"),
+               lambda _: body())
+
+
+def test_a_rule_change_can_be_allowed_explicitly(tmp_path: Path) -> None:
+    repo, _ = make_repo(tmp_path)
+    (repo / "council.toml").write_text(
+        '[[rules]]\nglob = "*.py"\ndoc = "RULES.md"\n', encoding="utf-8")
+    (repo / "RULES.md").write_text("the rule\n", encoding="utf-8")
+    git(repo, "add", "council.toml", "RULES.md", "a.py")
+    git(repo, "commit", "-qm", "rules")
+    base = git(repo, "rev-parse", "HEAD")
+    (repo / "RULES.md").write_text("the changed rule\n", encoding="utf-8")
+
+    report = review(ReviewRequest(repo=repo, base=base, run_id="rules-allowed",
+                                  samples=1, allow_single_sample=True,
+                                  allow_rules_change=True),
+                    lambda _: body())
+    assert report.verdict is Verdict.PASS
+
+
+def test_a_rule_configuration_change_cannot_remove_its_own_guard(tmp_path: Path) -> None:
+    repo, _ = make_repo(tmp_path)
+    (repo / "council.toml").write_text(
+        '[[rules]]\nglob = "*.py"\ndoc = "RULES.md"\n', encoding="utf-8")
+    (repo / "RULES.md").write_text("the rule\n", encoding="utf-8")
+    git(repo, "add", "council.toml", "RULES.md")
+    git(repo, "commit", "-qm", "rules")
+    base = git(repo, "rev-parse", "HEAD")
+    (repo / "council.toml").write_text("", encoding="utf-8")
+
+    with pytest.raises(ReviewError, match="rule configuration"):
+        review(ReviewRequest(repo=repo, base=base, run_id="rules-config-edit"),
+               lambda _: body())

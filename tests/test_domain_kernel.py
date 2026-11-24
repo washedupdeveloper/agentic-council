@@ -74,3 +74,23 @@ def test_sandbox_command_outside_tmp_has_no_mountpoint() -> None:
     argv = command(["true"], Path("/srv/repo"), bwrap="/bin/bwrap")
     assert "--dir" not in argv
     assert argv[-1] == "true"
+
+
+def test_sandbox_command_masks_user_homes() -> None:
+    argv = command(["true"], Path("/srv/repo"), bwrap="/bin/bwrap")
+    assert argv[argv.index("/home") - 1] == "--tmpfs"
+    assert argv[argv.index("/root") - 1] == "--tmpfs"
+
+
+def test_sandbox_command_masks_only_what_the_caller_names() -> None:
+    argv = command(["true"], Path("/srv/repo"), bwrap="/bin/bwrap", masked=("/home",))
+    assert argv[argv.index("/home") - 1] == "--tmpfs"
+    assert "--tmpfs" not in argv[argv.index("/root") - 1:] if "/root" in argv else True
+
+
+def test_sandbox_command_binds_a_repo_under_home() -> None:
+    argv = command(["true"], Path("/home/alice/repo"), bwrap="/bin/bwrap")
+    index = argv.index("--dir")
+    assert argv[index + 1] == "/home/alice"
+    assert argv[index + 2:index + 5] == [
+        "--ro-bind", "/home/alice/repo", "/home/alice/repo"]

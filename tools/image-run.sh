@@ -4,12 +4,13 @@
 set -euo pipefail
 image=$1
 shift || true
-root=${TMPDIR:-/tmp}/council-image-root
-if [ -d "$root" ]; then
+root=$(mktemp -d "${TMPDIR:-/tmp}/council-image-root.XXXXXX")
+cleanup() {
   chmod -R u+w "$root" 2>/dev/null || true
   rm -rf "$root" 2>/dev/null || true
-fi
-here=$(dirname "$(readlink -f "$0")")
+}
+trap cleanup EXIT
+here=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 "$here/materialise-image.sh" "$image" "$root"
 if [ "$#" -eq 0 ]; then set -- /bin/council --help; fi
-exec unshare --user --map-root-user chroot "$root" "$@"
+unshare --user --map-root-user chroot "$root" "$@"

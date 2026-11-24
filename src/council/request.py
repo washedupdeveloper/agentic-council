@@ -62,6 +62,7 @@ class ReviewRequest:
     baseline_from_base: bool = False
     baseline_strict: bool = False
     allow_baseline_change: bool = False
+    allow_rules_change: bool = False
     include: tuple[str, ...] = ()
     exclude: tuple[str, ...] = ()
     staged: bool = False

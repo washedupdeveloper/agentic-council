@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
+from pathlib import Path
 from typing import Any
 
 from mcp.server.fastmcp import Context, FastMCP
@@ -20,6 +22,22 @@ from council_server.cli import (
 )
 
 TOOL_NAMES = ("council_plan", "council_review", "council_doctor")
+
+
+def verdict_path(state_root: Path, run_id: str) -> Path:
+    """Resolve a retained verdict without letting the resource leave its root."""
+    if not run_id or run_id in (".", "..") or "/" in run_id or "\\" in run_id:
+        raise ValueError(f"verdict {run_id!r} is not a run id")
+    if Path(run_id).is_absolute():
+        raise ValueError(f"verdict {run_id!r} is not a run id")
+    root = state_root.resolve()
+    candidate = (root / run_id).resolve()
+    if candidate == root or not candidate.is_relative_to(root):
+        raise ValueError(f"verdict {run_id!r} leaves the retention root")
+    path = (candidate / "verdict.json").resolve()
+    if not path.is_relative_to(root):
+        raise ValueError(f"verdict {run_id!r} leaves the retention root")
+    return path
 
 
 def _summary(payload: dict[str, Any], result: Any) -> dict[str, Any]:
@@ -127,10 +145,22 @@ def build_server(config: ServerConfig) -> FastMCP:
     @mcp.resource("council://runs/{run_id}")
     async def verdict(run_id: str) -> str:
         """The complete verdict document for a retained review."""
-        path = config.state_root / run_id / "verdict.json"
         try:
-            return path.read_text(encoding="utf-8")
-        except OSError as exc:
+            verdict_path(config.state_root, run_id)
+            flags = os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_NOFOLLOW", 0)
+            root_fd = os.open(config.state_root.resolve(), flags)
+            try:
+                run_fd = os.open(run_id, flags, dir_fd=root_fd)
+                try:
+                    file_fd = os.open("verdict.json", os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0),
+                                      dir_fd=run_fd)
+                    with os.fdopen(file_fd, "rb") as handle:
+                        return handle.read().decode("utf-8")
+                finally:
+                    os.close(run_fd)
+            finally:
+                os.close(root_fd)
+        except (OSError, ValueError) as exc:
             raise ValueError(f"verdict {run_id} is not retained: {exc}") from exc
 
     return mcp

@@ -17,8 +17,9 @@ SOURCE = Path(__file__).resolve().parent.parent / "src" / "council"
 #: The adapter seam adds an explicit package boundary; the evidence sidecar
 #: adds one local-only module without touching the review loop. The direct
 #: reviewer adapter adds one effect module at the same seam. The doctor source
-#: check and the single-sample opt-in add one guard each.
-SOURCE_LIMIT = 6740
+#: check and the single-sample opt-in add one guard each. The review-reliability
+#: fixes add the proof-cause, rule-trust and sandbox guards.
+SOURCE_LIMIT = 6845
 MODULE_LIMIT = 50
 
 

@@ -129,6 +129,8 @@ def add_review_arguments(parser: argparse.ArgumentParser, *, advice: bool,
                         help="fail when a baseline entry is expired or stale")
     parser.add_argument("--allow-baseline-change", action="store_true",
                         help="allow the reviewed diff to edit the baseline (maintenance only)")
+    parser.add_argument("--allow-rules-change", action="store_true",
+                        help="allow the reviewed diff to edit a governing rule document")
     parser.add_argument("--context-url", action="append", default=[], metavar="URL",
                         help="fetch this URL as reference context (repeatable; never a proof)")
     parser.add_argument("--context-depth", type=int, choices=(0, 1, 2, 3), default=3,

@@ -316,7 +316,9 @@ council ci --baseline council-baseline.json
 
 `ci` and `pr` read the baseline from the base revision by default, so a pull
 request cannot edit the baseline to hide its own new finding. A diff that edits
-the baseline is refused unless `--allow-baseline-change` is explicit. Entries
+the baseline is refused unless `--allow-baseline-change` is explicit. The same
+rule applies to the documents listed under `[[rules]]`: a diff that edits one is
+refused unless `--allow-rules-change` says the maintenance is deliberate. Entries
 expire; `--baseline-strict` fails on expired or stale entries, and
 `council baseline prune` reports or writes a cleaned baseline.
 
@@ -388,6 +390,7 @@ it always prints JSON and exits with the verdict.
 | `--baseline-from-base` | off for review; on for ci/pr | read the baseline from the base revision |
 | `--baseline-strict` | off | fail on expired or stale baseline entries |
 | `--allow-baseline-change` | off | allow the reviewed diff to edit the baseline |
+| `--allow-rules-change` | off | allow the reviewed diff to edit a governing rule document |
 | `--context-url URL` | none | fetch reference context (repeatable; never a proof) |
 | `--context-depth N` | 3 | 0 diff, 1 enclosing function, 2 +one call level, 3 +two |
 | `--max-prompt-bytes N` | 32768 | refuse a larger prompt |

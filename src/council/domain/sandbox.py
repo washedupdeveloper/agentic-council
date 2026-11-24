@@ -32,11 +32,22 @@ def reviewer(argv: Sequence[str], prompt_dir: Path, *, bwrap: str,
 
 
 def command(argv: Sequence[str], repo: Path, *, bwrap: str,
-            path: str = "/usr/bin:/bin") -> list[str]:
-    """The bubblewrap invocation for one command, given already-resolved inputs."""
+            path: str = "/usr/bin:/bin",
+            masked: Sequence[str] = ("/home", "/root")) -> list[str]:
+    """The bubblewrap invocation for one command, given already-resolved inputs.
+
+    `masked` is checked by the caller for existence: a build sandbox may have no
+    `/home` at all, and `--tmpfs` on a missing path is a failure rather than a
+    mask. The pure module cannot stat, so the decision stays with the effect.
+    """
     target = Path(repo)
     # A repo under /tmp lives under the tmpfs; create its mountpoint first.
     mountpoint = ["--dir", str(target.parent)] if target.is_relative_to("/tmp") else []
+    # The user home directories are masked after the host root bind. A repo
+    # living under one of them is bound back read-only before the overlay.
+    home_mounts: list[str] = []
+    if target.is_relative_to("/home") or target.is_relative_to("/root"):
+        home_mounts = ["--dir", str(target.parent), "--ro-bind", str(target), str(target)]
     return [
         bwrap,
         "--unshare-all",        # net, pid, ipc, uts, cgroup, user
@@ -46,7 +57,9 @@ def command(argv: Sequence[str], repo: Path, *, bwrap: str,
         "--dev", "/dev",
         "--proc", "/proc",
         "--tmpfs", "/tmp",
+        *(pair for name in masked for pair in ("--tmpfs", name)),
         *mountpoint,
+        *home_mounts,
         "--overlay-src", str(target), "--tmp-overlay", str(target),
         "--chdir", str(target),
         "--setenv", "PATH", path,

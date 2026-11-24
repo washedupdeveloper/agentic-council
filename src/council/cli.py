@@ -160,6 +160,7 @@ def _request(args: argparse.Namespace, *, allow: bool | None = None) -> ReviewRe
         baseline_from_base=bool(getattr(args, "baseline_from_base", False)),
         baseline_strict=bool(getattr(args, "baseline_strict", False)),
         allow_baseline_change=bool(getattr(args, "allow_baseline_change", False)),
+        allow_rules_change=bool(getattr(args, "allow_rules_change", False)),
         include=tuple(getattr(args, "include", ())),
         exclude=tuple(getattr(args, "exclude", ())),
         staged=bool(getattr(args, "staged", False)),

@@ -184,3 +184,65 @@ def test_an_inline_predicate_list_is_still_read(tmp_path: Path) -> None:
     result = run_tool(root, change, fake, home, command="plan")
     assert result.returncode == 0, result.stderr
     assert "predicate: test -f done.txt" in result.stdout
+
+
+def test_a_predicate_cannot_commit_through_the_shim(tmp_path: Path) -> None:
+    root, change, fake, home = make_repo(tmp_path)
+    (change / "routing.yaml").write_text(
+        'schema: 1\nchange: demo\ntasks:\n'
+        '  "1.1":\n    type: feature\n    verify:\n      - git commit -m predicate\n'
+        '  "1.2":\n    type: feature\n    verify:\n      - test -f done.txt\n',
+        encoding="utf-8",
+    )
+    result = run_tool(root, change, fake, home, "--limit", "1")
+    assert result.returncode == 1
+    assert "refusing git commit" in result.stdout
+    assert "- [ ] 1.1 Do the first thing" in tasks_text(change)
+
+
+def test_a_mixed_inline_list_keeps_every_predicate(tmp_path: Path) -> None:
+    root, change, fake, home = make_repo(tmp_path)
+    (change / "routing.yaml").write_text(
+        'schema: 1\nchange: demo\ntasks:\n'
+        '  "1.1":\n    type: feature\n'
+        '    verify: ["test -f done.txt", test -f done.txt]\n'
+        '  "1.2":\n    type: feature\n    verify:\n      - test -f done.txt\n',
+        encoding="utf-8",
+    )
+    result = run_tool(root, change, fake, home, command="plan")
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.count("test -f done.txt") >= 2
+
+
+def test_a_quoted_hash_is_not_a_comment(tmp_path: Path) -> None:
+    root, change, fake, home = make_repo(tmp_path)
+    (change / "routing.yaml").write_text(
+        'schema: 1\nchange: demo\ntasks:\n'
+        '  "1.1":\n    type: feature\n'
+        "    verify: [\"test -f 'done#done'\"]\n"
+        '  "1.2":\n    type: feature\n    verify:\n      - test -f done.txt\n',
+        encoding="utf-8",
+    )
+    result = run_tool(root, change, fake, home, command="plan")
+    assert result.returncode == 0, result.stderr
+    assert "done#done" in result.stdout
+
+
+def test_a_plain_predicate_keeps_its_shell_quoting(tmp_path: Path) -> None:
+    root, change, fake, home = make_repo(tmp_path)
+    (change / "routing.yaml").write_text(
+        'schema: 1\nchange: demo\ntasks:\n'
+        '  "1.1":\n    type: feature\n'
+        '    verify: ["test -f \'release notes\'"]\n'
+        '  "1.2":\n    type: feature\n    verify:\n      - test -f done.txt\n',
+        encoding="utf-8",
+    )
+    result = run_tool(root, change, fake, home, command="plan")
+    assert result.returncode == 0, result.stderr
+    assert "'release notes'" in result.stdout
+
+
+def test_a_doubled_apostrophe_is_literal_in_a_single_quoted_item() -> None:
+    import runpy
+    parse = runpy.run_path(str(ROOT / "tools" / "milestone.py"))["_inline_list"]
+    assert parse("['it''s here']") == ["it's here"]

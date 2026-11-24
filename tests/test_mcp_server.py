@@ -8,10 +8,13 @@ import sys
 from pathlib import Path
 from typing import Any
 
+import pytest
+
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
 from conftest import SOURCE
+from council_mcp.server import verdict_path
 
 
 def server_args(repo: Path, tmp_path: Path, reviewer: Path) -> list[str]:
@@ -152,3 +155,24 @@ def test_mcp_refuses_a_repository_outside_its_root(
             raise AssertionError("an outside repository must be refused")
 
     asyncio.run(run())
+
+
+def test_a_verdict_path_refuses_a_run_id_outside_the_root(tmp_path: Path) -> None:
+    for bad in ("", ".", "..", "../secrets", "/etc", "a/b", "a\\b"):
+        with pytest.raises(ValueError):
+            verdict_path(tmp_path, bad)
+
+
+def test_a_verdict_path_stays_inside_the_retention_root(tmp_path: Path) -> None:
+    (tmp_path / "run-1").mkdir()
+    assert verdict_path(tmp_path, "run-1") == tmp_path / "run-1" / "verdict.json"
+
+
+def test_a_verdict_path_refuses_a_symlink_at_the_final_component(tmp_path: Path) -> None:
+    run = tmp_path / "run-1"
+    run.mkdir()
+    outside = tmp_path.parent / "outside-verdict.json"
+    outside.write_text("{}", encoding="utf-8")
+    (run / "verdict.json").symlink_to(outside)
+    with pytest.raises(ValueError):
+        verdict_path(tmp_path, "run-1")

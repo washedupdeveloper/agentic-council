@@ -36,4 +36,5 @@ def argv(argv: Sequence[str], repo: Path) -> list[str] | None:
         repo.resolve(),
         bwrap=bwrap,
         path=os.environ.get("PATH", "/usr/bin:/bin"),
+        masked=tuple(name for name in ("/home", "/root") if os.path.isdir(name)),
     )

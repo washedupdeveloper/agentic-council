@@ -124,7 +124,9 @@ MUTATIONS: tuple[Mutation, ...] = (
              "if within and not any(fnmatch.fnmatch(rel, glob) for glob in within):",
              "if False:"),
     Mutation("repro-passes-on-success",
-             "proofs.py", "if ran.returncode == 0:", "if False:"),
+             "proofs.py",
+             'return _failed(f"{\' \'.join(argv)} exited 0: the defect did not reproduce")',
+             'return _held(f"{\' \'.join(argv)} exited 0: the defect did not reproduce")'),
     Mutation("window-bounds-ignore-the-budget",
              "planning.py", "if total + size > room and index > start:", "if False:"),
     Mutation("windows-never-refused",
@@ -322,6 +324,14 @@ def run_suite(src: Path) -> tuple[int, set[str]]:
         return code, failing_tests(report) if report.exists() else set()
 
 
+def _copy_src(raw: str) -> Path:
+    src = Path(raw) / "src"
+    shutil.copytree(ROOT / "src", src)
+    for path in [src, *src.rglob("*")]:
+        path.chmod(0o755 if path.is_dir() else 0o644)
+    return src
+
+
 def main() -> int:
     claims = load_claims(ROOT / "claims.toml")
     by_node: dict[str, list[str]] = {}
@@ -330,16 +340,20 @@ def main() -> int:
         if node is not None:
             by_node.setdefault(node, []).append(claim.id)
 
+    with tempfile.TemporaryDirectory(prefix="council-baseline-") as raw:
+        baseline_src = _copy_src(raw)
+        baseline_code, baseline_broken = run_suite(baseline_src)
+    if baseline_code != 0:
+        print("BASELINE RED: the unmodified suite must pass before mutations are scored")
+        for node in sorted(baseline_broken):
+            print(f"  {node}")
+        return 1
+
     survivors: list[str] = []
     falsified: dict[str, set[str]] = {}
     for mutation in MUTATIONS:
         with tempfile.TemporaryDirectory(prefix="council-mut-") as raw:
-            src = Path(raw) / "src"
-            shutil.copytree(ROOT / "src", src)
-            # A copied tree can keep its source permissions (a store path or a
-            # read-only checkout); the mutations have to be writable.
-            for path in [src, *src.rglob("*")]:
-                path.chmod(0o755 if path.is_dir() else 0o644)
+            src = _copy_src(raw)
             target = src / "council" / mutation.file
             text = target.read_text(encoding="utf-8")
             if mutation.old not in text:

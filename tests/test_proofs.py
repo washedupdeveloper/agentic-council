@@ -396,3 +396,72 @@ def test_without_bwrap_a_repro_does_not_run(tmp_path: Path,
     outcome = run_proof("repro", {"argv": ["true"]}, sandbox_ctx(tmp_path))
     assert outcome.state is State.UNRUNNABLE
     assert "bwrap" in outcome.detail
+
+
+# --- proof infrastructure and stale locations --------------------------------
+
+def test_present_reports_a_stale_line_instead_of_refuting(tmp_path: Path) -> None:
+    write(tmp_path, "a.py", "one\ntwo\n")
+    outcome = run_proof("present", {"path": "a.py", "line": 1, "text": "two"}, ctx(tmp_path))
+    assert outcome.state is State.UNRUNNABLE
+    assert "line 2" in outcome.detail
+
+
+def test_a_repro_with_a_missing_module_is_unrunnable(tmp_path: Path) -> None:
+    outcome = run_proof(
+        "repro",
+        {"argv": ["python3", "-c", "import council_missing_dependency"],
+         "contains": "claimed failure"},
+        ctx(tmp_path),
+    )
+    assert outcome.state is State.UNRUNNABLE
+    assert "dependency" in outcome.detail
+
+
+def test_a_command_with_a_missing_module_is_unrunnable_even_when_nonzero(
+        tmp_path: Path) -> None:
+    outcome = run_proof(
+        "command",
+        {"argv": ["python3", "-c", "import council_missing_dependency"],
+         "expect": {"exit": "nonzero"}},
+        ctx(tmp_path),
+    )
+    assert outcome.state is State.UNRUNNABLE
+    assert "dependency" in outcome.detail
+
+
+def test_python_is_normalised_to_python3_when_allowed(tmp_path: Path) -> None:
+    outcome = run_proof("command", {"argv": ["python", "-c", "pass"]}, ctx(tmp_path))
+    assert outcome.state is State.PROVEN
+
+
+def test_a_message_mentioning_a_missing_module_is_not_infrastructure_failure(
+        tmp_path: Path) -> None:
+    outcome = run_proof(
+        "repro",
+        {"argv": ["sh", "-c", "echo 'check failed: No module named'; exit 1"],
+         "contains": "claimed failure"},
+        ctx(tmp_path),
+    )
+    assert outcome.state is State.REFUTED
+
+
+def test_a_test_name_mentioning_module_not_found_is_not_infrastructure(
+        tmp_path: Path) -> None:
+    outcome = run_proof(
+        "repro",
+        {"argv": ["sh", "-c", "echo 'FAILED test_errors.py::test_handles_ModuleNotFoundError - AssertionError'; exit 1"],
+         "contains": "claimed failure"},
+        ctx(tmp_path),
+    )
+    assert outcome.state is State.REFUTED
+
+
+def test_a_pytest_prefixed_module_error_is_unrunnable(tmp_path: Path) -> None:
+    outcome = run_proof(
+        "repro",
+        {"argv": ["sh", "-c", "echo 'E   ModuleNotFoundError: No module named x'; exit 1"],
+         "contains": "claimed failure"},
+        ctx(tmp_path),
+    )
+    assert outcome.state is State.UNRUNNABLE

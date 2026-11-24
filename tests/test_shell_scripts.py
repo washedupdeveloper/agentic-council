@@ -72,3 +72,11 @@ def test_the_shell_document_states_each_invocation() -> None:
         "does **not** start a login shell",
     ):
         assert needle in text, f"docs/SHELLS.md does not mention {needle!r}"
+
+
+def test_image_run_uses_a_unique_workspace() -> None:
+    text = (ROOT / "tools" / "image-run.sh").read_text(encoding="utf-8")
+    assert "mktemp -d" in text
+    assert "council-image-root.XXXXXX" in text
+    assert "trap cleanup EXIT" in text
+    assert "rm -rf \"$root\"" in text

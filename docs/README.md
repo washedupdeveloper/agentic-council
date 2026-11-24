@@ -66,6 +66,7 @@ looks the way it does.
 | [`M33.md`](M33.md) | one reviewer adapter seam; Hermes is the reference adapter, not the engine |
 | [`M34.md`](M34.md) | closing review breakpoints: the verdict on claim merge, two-clean sampling and strict proof mode |
 | [`M35.md`](M35.md) | closing the residual breakpoints: both Linux systems, the installed/source doctor, the single-sample opt-in, selector emission and the milestone runner |
+| [`M36.md`](M36.md) | closing the Astra review findings: the action manifest, proof-cause classification, rule trust, the sandbox boundary and the container tooling |
 
 The series has gaps — `M21`–`M24` and `M27` have no record here. Those changes
 went in without a decision record; this page does not invent one after the fact.

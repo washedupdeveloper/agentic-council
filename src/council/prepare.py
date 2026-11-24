@@ -17,9 +17,10 @@ from .baseline import load_at as load_baseline_at
 from .domain.changes import file_sections
 from .config import CONFIG_NAME
 from .config import load as load_config
+from .domain.config import Config, ConfigError, parse as parse_config
 from .domain.baseline import Baseline
 from .domain.scope import Scope, ScopeError
-from .planning import Prepared, prompt_for, rules_block
+from .planning import Prepared, prompt_for, reader, rules_block
 from .domain.prompt import PromptError, instrument_digest
 from .reference import FetchError, fetch
 from .repo import ReviewError, diff, output
@@ -57,6 +58,19 @@ def _baseline_changed(request: ReviewRequest, patch: str) -> bool:
     return any(section.path == rel for section in file_sections(patch))
 
 
+def _staged_config(root: Path) -> Config | None:
+    """The index copy of council.toml, so a staged review judges its own rules."""
+    rel = CONFIG_NAME
+    try:
+        text = output(root, "show", f":{rel}")
+    except ReviewError:
+        return None
+    try:
+        return parse_config(text, name=rel)
+    except ConfigError as exc:
+        raise ReviewError(f"the staged {rel} is not usable: {exc}") from exc
+
+
 def prepare(request: ReviewRequest) -> Prepared:
     """Resolve the change and build the prompt, writing nothing.
 
@@ -71,7 +85,11 @@ def prepare(request: ReviewRequest) -> Prepared:
         request.validate()
     except ValueError as exc:
         raise ReviewError(str(exc)) from exc
-    config = load_config(root / CONFIG_NAME)
+    if request.staged:
+        staged_config = _staged_config(root)
+        config = staged_config if staged_config is not None else Config()
+    else:
+        config = load_config(root / CONFIG_NAME)
     try:
         scope = Scope.create(request.include, request.exclude)
     except ScopeError as exc:
@@ -85,6 +103,17 @@ def prepare(request: ReviewRequest) -> Prepared:
             "the baseline file is changed in this diff; refusing to use a "
             "baseline the change itself can edit (use --allow-baseline-change "
             "only for a deliberate maintenance change)")
+    rule_docs = {rule.doc for rule in config.rules}
+    changed_docs = {section.path for section in file_sections(change.patch)}
+    protected = set(rule_docs & changed_docs)
+    if CONFIG_NAME in changed_docs:
+        protected.add(CONFIG_NAME)
+    if protected and not request.allow_rules_change:
+        raise ReviewError(
+            "the change edits the rule configuration or governing rule document(s): "
+            + ", ".join(sorted(protected))
+            + "; refusing to use rules the change itself can rewrite "
+              "(use --allow-rules-change only for a deliberate maintenance change)")
     # `git` decodes with surrogateescape so a non-UTF-8 path stays readable; a
     # non-UTF-8 *content* byte becomes a lone surrogate, which cannot be encoded
     # into the prompt. Replace those bytes once, here, so the prompt is valid.
@@ -139,8 +168,19 @@ def prepare(request: ReviewRequest) -> Prepared:
         raise ReviewError(str(exc)) from exc
 
     changed = tuple(section.path for section in file_sections(patch))
+    rule_reader = reader(root)
+    if request.staged:
+        def staged_reader(rel: str) -> str | None:
+            try:
+                index = output(root, "ls-files", "-s", "--", rel).strip()
+                if index.startswith("120000"):
+                    return None
+                return output(root, "show", f":{rel}")
+            except ReviewError:
+                return None
+        rule_reader = staged_reader
     try:
-        rules_text, rules = rules_block(root, config.rules, changed)
+        rules_text, rules = rules_block(root, config.rules, changed, read=rule_reader)
     except PromptError as exc:
         raise ReviewError(f"the reviewer prompt is not usable: {exc}") from exc
 

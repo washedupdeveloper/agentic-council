@@ -1332,3 +1332,63 @@ check = "python3 -m pytest tests/test_milestone.py::test_the_worker_cannot_git_c
 id = "shell-scripts-declare-and-parse-as-bash"
 text = "Every shipped shell script declares bash and parses under bash."
 check = "python3 -m pytest tests/test_shell_scripts.py -q"
+
+[[claim]]
+id = "the-shipped-action-manifest-is-valid-yaml"
+text = "The shipped composite action parses as YAML."
+check = "python3 -m pytest tests/test_governance.py::test_the_review_action_manifest_is_valid_yaml -q"
+
+[[claim]]
+id = "the-shipped-action-passes-inputs-as-data"
+text = "No run step in the shipped action interpolates an input into Bash source."
+check = "python3 -m pytest tests/test_governance.py::test_the_review_action_passes_inputs_as_data -q"
+
+[[claim]]
+id = "a-missing-proof-dependency-is-unrunnable"
+text = "A proof command that cannot import its dependency is UNRUNNABLE, never REFUTED."
+check = "python3 -m pytest tests/test_proofs.py::test_a_repro_with_a_missing_module_is_unrunnable -q"
+
+[[claim]]
+id = "a-stale-line-is-unrunnable"
+text = "A present proof whose quote is found at another line is UNRUNNABLE and names the actual line."
+check = "python3 -m pytest tests/test_proofs.py::test_present_reports_a_stale_line_instead_of_refuting -q"
+
+[[claim]]
+id = "a-governing-rule-cannot-be-edited-by-its-diff"
+text = "A review refuses a diff that edits one of its governing rule documents unless the caller opts in."
+check = "python3 -m pytest tests/test_run.py::test_a_governing_rule_cannot_be_edited_by_the_diff_it_judges -q"
+
+[[claim]]
+id = "the-command-sandbox-hides-user-homes"
+text = "The command sandbox masks /home and /root while keeping a repository under a home readable."
+check = "python3 -m pytest tests/test_domain_kernel.py::test_sandbox_command_masks_user_homes -q"
+
+[[claim]]
+id = "a-predicate-runs-under-the-guarded-path"
+text = "A milestone predicate cannot commit through the worker's PATH shim."
+check = "python3 -m pytest tests/test_milestone.py::test_a_predicate_cannot_commit_through_the_shim -q"
+
+[[claim]]
+id = "a-mixed-predicate-list-keeps-every-command"
+text = "A verify list mixing quoted and unquoted commands keeps every predicate."
+check = "python3 -m pytest tests/test_milestone.py::test_a_mixed_inline_list_keeps_every_predicate -q"
+
+[[claim]]
+id = "a-red-baseline-stops-the-mutation-gate"
+text = "The mutation checker refuses to score mutations when the unmodified suite is red."
+check = "python3 -m pytest tests/test_mutation_check.py::test_a_red_baseline_stops_before_any_mutation -q"
+
+[[claim]]
+id = "a-verdict-resource-cannot-leave-the-retention-root"
+text = "The MCP verdict resource rejects a run id that resolves outside the retention root."
+check = "python3 -m pytest tests/test_mcp_server.py::test_a_verdict_path_refuses_a_run_id_outside_the_root -q"
+
+[[claim]]
+id = "the-image-workspace-is-unique"
+text = "The image runner uses a unique workspace and cleans it up."
+check = "python3 -m pytest tests/test_shell_scripts.py::test_image_run_uses_a_unique_workspace -q"
+
+[[claim]]
+id = "an-oci-image-is-materialised"
+text = "The image materialiser reads an OCI index and applies a whiteout layer."
+check = "python3 -m pytest tests/test_image_tools.py::test_materialise_an_oci_layout tests/test_image_tools.py::test_a_whiteout_removes_the_lower_layer_file -q"
