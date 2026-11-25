@@ -100,9 +100,15 @@ def test_the_gate_pays_for_the_cheap_checks_before_the_expensive_one() -> None:
     `flake.nix`, so there is no second copy of it to drift.
     """
     gate = read(".github/workflows/gate.yml")
-    fast = gate.index("nix run .#gate-fast")
-    full = gate.index("nix run .#gate-ci")
-    assert fast < full, "the fast tier must precede the rest of the gate"
+    assert "nix run .#gate-fast" in gate
+    assert "nix run .#gate-ci" in gate
+    assert gate.count("needs: fast") == 2, "both expensive jobs must wait for the cheap tier"
+
+    # A matrix cannot be shared between jobs, so it is written twice; a drift here
+    # would gate one system in the cheap tier and another in the expensive one.
+    matrices = re.findall(r"include:\n((?:\s+- os: .*\n\s+system: .*\n)+)", gate)
+    assert len(matrices) == 2, f"expected two matrices, found {len(matrices)}"
+    assert matrices[0] == matrices[1], "the two matrices disagree"
 
     flake = read("flake.nix")
     match = re.search(r"fastChecks\s*=\s*\[([^\]]*)\]", flake)

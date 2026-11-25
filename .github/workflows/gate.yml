@@ -23,8 +23,43 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Fail in seconds, not minutes. Measured on a real defect (an unused import that
+  # also moved `__future__`): 11.8 s to a red verdict. The expensive jobs both wait
+  # for this one, so a lint error costs 57 s and no campaign is ever started.
+  #
+  # `--keep-going` inside the app, so every cheap check reports at once instead of
+  # one per push. The duplication this costs on a green run -- these four checks are
+  # built again in `gate`, which cannot share this runner's store -- was measured at
+  # ~6% of the gate's compute, and it buys back four minutes on a red one.
+  fast:
+    name: fast checks (${{ matrix.system }})
+    strategy:
+      fail-fast: false
+      # Duplicated in `gate` because a matrix cannot be shared between jobs;
+      # `tests/test_governance.py` holds the two lists identical.
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            system: x86_64-linux
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: cachix/install-nix-action@v31
+      - name: allow unprivileged user namespaces
+        run: |
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+          sudo sysctl -w kernel.unprivileged_userns_clone=1 || true
+          nix shell nixpkgs#bubblewrap -c bwrap --unshare-user --dev-bind / / true \
+            && echo "bwrap: usable"
+      - name: fast checks
+        run: nix run .#gate-fast
+
   gate:
     name: nix flake check (${{ matrix.system }})
+    needs: fast
     # x86_64 only. `aarch64-linux` stays declared in `flake.nix` because the
     # package must still evaluate for a Pi, but it is not gated here: add
     # `ubuntu-24.04-arm` back to this one list to turn the leg on. The runner
@@ -63,21 +98,9 @@ jobs:
           # `bwrap` is not on the runner's PATH: the tests take it from the Nix build.
           nix shell nixpkgs#bubblewrap -c bwrap --unshare-user --dev-bind / / true \
             && echo "bwrap: usable"
-      # Fail in seconds, not minutes. Measured on a real defect (an unused import
-      # that also moved `__future__`): 11.8 s to a red verdict, against ~12 min for
-      # the whole gate. The mutation campaign is ~68% of that, and it never starts
-      # when this step fails.
-      #
-      # `--keep-going` inside the app, so every cheap check reports at once instead
-      # of one per push. The Nix store is the same one the next step uses, so
-      # nothing built here is rebuilt there.
-      - name: fast checks
-        run: nix run .#gate-fast
-
-      # Every check except the campaign, which the shards below own. Measured, the
-      # campaign was 912 s of a 990 s gate -- everything else is under 90 s.
-      # `nix flake check` stays the one full gate locally; CI splits only the part
-      # that benefits from more machines.
+      # Every check except the campaign, which the shard job owns. `nix flake
+      # check` stays the one full gate locally; CI splits only the part that
+      # benefits from more machines.
       - name: the gate
         run: nix run .#gate-ci
 
@@ -89,7 +112,8 @@ jobs:
   # cores on a campaign that cannot matter.
   mutations:
     name: mutations (shard ${{ matrix.shard }}/4)
-    needs: gate
+    # Waits on the cheap tier only, so it runs beside `gate` rather than after it.
+    needs: fast
     strategy:
       fail-fast: false
       matrix:
