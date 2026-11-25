@@ -182,9 +182,22 @@
       ]
       ++ toolConfig;
     in
-    {
+    # `rec` because `packages` links to its sibling `checks` through
+    # `passthru.tests`: a consumer of the artifact can reach what proves it.
+    rec {
       packages = each (pkgs: {
-        default = app pkgs;
+        # `passthru.tests` links the artifact to what proves it, so a consumer can
+        # run `nix build .#default.passthru.tests` (or `nix flake check`) rather
+        # than trusting an untested build. It is not `doCheck`: the suite cannot
+        # run in the package build, because the build's own artifacts and Nix's
+        # `HOME=/homeless-shelter` each break a test that the copied-tree check
+        # passes. `passthru` is excluded from the derivation, so this does not
+        # change the output path.
+        default = (app pkgs).overrideAttrs (prev: {
+          passthru = (prev.passthru or { }) // {
+            tests = checks.${pkgs.stdenv.hostPlatform.system};
+          };
+        });
 
         # The full checker: the rules `--static` inside `mkCheck` leaves out,
         # because a build sandbox has neither the network nor a daemon.
@@ -232,10 +245,16 @@
         # remains free of both SDKs.
         council-mcp = serverApp pkgs (with pkgs.python3Packages; [ mcp ]) "council-mcp";
         council-acp = serverApp pkgs (with pkgs.python3Packages; [ agent-client-protocol ]) "council-acp";
-        council-server = serverApp pkgs (with pkgs.python3Packages; [
-          mcp
-          agent-client-protocol
-        ]) "council-mcp council-acp";
+        council-server =
+          (serverApp pkgs (with pkgs.python3Packages; [
+            mcp
+            agent-client-protocol
+          ]) "council-mcp council-acp").overrideAttrs
+            (prev: {
+              passthru = (prev.passthru or { }) // {
+                tests = checks.${pkgs.stdenv.hostPlatform.system};
+              };
+            });
       });
 
       checks = each (
