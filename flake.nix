@@ -114,14 +114,73 @@
             done
           '';
 
-      # A writable copy of the tree: the flake source is read-only, and pytest,
-      # mypy and the mutation check all write caches.
-      workTree =
-        pkgs:
-        pkgs.runCommandLocal "council-src" { } ''
-          cp -r ${self} $out
-          chmod -R u+w $out
-        '';
+      # What each check actually reads. `nix flake check` skips a check whose
+      # derivation is unchanged, but a single input carrying the whole tree means
+      # every edit changes every hash: measured, a README edit rebuilt 11 of 12
+      # checks. These filesets are each the *superset* a command opens, so an
+      # edit outside them leaves that check cached. Proven on the real flake: a
+      # docs edit rebuilt 3 checks, a spec edit 2, where both rebuilt 11 before.
+      #
+      # A path missing here is a check that silently reads less, which is worse
+      # than a slow gate. `tests/test_governance.py` holds the lists to what the
+      # suite and the tools actually open.
+      scopeRoot = ./.;
+      scope =
+        paths:
+        nixpkgs.lib.fileset.toSource {
+          root = scopeRoot;
+          fileset = nixpkgs.lib.fileset.unions (map (p: scopeRoot + "/${p}") paths);
+        };
+
+      # Tool configuration travels with every scope. Without it a scoped copy
+      # silently falls back to defaults: pyright reported type errors in the build
+      # sandbox that it does not report in the checkout, because its copy had no
+      # `pyrightconfig.json`. A check must see the same configuration everywhere.
+      toolConfig = [
+        "pyproject.toml"
+        "pyrightconfig.json"
+        "check-nix.allow"
+      ];
+
+      # The Python package and the suite that exercises it.
+      codeScope = [
+        "src"
+        "tests"
+      ]
+      ++ toolConfig;
+
+      # `pytest` also opens the governance and documentation fixtures.
+      testScope = codeScope ++ [
+        # The suite reads the flake itself: the governance tests assert its matrix
+        # and systems, and `tests/test_build_scope.py` parses the scope lists below.
+        "flake.nix"
+        "flake.lock"
+        ".github"
+        "docs"
+        "openspec"
+        "fixtures"
+        "skills"
+        "claims.toml"
+        "README.md"
+        "CHANGELOG.md"
+        "AGENTS.md"
+        "GLOSSARY.md"
+        "LICENSE"
+        "Dockerfile"
+        "bin"
+        "tools"
+      ];
+
+      # `tools/release.py` reads the changelog, the version and the tree layout.
+      releaseScope = [
+        "CHANGELOG.md"
+        "src"
+        "tools"
+        "docs"
+        "README.md"
+        "openspec"
+      ]
+      ++ toolConfig;
     in
     {
       packages = each (pkgs: {
@@ -183,12 +242,11 @@
         pkgs:
         let
           py = pythonEnv pkgs;
-          src = workTree pkgs;
 
           # Each check runs in a writable copy: the flake source in the store is
           # read-only, and pytest, mypy and the mutation check all write.
           mkCheck =
-            name: command:
+            name: paths: command:
             pkgs.runCommand name
               {
                 nativeBuildInputs = with pkgs; [
@@ -198,13 +256,26 @@
                   ruff
                   pyright
                 ];
+                src = pkgs.runCommandLocal "${name}-src" { } ''
+                  cp -r ${scope paths} $out
+                  chmod -R u+w $out
+                '';
               }
               ''
-                cp -r ${src} work
+                cp -r $src work
                 chmod -R u+w work
                 cd work
                 set -e
                 export HOME=$TMPDIR
+                # A scoped copy carries no history, and the claims registry and
+                # several tests ask the repository questions. A one-commit
+                # snapshot is enough for every one of them.
+                if [ ! -d .git ]; then
+                  git init -q .
+                  git add -A
+                  git -c user.email=council@example.invalid \
+                      -c user.name=council commit -qm snapshot
+                fi
                 # The subshell matters: `set -e` does not fire for the left side of
                 # a `&&` list, so a failing check joined with `&&` would fall through
                 # to `touch $out` and report success. In a subshell the list's
@@ -214,32 +285,38 @@
               '';
         in
         {
-          tests = mkCheck "council-tests" "python -m pytest -q -p no:cacheprovider";
+          tests = mkCheck "council-tests" testScope "python -m pytest -q -p no:cacheprovider";
 
-          types = mkCheck "council-types" "mypy src";
+          types = mkCheck "council-types" codeScope "mypy src";
 
           # The editor's language server over the same source. mypy owns the
           # package contract; pyright catches Optional access in tools too.
-          pyright = mkCheck "council-pyright" "pyright";
+          pyright = mkCheck "council-pyright" (codeScope ++ [ "tools" ]) "pyright";
 
           # F: a name that is imported and never used. E9: code that cannot run.
-          lint = mkCheck "council-lint" "ruff check --select F,E9 src tools tests";
+          lint = mkCheck "council-lint" (codeScope ++ [ "tools" ]) "ruff check --select F,E9 src tools tests";
 
           # The registry, executed: every sentence in claims.toml is a command
           # that must exit 0, so the documentation cannot outrun the code.
           # Invoked through bash because the sandbox has no /usr/bin/env.
-          claims = mkCheck "council-claims" "bash ./bin/council-verify && bash ./bin/council-verify --check docs/CLAIMS.md";
+          claims = mkCheck "council-claims" (
+            testScope ++ [ "bin" ]
+          ) "bash ./bin/council-verify && bash ./bin/council-verify --check docs/CLAIMS.md";
 
           # The optional adapters are importable and expose their command help
           # under the same test interpreter as the core suite.
-          server-mcp = mkCheck "council-server-mcp" "PYTHONPATH=src python -m council_mcp --help > /dev/null";
-          server-acp = mkCheck "council-server-acp" "PYTHONPATH=src python -m council_acp --help > /dev/null";
+          server-mcp =
+            mkCheck "council-server-mcp" codeScope
+              "PYTHONPATH=src python -m council_mcp --help > /dev/null";
+          server-acp =
+            mkCheck "council-server-acp" codeScope
+              "PYTHONPATH=src python -m council_acp --help > /dev/null";
 
           # The suite, broken on purpose eighteen ways. It must notice each one.
-          mutations = mkCheck "council-mutations" "python tools/mutation_check.py";
+          mutations = mkCheck "council-mutations" (testScope ++ [ "tools" ]) "python tools/mutation_check.py";
 
           # v1.9.0's pinned verdicts beside this rule, on the same fixtures.
-          differential = mkCheck "council-differential" "python tools/differential.py";
+          differential = mkCheck "council-differential" testScope "python tools/differential.py";
 
           # The flake and the scripts, held to what the formatter cannot check.
           # `--static` inside mkCheck: the sandbox has no network, so the rules
@@ -253,10 +330,10 @@
 
           # The version, the changelog and every prose claim agree, and the
           # changelog is ordered. Maintainer tool: it is not a shipped verb.
-          release = mkCheck "council-release" "python tools/release.py check";
+          release = mkCheck "council-release" releaseScope "python tools/release.py check";
 
           # The wheel is built and installed into a fresh prefix, then run.
-          wheel = mkCheck "council-wheel" ''
+          wheel = mkCheck "council-wheel" (codeScope ++ [ "README.md" ]) ''
             python -m pip wheel --no-deps --no-build-isolation --wheel-dir dist .
             python -m pip install --no-index --target dist/site dist/*.whl
             PYTHONPATH=dist/site python -m council --help > /dev/null

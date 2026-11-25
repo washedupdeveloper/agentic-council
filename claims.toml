@@ -1392,3 +1392,8 @@ check = "python3 -m pytest tests/test_shell_scripts.py::test_image_run_uses_a_un
 id = "an-oci-image-is-materialised"
 text = "The image materialiser reads an OCI index and applies a whiteout layer."
 check = "python3 -m pytest tests/test_image_tools.py::test_materialise_an_oci_layout tests/test_image_tools.py::test_a_whiteout_removes_the_lower_layer_file -q"
+
+[[claim]]
+id = "every-check-declares-what-it-reads"
+text = "Every check's declared input is a superset of the trees its command opens."
+check = "python3 -m pytest tests/test_build_scope.py -q"

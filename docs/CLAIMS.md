@@ -270,3 +270,4 @@ registry, so it cannot describe a claim that has no check.
 | `a-verdict-resource-cannot-leave-the-retention-root` | The MCP verdict resource rejects a run id that resolves outside the retention root. | `python3 -m pytest tests/test_mcp_server.py::test_a_verdict_path_refuses_a_run_id_outside_the_root -q` |
 | `the-image-workspace-is-unique` | The image runner uses a unique workspace and cleans it up. | `python3 -m pytest tests/test_shell_scripts.py::test_image_run_uses_a_unique_workspace -q` |
 | `an-oci-image-is-materialised` | The image materialiser reads an OCI index and applies a whiteout layer. | `python3 -m pytest tests/test_image_tools.py::test_materialise_an_oci_layout tests/test_image_tools.py::test_a_whiteout_removes_the_lower_layer_file -q` |
+| `every-check-declares-what-it-reads` | Every check's declared input is a superset of the trees its command opens. | `python3 -m pytest tests/test_build_scope.py -q` |

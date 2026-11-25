@@ -18,6 +18,9 @@ and every mutation falsifies at least one claim.
 
 from __future__ import annotations
 
+import argparse
+import concurrent.futures
+import os
 import re
 import shutil
 import subprocess
@@ -332,7 +335,64 @@ def _copy_src(raw: str) -> Path:
     return src
 
 
-def main() -> int:
+def mutation_names() -> list[str]:
+    """Every mutant, in registry order."""
+    return [mutation.name for mutation in MUTATIONS]
+
+
+def _select(names: list[str] | None) -> tuple[Mutation, ...]:
+    if not names:
+        return MUTATIONS
+    wanted = set(names)
+    chosen = tuple(m for m in MUTATIONS if m.name in wanted)
+    unknown = wanted - {m.name for m in chosen}
+    if unknown:
+        raise SystemExit(f"no such mutation: {', '.join(sorted(unknown))}")
+    return chosen
+
+
+def _score(mutation: Mutation, by_node: dict[str, list[str]]
+           ) -> tuple[str, bool, set[str], str | None]:
+    """Run one mutant against the full suite.
+
+    Returns (name, caught, claims-broken, problem). The body is the serial loop's
+    body moved into a function: the mutant is applied to a private copy, the whole
+    suite runs, and `caught` is whether it noticed. A pool only decides *when*
+    this runs, never what it does, so the guarantee is identical to the serial
+    campaign -- unlike test-selection, which silently narrows what can be noticed.
+    """
+    with tempfile.TemporaryDirectory(prefix="council-mut-") as raw:
+        src = _copy_src(raw)
+        target = src / "council" / mutation.file
+        body = target.read_text(encoding="utf-8")
+        if mutation.old not in body:
+            return mutation.name, False, set(), f"pattern not found in {mutation.file}"
+        target.write_text(body.replace(mutation.old, mutation.new, 1), encoding="utf-8")
+        code, broken = run_suite(src)
+    hit = {claim_id for node in broken for claim_id in by_node.get(node, [])}
+    return mutation.name, code != 0, hit, None
+
+
+def main(argv: list[str] | None = None) -> int:
+    # `argv=None` means "the campaign, as a library call": a test that imports
+    # this module must not be given pytest's own command line.
+    parser = argparse.ArgumentParser(
+        prog="mutation_check",
+        description="Break each rule on purpose and prove the suite notices.")
+    parser.add_argument(
+        "--list", action="store_true",
+        help="print every mutation name and exit")
+    parser.add_argument(
+        "--only", action="append", metavar="NAME",
+        help="score only this mutation (repeatable); the whole registry is the default")
+    args = parser.parse_args(argv) if argv is not None else None
+
+    if args is not None and args.list:
+        for name in mutation_names():
+            print(name)
+        return 0
+
+    selected = _select(args.only if args is not None else None)
     claims = load_claims(ROOT / "claims.toml")
     by_node: dict[str, list[str]] = {}
     for claim in claims:
@@ -351,26 +411,29 @@ def main() -> int:
 
     survivors: list[str] = []
     falsified: dict[str, set[str]] = {}
-    for mutation in MUTATIONS:
-        with tempfile.TemporaryDirectory(prefix="council-mut-") as raw:
-            src = _copy_src(raw)
-            target = src / "council" / mutation.file
-            text = target.read_text(encoding="utf-8")
-            if mutation.old not in text:
-                print(f"  STALE  {mutation.name}: pattern not found in {mutation.file}")
-                survivors.append(mutation.name)
-                falsified[mutation.name] = set()
+
+    # One worker per core by default; `MUTATION_WORKERS` overrides. A pool decides
+    # scheduling only. The suite is the same, the mutants are the same, and every
+    # mutant must still be caught -- so the campaign proves exactly what it did
+    # serially, in a fraction of the wall clock.
+    default_workers = os.cpu_count() or 2
+    workers = max(1, min(len(selected), int(os.environ.get("MUTATION_WORKERS", "0")) or default_workers))
+    print(f"scoring {len(selected)} mutant(s) across {workers} worker(s)", flush=True)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as pool:
+        futures = {pool.submit(_score, m, by_node): m for m in selected}
+        for future in concurrent.futures.as_completed(futures):
+            name, caught, hit, problem = future.result()
+            if problem is not None:
+                print(f"  STALE  {name}: {problem}", flush=True)
+                survivors.append(name)
+                falsified[name] = set()
                 continue
-            target.write_text(text.replace(mutation.old, mutation.new, 1), encoding="utf-8")
-            code, broken = run_suite(src)
-            caught = code != 0
-            print(f"  {'caught' if caught else 'SURVIVED'}  {mutation.name}")
+            print(f"  {'caught' if caught else 'SURVIVED'}  {name}", flush=True)
             if not caught:
-                survivors.append(mutation.name)
-            hit = {claim_id for node in broken for claim_id in by_node.get(node, [])}
-            falsified[mutation.name] = hit
+                survivors.append(name)
+            falsified[name] = hit
             if hit:
-                print(f"            falsifies {', '.join(sorted(hit))}")
+                print(f"            falsifies {', '.join(sorted(hit))}", flush=True)
 
     problems: list[str] = []
     for claim in claims:
@@ -380,11 +443,11 @@ def main() -> int:
             problems.append(f"{claim.id}: falsifier {claim.falsifier!r} is not a mutation")
         elif claim.id not in falsified[claim.falsifier]:
             problems.append(f"{claim.id}: falsifier {claim.falsifier!r} did not break it")
-    for mutation in MUTATIONS:
+    for mutation in selected:
         if not falsified[mutation.name]:
             problems.append(f"mutation {mutation.name!r} falsifies no claim")
 
-    total = len(MUTATIONS)
+    total = len(selected)
     declared = sum(1 for claim in claims if claim.falsifier is not None)
     print(f"\n{total - len(survivors)}/{total} mutations caught; "
           f"{declared} claim(s) declare a falsifier")
@@ -394,4 +457,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(main(sys.argv[1:]))
