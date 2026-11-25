@@ -4,10 +4,12 @@ sentence, one command that would falsify it."""
 from __future__ import annotations
 
 import argparse
+import os
 import shlex
 import subprocess
 import sys
 import tomllib
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -124,9 +126,21 @@ def run_one(claim: Claim, cwd: Path, timeout: int = DEFAULT_TIMEOUT) -> ClaimRes
     return ClaimResult(claim, False, f"exit {proc.returncode}: {tail[-1] if tail else ''}".rstrip())
 
 
-def run_all(claims: list[Claim], cwd: Path, timeout: int = DEFAULT_TIMEOUT) -> list[ClaimResult]:
-    """Run every claim, in registry order, and keep going after a failure."""
-    return [run_one(claim, cwd, timeout) for claim in claims]
+def run_all(claims: list[Claim],
+            cwd: Path,
+            timeout: int = DEFAULT_TIMEOUT,
+            jobs: int = 0) -> list[ClaimResult]:
+    """Run every claim and keep going after a failure; report in registry order.
+
+    Each check is an independent process, so the pool decides only when a claim
+    runs. Two hundred and sixty-three claims at roughly a second of interpreter
+    startup each is the entire cost of this check; it is not the work.
+    """
+    if jobs <= 1 or len(claims) <= 1:
+        return [run_one(claim, cwd, timeout) for claim in claims]
+    with ThreadPoolExecutor(max_workers=jobs) as pool:
+        # `map` preserves input order, so the report is registry order either way.
+        return list(pool.map(lambda c: run_one(c, cwd, timeout), claims))
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -138,6 +152,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--write", type=Path, default=None, help="write the registry as markdown")
     parser.add_argument("--check", type=Path, default=None,
                         help="fail if the given markdown is not what the registry renders")
+    parser.add_argument("--jobs", type=int, default=0,
+                        help="claims to run at once (0 = one per core)")
     try:
         args = parser.parse_args(sys.argv[1:] if argv is None else argv)
     except SystemExit as exc:
@@ -170,7 +186,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"{args.check} matches the registry ({len(claims)} claims)")
         return 0
 
-    results = run_all(claims, Path.cwd())
+    jobs = args.jobs or (os.cpu_count() or 1)
+    results = run_all(claims, Path.cwd(), jobs=jobs)
     failed = [r for r in results if not r.ok]
     for result in results:
         mark = "ok  " if result.ok else "FAIL"
