@@ -68,32 +68,10 @@
       # One interpreter with the tools the checks need. The protocol SDKs are
       # dev dependencies because the server adapters are tested here; the core
       # `council` package itself still has no runtime dependencies.
-      # pytest, pinned by the flake lock and patched here.
-      #
-      # `_pytest.pathlib.find_prefixed` scans with `os.scandir` and never closes
-      # the handle. When the generator is finalised instead of exhausted -- which
-      # `cleanup_numbered_dir` does, through `itertools.tee` and `zip(strict=True)`
-      # -- CPython raises `ResourceWarning: unclosed scandir iterator` from the
-      # handle's own finaliser. This project runs pytest with
-      # `filterwarnings = ["error"]`, so that warning fails whichever test happens
-      # to be running: measured, one claim failed in six rounds at four workers.
-      #
-      # The leak is still upstream: `os.scandir(root)` with no context manager in
-      # 9.1.1, in 9.2.0, and on `main`. Bumping therefore fixes nothing, so the
-      # version is whatever the lock pins and the close comes from
-      # `patches/pytest-close-scandir.patch`. If the pin moves and the patch stops
-      # applying, the build fails loudly rather than the gate going flaky --
-      # `tests/test_pytest_pin.py` holds the behaviour.
-      pytestPinned =
-        pkgs:
-        pkgs.python3Packages.pytest.overrideAttrs (prev: {
-          patches = (prev.patches or [ ]) ++ [ ./patches/pytest-close-scandir.patch ];
-        });
-
       pythonEnv =
         pkgs:
         pkgs.python3.withPackages (ps: [
-          (pytestPinned pkgs)
+          ps.pytest
           ps.hypothesis
           ps.mypy
           ps.setuptools
@@ -338,7 +316,9 @@
               '';
         in
         {
-          tests = mkCheck "council-tests" testScope "python -m pytest -q -p no:cacheprovider";
+          tests =
+            mkCheck "council-tests" testScope
+              "python -m pytest -q -p no:cacheprovider --basetemp=$TMPDIR/pytest-base";
 
           types = mkCheck "council-types" codeScope "mypy src";
 

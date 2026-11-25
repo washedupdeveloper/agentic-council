@@ -19,7 +19,7 @@ SOURCE = Path(__file__).resolve().parent.parent / "src" / "council"
 #: reviewer adapter adds one effect module at the same seam. The doctor source
 #: check and the single-sample opt-in add one guard each. The review-reliability
 #: fixes add the proof-cause, rule-trust and sandbox guards.
-SOURCE_LIMIT = 6965
+SOURCE_LIMIT = 6986
 MODULE_LIMIT = 50
 
 

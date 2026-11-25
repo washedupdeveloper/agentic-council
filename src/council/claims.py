@@ -108,20 +108,41 @@ def render(claims: list[Claim]) -> str:
     return HEADER + "\n".join(rows) + "\n"
 
 
+def _is_pytest(argv: list[str]) -> bool:
+    """True when the command is a pytest invocation, however it is spelled."""
+    if argv and Path(argv[0]).name.startswith("pytest"):
+        return True
+    return any(token == "-m" and following == "pytest"
+               for token, following in zip(argv, argv[1:]))
+
+
+def _with_basetemp(argv: list[str], tmp: Path) -> list[str]:
+    """Point pytest at its own basetemp, so it never builds numbered directories.
+
+    `TempPathFactory.getbasetemp` only runs `make_numbered_dir_with_cleanup` when no
+    basetemp is given, and that cleanup is where pytest leaves a scandir handle for
+    the collector to warn about. Nothing about the check changes.
+    """
+    if not _is_pytest(argv):
+        return argv
+    return [*argv, f"--basetemp={tmp / 'pytest'}"]
+
+
 def run_one(claim: Claim, cwd: Path, timeout: int = DEFAULT_TIMEOUT) -> ClaimResult:
     """Run one claim's check. A timeout is a failure, not a pass."""
     argv = shlex.split(claim.check)
     if not argv:
         return ClaimResult(claim, False, "empty check")
-    # A claim owns its own temp root and does not write a shared pytest cache, so
-    # two claims running at once cannot collide. Neither setting changes what the
+    # A claim owns its own temp root, its own basetemp and no shared pytest cache,
+    # so two claims running at once cannot collide. None of it changes what the
     # command checks.
     env = dict(os.environ)
     env["PYTEST_ADDOPTS"] = (env.get("PYTEST_ADDOPTS", "") + " -p no:cacheprovider").strip()
     try:
         with tempfile.TemporaryDirectory(prefix="council-claim-") as tmp:
             env["TMPDIR"] = tmp
-            proc = subprocess.run(argv, cwd=cwd, capture_output=True, text=True,
+            proc = subprocess.run(_with_basetemp(argv, Path(tmp)), cwd=cwd,
+                                  capture_output=True, text=True,
                                   timeout=timeout, env=env)
     except FileNotFoundError:
         return ClaimResult(claim, False, f"check command not found: {argv[0]}")
