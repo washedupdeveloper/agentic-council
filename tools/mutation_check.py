@@ -319,10 +319,16 @@ def run_suite(src: Path) -> tuple[int, set[str]]:
     """Run the suite against a mutated tree; return the exit code and failing node ids."""
     with tempfile.TemporaryDirectory() as raw:
         report = Path(raw) / "junit.xml"
+        # A private temp root per suite: twelve of these run at once, and pytest
+        # prunes numbered basetemps under whatever TMPDIR it inherits. Sharing one
+        # lets two suites delete each other's directories mid-scan, which surfaces
+        # as an unraisable scandir warning and, under `filterwarnings = ["error"]`,
+        # as a red check that has nothing to do with the mutant.
+        env = {**os.environ, "TMPDIR": raw, "TMP": raw, "TEMP": raw}
         code = subprocess.run(
             [sys.executable, "-m", "pytest", "-o", f"pythonpath={src}", "-q", "--no-header",
              "-p", "no:cacheprovider", f"--junitxml={report}"],
-            cwd=ROOT, capture_output=True, text=True,
+            cwd=ROOT, capture_output=True, text=True, env=env,
         ).returncode
         return code, failing_tests(report) if report.exists() else set()
 
