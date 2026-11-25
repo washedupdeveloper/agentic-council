@@ -8,6 +8,7 @@ import os
 import shlex
 import subprocess
 import sys
+import tempfile
 import tomllib
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
@@ -112,8 +113,16 @@ def run_one(claim: Claim, cwd: Path, timeout: int = DEFAULT_TIMEOUT) -> ClaimRes
     argv = shlex.split(claim.check)
     if not argv:
         return ClaimResult(claim, False, "empty check")
+    # A claim owns its own temp root and does not write a shared pytest cache, so
+    # two claims running at once cannot collide. Neither setting changes what the
+    # command checks.
+    env = dict(os.environ)
+    env["PYTEST_ADDOPTS"] = (env.get("PYTEST_ADDOPTS", "") + " -p no:cacheprovider").strip()
     try:
-        proc = subprocess.run(argv, cwd=cwd, capture_output=True, text=True, timeout=timeout)
+        with tempfile.TemporaryDirectory(prefix="council-claim-") as tmp:
+            env["TMPDIR"] = tmp
+            proc = subprocess.run(argv, cwd=cwd, capture_output=True, text=True,
+                                  timeout=timeout, env=env)
     except FileNotFoundError:
         return ClaimResult(claim, False, f"check command not found: {argv[0]}")
     except subprocess.TimeoutExpired:
