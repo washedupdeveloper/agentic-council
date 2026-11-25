@@ -37,6 +37,7 @@ fails the gate when one exists.
 | [`ADOPTION.md`](ADOPTION.md) | the `pypa/sampleproject` adoption run: the evidence that the tool works on a repository that is not this one |
 | [`UNTANGLE.md`](UNTANGLE.md) | the decision log of the first refactor: problems found, what moved, what is still owed |
 | [`UNTANGLE2.md`](UNTANGLE2.md) | the second pass: the five-parser diff grammar, the run ledger, the comment ruling, and the two moves it left |
+| [`UPSTREAM.md`](UPSTREAM.md) | defects in dependencies that the gate routes around: what we do instead, the measurements, and when to re-check |
 
 ## Decision records
 
