@@ -404,7 +404,7 @@
           program = toString (
             pkgs.writeShellScript "council-gate-ci" ''
               set -euo pipefail
-              exec nix build --no-link --keep-going \
+              exec nix build --no-link --keep-going --print-build-logs \
                 ${nixpkgs.lib.concatStringsSep " " (
                   map (c: "\".#checks.${pkgs.stdenv.hostPlatform.system}.${c}\"") (
                     builtins.attrNames (builtins.removeAttrs checks.${pkgs.stdenv.hostPlatform.system} [ "mutations" ])
@@ -420,7 +420,7 @@
           program = toString (
             pkgs.writeShellScript "council-gate-fast" ''
               set -euo pipefail
-              exec nix build --no-link --keep-going \
+              exec nix build --no-link --keep-going --print-build-logs \
                 ${nixpkgs.lib.concatStringsSep " " (
                   map (c: "\".#checks.${pkgs.stdenv.hostPlatform.system}.${c}\"") fastChecks
                 )}
