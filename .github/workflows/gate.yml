@@ -1,9 +1,11 @@
 name: gate
 
-# The portable gate on a hosted runner: the same `nix flake check` that runs locally, so a
-# push to v2 is verified without waiting for a person. `council.yml` beside this one stays
-# manual on purpose — it spends model time and needs a self-hosted runner; this spends
-# neither.
+# The portable gate on a hosted runner: the same checks `nix flake check` runs locally, so a
+# push to v2 is verified without waiting for a person. Two jobs, because the cheap checks
+# fail fastest and the campaign is most of the cost: `gate` runs the fast tier and then
+# everything except the campaign, and `mutations` scores the campaign across four shards.
+# `council.yml` beside this one stays manual on purpose — it spends model time and needs a
+# self-hosted runner; this spends neither.
 
 on:
   push:
@@ -72,6 +74,41 @@ jobs:
       - name: fast checks
         run: nix run .#gate-fast
 
-      - run: nix flake check --print-build-logs
+      # Every check except the campaign, which the shards below own. Measured, the
+      # campaign was 912 s of a 990 s gate -- everything else is under 90 s.
+      # `nix flake check` stays the one full gate locally; CI splits only the part
+      # that benefits from more machines.
+      - name: the gate
+        run: nix run .#gate-ci
+
       - name: validate OpenSpec changes
         run: nix shell nixpkgs#nodejs_22 -c npx -y @fission-ai/openspec@1.15.0 validate --all --strict
+
+  # Four runners instead of one: 72 mutants split by index, each still scored
+  # against the whole suite. `needs: gate` so a lint failure never spends sixteen
+  # cores on a campaign that cannot matter.
+  mutations:
+    name: mutations (shard ${{ matrix.shard }}/4)
+    needs: gate
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: cachix/install-nix-action@v31
+      - name: allow unprivileged user namespaces
+        run: |
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+          sudo sysctl -w kernel.unprivileged_userns_clone=1 || true
+          nix shell nixpkgs#bubblewrap -c bwrap --unshare-user --dev-bind / / true \
+            && echo "bwrap: usable"
+      # The same tool the `mutations` check runs; `--shard` partitions the registry
+      # by index, so the union of these jobs is exactly the registry, and each job
+      # verifies only the claims whose falsifier it owns.
+      - name: score this shard
+        run: nix develop -c python tools/mutation_check.py --shard ${{ matrix.shard }}/4

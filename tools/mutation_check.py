@@ -351,6 +351,23 @@ def _select(names: list[str] | None) -> tuple[Mutation, ...]:
     return chosen
 
 
+def _parse_shard(raw: str) -> tuple[int, int]:
+    """"I/N" -> the I-th of N interleaved slices of the registry."""
+    head, _, tail = raw.partition("/")
+    try:
+        index, count = int(head), int(tail)
+    except ValueError:
+        raise SystemExit(f"--shard wants I/N, got {raw!r}") from None
+    if count < 1 or not 0 <= index < count:
+        raise SystemExit(f"--shard wants 0 <= I < N, got {raw!r}")
+    return index, count
+
+
+def _shard(mutations: tuple[Mutation, ...], index: int, count: int) -> tuple[Mutation, ...]:
+    """Interleaved, so each slice gets a spread of files rather than one region."""
+    return tuple(m for i, m in enumerate(mutations) if i % count == index)
+
+
 def _score(mutation: Mutation, by_node: dict[str, list[str]]
            ) -> tuple[str, bool, set[str], str | None]:
     """Run one mutant against the full suite.
@@ -385,6 +402,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--only", action="append", metavar="NAME",
         help="score only this mutation (repeatable); the whole registry is the default")
+    parser.add_argument(
+        "--shard", metavar="I/N", default=None,
+        help="score the I-th of N interleaved slices; CI runs one job per slice")
     args = parser.parse_args(argv) if argv is not None else None
 
     if args is not None and args.list:
@@ -393,6 +413,11 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     selected = _select(args.only if args is not None else None)
+    shard = _parse_shard(args.shard) if args is not None and args.shard else None
+    if shard is not None:
+        whole = len(selected)
+        selected = _shard(selected, *shard)
+        print(f"shard {shard[0]}/{shard[1]}: {len(selected)} of {whole} mutant(s)", flush=True)
     claims = load_claims(ROOT / "claims.toml")
     by_node: dict[str, list[str]] = {}
     for claim in claims:
@@ -436,11 +461,17 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"            falsifies {', '.join(sorted(hit))}", flush=True)
 
     problems: list[str] = []
+    known = set(mutation_names())
     for claim in claims:
         if claim.falsifier is None:
             continue
-        if claim.falsifier not in falsified:
+        if claim.falsifier not in known:
+            # A registry error, independent of which shard is running.
             problems.append(f"{claim.id}: falsifier {claim.falsifier!r} is not a mutation")
+        elif claim.falsifier not in falsified:
+            # Another shard owns this mutant; the union over 0..N-1 is every index
+            # by construction, so nothing is dropped by skipping it here.
+            continue
         elif claim.id not in falsified[claim.falsifier]:
             problems.append(f"{claim.id}: falsifier {claim.falsifier!r} did not break it")
     for mutation in selected:
@@ -449,8 +480,10 @@ def main(argv: list[str] | None = None) -> int:
 
     total = len(selected)
     declared = sum(1 for claim in claims if claim.falsifier is not None)
+    owned = sum(1 for claim in claims if claim.falsifier in falsified)
+    scope = f"; {owned}/{declared} falsifier claim(s) owned by this shard" if shard else ""
     print(f"\n{total - len(survivors)}/{total} mutations caught; "
-          f"{declared} claim(s) declare a falsifier")
+          f"{declared} claim(s) declare a falsifier{scope}")
     for problem in problems:
         print(f"  PROBLEM {problem}")
     return 0 if not survivors and not problems else 1

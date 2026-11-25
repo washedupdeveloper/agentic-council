@@ -396,6 +396,24 @@
       });
 
       apps = each (pkgs: {
+        # Everything except the campaign, for CI: the shard jobs own that. Local
+        # `nix flake check` remains the one full gate, so nothing here weakens what
+        # a contributor runs before a push.
+        gate-ci = {
+          type = "app";
+          program = toString (
+            pkgs.writeShellScript "council-gate-ci" ''
+              set -euo pipefail
+              exec nix build --no-link --keep-going \
+                ${nixpkgs.lib.concatStringsSep " " (
+                  map (c: "\".#checks.${pkgs.stdenv.hostPlatform.system}.${c}\"") (
+                    builtins.attrNames (builtins.removeAttrs checks.${pkgs.stdenv.hostPlatform.system} [ "mutations" ])
+                  )
+                )}
+            ''
+          );
+        };
+
         # One command for the inner loop: `nix run .#gate-fast`.
         gate-fast = {
           type = "app";

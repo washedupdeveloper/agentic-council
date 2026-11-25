@@ -71,6 +71,27 @@ def test_the_gate_runs_x86_64_and_documents_how_to_add_arm() -> None:
     assert '"aarch64-linux"' in flake
 
 
+def test_the_campaign_is_sharded_without_changing_what_it_proves() -> None:
+    """CI splits the campaign across jobs; the union must still be the registry.
+
+    The shard count is written twice: once as the matrix, once in `--shard I/N`.
+    If they disagree, the gate silently scores a fraction of the mutants and still
+    reports green -- which is the failure mode this whole file exists to prevent.
+    """
+    gate = read(".github/workflows/gate.yml")
+    match = re.search(r"shard: \[([^\]]*)\]", gate)
+    assert match is not None, "the shard matrix disappeared"
+    count = len([x for x in match.group(1).split(",") if x.strip()])
+    assert count > 1, "one shard is not a shard"
+    assert f"--shard ${{{{ matrix.shard }}}}/{count}" in gate
+
+    # The single gate must not also run the campaign, or every shard is duplicated.
+    assert "nix run .#gate-ci" in gate
+    flake = read("flake.nix")
+    assert "removeAttrs checks." in flake
+    assert '"mutations"' in flake
+
+
 def test_the_gate_pays_for_the_cheap_checks_before_the_expensive_one() -> None:
     """A ruff finding must not wait behind a 72-mutant campaign.
 
@@ -80,8 +101,8 @@ def test_the_gate_pays_for_the_cheap_checks_before_the_expensive_one() -> None:
     """
     gate = read(".github/workflows/gate.yml")
     fast = gate.index("nix run .#gate-fast")
-    full = gate.index("nix flake check --print-build-logs")
-    assert fast < full, "the fast tier must precede the full check"
+    full = gate.index("nix run .#gate-ci")
+    assert fast < full, "the fast tier must precede the rest of the gate"
 
     flake = read("flake.nix")
     match = re.search(r"fastChecks\s*=\s*\[([^\]]*)\]", flake)
