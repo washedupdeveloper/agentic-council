@@ -32,9 +32,17 @@ jobs:
     # is a one-word edit and not a rewrite of the job.
     strategy:
       fail-fast: false
+      # `os` is the runner label; `system` is the Nix system those checks are
+      # addressed by. They are two fields because `.#checks.<system>.<name>` needs
+      # the Nix name, which is not the runner's. To gate aarch64 again, add one
+      # entry and nothing else in this file changes:
+      #   - os: ubuntu-24.04-arm
+      #     system: aarch64-linux
       matrix:
-        system: [ubuntu-24.04]
-    runs-on: ${{ matrix.system }}
+        include:
+          - os: ubuntu-24.04
+            system: x86_64-linux
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
@@ -53,6 +61,17 @@ jobs:
           # `bwrap` is not on the runner's PATH: the tests take it from the Nix build.
           nix shell nixpkgs#bubblewrap -c bwrap --unshare-user --dev-bind / / true \
             && echo "bwrap: usable"
+      # Fail in seconds, not minutes. Measured on a real defect (an unused import
+      # that also moved `__future__`): 11.8 s to a red verdict, against ~12 min for
+      # the whole gate. The mutation campaign is ~68% of that, and it never starts
+      # when this step fails.
+      #
+      # `--keep-going` inside the app, so every cheap check reports at once instead
+      # of one per push. The Nix store is the same one the next step uses, so
+      # nothing built here is rebuilt there.
+      - name: fast checks
+        run: nix run .#gate-fast
+
       - run: nix flake check --print-build-logs
       - name: validate OpenSpec changes
         run: nix shell nixpkgs#nodejs_22 -c npx -y @fission-ai/openspec@1.15.0 validate --all --strict

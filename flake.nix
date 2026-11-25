@@ -257,6 +257,18 @@
             });
       });
 
+      # The cheap half of the gate, ordered by how fast a failure is found and how
+      # likely it is. `nix run .#gate-fast` builds exactly this list and stops there:
+      # a typo costs 22 ms, a type error 3.6 s, a broken test 31 s -- and the
+      # mutation campaign, which is the whole cost of the gate, never starts.
+      # `tests/test_governance.py` holds the workflow to this list.
+      fastChecks = [
+        "lint"
+        "types"
+        "pyright"
+        "tests"
+      ];
+
       checks = each (
         pkgs:
         let
@@ -380,6 +392,22 @@
             echo "  ./bin/council-verify every claim"
             echo "  nix flake check       every check, including the Nix sources"
           '';
+        };
+      });
+
+      apps = each (pkgs: {
+        # One command for the inner loop: `nix run .#gate-fast`.
+        gate-fast = {
+          type = "app";
+          program = toString (
+            pkgs.writeShellScript "council-gate-fast" ''
+              set -euo pipefail
+              exec nix build --no-link --keep-going \
+                ${nixpkgs.lib.concatStringsSep " " (
+                  map (c: "\".#checks.${pkgs.stdenv.hostPlatform.system}.${c}\"") fastChecks
+                )}
+            ''
+          );
         };
       });
 

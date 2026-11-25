@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import yaml
@@ -59,14 +60,33 @@ def test_the_review_workflow_defaults_to_auto_sampling() -> None:
 
 
 def test_the_gate_runs_x86_64_and_documents_how_to_add_arm() -> None:
-    """One gated system, with the arm leg named and one edit away."""
+    """One gated system, with the arm leg named and one entry away."""
     gate = read(".github/workflows/gate.yml")
-    assert "system: [ubuntu-24.04]" in gate
+    assert "- os: ubuntu-24.04" in gate
+    assert "system: x86_64-linux" in gate
     assert "ubuntu-24.04-arm" in gate
     assert "matrix:" in gate
     flake = read("flake.nix")
     assert '"x86_64-linux"' in flake
     assert '"aarch64-linux"' in flake
+
+
+def test_the_gate_pays_for_the_cheap_checks_before_the_expensive_one() -> None:
+    """A ruff finding must not wait behind a 72-mutant campaign.
+
+    The order is the guarantee: a failing fast step stops the job, so the full
+    check below it never runs. `nix run .#gate-fast` is one command for the list in
+    `flake.nix`, so there is no second copy of it to drift.
+    """
+    gate = read(".github/workflows/gate.yml")
+    fast = gate.index("nix run .#gate-fast")
+    full = gate.index("nix flake check --print-build-logs")
+    assert fast < full, "the fast tier must precede the full check"
+
+    flake = read("flake.nix")
+    match = re.search(r"fastChecks\s*=\s*\[([^\]]*)\]", flake)
+    assert match is not None, "fastChecks disappeared from flake.nix"
+    assert re.findall(r'"([^"]+)"', match.group(1)), "fastChecks is empty"
 
 
 def test_the_review_action_exposes_the_single_sample_opt_in() -> None:
