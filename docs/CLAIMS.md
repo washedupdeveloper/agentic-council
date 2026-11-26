@@ -160,7 +160,7 @@ registry, so it cannot describe a claim that has no check.
 | `different-claims-at-one-place-are-two-findings` | Two samples that report different claims at one place produce two findings in verdict.json, and the run fails. | `python3 -m pytest tests/test_run.py::test_different_claims_at_one_place_are_two_findings -q` |
 | `one-claim-is-one-finding` | One normalized claim is one finding whatever dimension its samples name it with. | `python3 -m pytest tests/test_merge.py::test_one_claim_is_one_finding_whatever_the_dimension -q` |
 | `the-verdict-keeps-every-wording-of-one-claim` | Two case-or-whitespace variants of one claim keep both wordings in verdict.json. | `python3 -m pytest tests/test_run.py::test_the_verdict_keeps_every_wording_of_one_claim -q` |
-| `the-source-stays-under-the-line-ratchet` | The reviewed package stays under 6,000 physical source lines. | `python3 -m pytest tests/test_size.py::test_the_source_stays_under_the_line_ratchet -q` |
+| `the-source-stays-under-the-line-ratchet` | The reviewed package stays under the line ratchet declared in tests/test_size.py. | `python3 -m pytest tests/test_size.py::test_the_source_stays_under_the_line_ratchet -q` |
 | `the-module-count-stays-under-the-ratchet` | The reviewed package stays at or under 50 modules. | `python3 -m pytest tests/test_size.py::test_the_module_count_stays_under_the_ratchet -q` |
 | `config-parsing-is-pure` | Configuration parsing takes text and returns a value without touching a file. | `python3 -m pytest tests/test_domain_kernel.py::test_config_parse_reads_text_not_a_file -q` |
 | `adjudication-is-a-pure-decision` | Adjudication decides findings from proof outcomes without executing a proof. | `python3 -m pytest tests/test_domain_kernel.py::test_adjudication_is_reproducible_from_outcomes -q` |
@@ -271,3 +271,4 @@ registry, so it cannot describe a claim that has no check.
 | `the-image-workspace-is-unique` | The image runner uses a unique workspace and cleans it up. | `python3 -m pytest tests/test_shell_scripts.py::test_image_run_uses_a_unique_workspace -q` |
 | `an-oci-image-is-materialised` | The image materialiser reads an OCI index and applies a whiteout layer. | `python3 -m pytest tests/test_image_tools.py::test_materialise_an_oci_layout tests/test_image_tools.py::test_a_whiteout_removes_the_lower_layer_file -q` |
 | `every-check-declares-what-it-reads` | Every check's declared input is a superset of the trees its command opens. | `python3 -m pytest tests/test_build_scope.py -q` |
+| `a-skipped-proof-proves-nothing` | A claim whose test skips is reported unproven, not holding. | `python3 -m pytest tests/test_claims.py::test_a_skipped_check_is_not_a_holding_claim -q` |

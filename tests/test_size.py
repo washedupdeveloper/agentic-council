@@ -19,7 +19,9 @@ SOURCE = Path(__file__).resolve().parent.parent / "src" / "council"
 #: reviewer adapter adds one effect module at the same seam. The doctor source
 #: check and the single-sample opt-in add one guard each. The review-reliability
 #: fixes add the proof-cause, rule-trust and sandbox guards.
-SOURCE_LIMIT = 6986
+#: The claim registry's skip guard: a pytest node that skips exits 0, so a skip used to
+#: count as a holding claim. The verdict, its reason line and `re` add 31 lines.
+SOURCE_LIMIT = 7017
 MODULE_LIMIT = 50
 
 

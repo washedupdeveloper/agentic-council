@@ -119,3 +119,25 @@ def test_run_all_keeps_going_after_a_failure(tmp_path: Path) -> None:
     claims = [Claim("a", "Fails.", "false"), Claim("b", "Passes.", "true")]
     results = run_all(claims, tmp_path)
     assert [r.ok for r in results] == [False, True]
+
+
+def test_a_skipped_check_is_not_a_holding_claim(tmp_path: Path) -> None:
+    """pytest exits 0 for a skipped node: the command passed without running.
+
+    A claim is a sentence plus the command that would falsify it. A skip falsifies
+    nothing, so counting it as a pass would let the registry report proof it never had.
+    """
+    (tmp_path / "test_probe.py").write_text(
+        "import pytest\n\n\n"
+        "@pytest.mark.skip(reason='probe')\n"
+        "def test_never_runs() -> None:\n"
+        "    raise AssertionError('the body must not run')\n",
+        encoding="utf-8",
+    )
+    result = run_one(
+        Claim("x", "It holds.", "python3 -m pytest test_probe.py::test_never_runs -q"),
+        tmp_path,
+    )
+    assert not result.ok
+    assert "not proven" in result.detail
+    assert "probe" in result.detail

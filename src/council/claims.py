@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 import shlex
 import subprocess
 import sys
@@ -125,7 +126,34 @@ def _with_basetemp(argv: list[str], tmp: Path) -> list[str]:
     """
     if not _is_pytest(argv):
         return argv
-    return [*argv, f"--basetemp={tmp / 'pytest'}"]
+    # `-rs` puts the reason in the summary: a skip that counts as a pass is the one
+    # result the claim registry must not accept, so the reason has to be legible.
+    return [*argv, "-rs", f"--basetemp={tmp / 'pytest'}"]
+
+
+SKIP_SUMMARY = re.compile(r"\b(\d+) skipped\b")
+
+
+def _unproven(argv: list[str], stdout: str) -> str | None:
+    """A reason when a pytest check proved nothing, or None when it proved its claim.
+
+    pytest exits 0 when the selected node is skipped. The command "passed" without
+    running, so a skip would count as a holding claim while nothing was falsified and
+    nothing was checked -- the registry's premise (one sentence, one command that would
+    falsify it) is only true if the command actually ran. Only node-level checks are
+    judged this way: a file-level command that also collects an unrelated skipping test
+    is not evidence about the claim.
+    """
+    if not _is_pytest(argv) or not any("::" in arg for arg in argv):
+        return None
+    match = SKIP_SUMMARY.search(stdout)
+    if match is None or int(match.group(1)) == 0:
+        return None
+    reason = next(
+        (line.strip() for line in stdout.splitlines() if line.strip().startswith("SKIPPED")),
+        "the selected test skipped",
+    )
+    return f"skipped, not proven: {reason}"
 
 
 def run_one(claim: Claim, cwd: Path, timeout: int = DEFAULT_TIMEOUT) -> ClaimResult:
@@ -151,6 +179,9 @@ def run_one(claim: Claim, cwd: Path, timeout: int = DEFAULT_TIMEOUT) -> ClaimRes
 
     ok = proc.returncode == 0
     if ok:
+        unproven = _unproven(argv, proc.stdout or "")
+        if unproven is not None:
+            return ClaimResult(claim, False, unproven)
         return ClaimResult(claim, True, "")
     tail = (proc.stderr or proc.stdout).strip().splitlines()
     return ClaimResult(claim, False, f"exit {proc.returncode}: {tail[-1] if tail else ''}".rstrip())
