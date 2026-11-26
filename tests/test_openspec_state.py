@@ -50,3 +50,25 @@ def test_the_change_directories_are_readable() -> None:
     assert CHANGES.is_dir(), f"{CHANGES} does not exist"
     for change in _open_changes():
         assert (change / "proposal.md").is_file(), f"{change.name} has no proposal.md"
+
+def test_an_open_change_records_its_evidence() -> None:
+    """A change in flight carries the commands that settle its claims.
+
+    `tasks.md` says what is done; evidence says how anyone can tell. A ticked task with
+    no command behind it is unproven, and the difference between "finished" and "I think
+    it is finished" is exactly the row the reader needs. Archived changes are the record
+    of work already gated; this applies to the ones still open.
+    """
+    missing = []
+    for change in _open_changes():
+        tasks = change / "tasks.md"
+        if not tasks.is_file():
+            continue
+        if "## Evidence" not in tasks.read_text(encoding="utf-8"):
+            missing.append(change.name)
+    assert not missing, (
+        "these open changes have no `## Evidence` section in tasks.md:\n  "
+        + "\n  ".join(missing)
+        + "\n\nOne row per ticked task: | claim | command | result |. "
+        "See docs/sdd.md."
+    )

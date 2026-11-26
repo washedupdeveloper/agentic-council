@@ -38,6 +38,7 @@ fails the gate when one exists.
 | [`UNTANGLE.md`](UNTANGLE.md) | the decision log of the first refactor: problems found, what moved, what is still owed |
 | [`UNTANGLE2.md`](UNTANGLE2.md) | the second pass: the five-parser diff grammar, the run ledger, the comment ruling, and the two moves it left |
 | [`UPSTREAM.md`](UPSTREAM.md) | defects in dependencies that the gate routes around: what we do instead, the measurements, and when to re-check |
+| [`sdd.md`](sdd.md) | how a change is authored: the loop, what the gate enforces, and the testing contract that makes a spec real |
 
 ## Decision records
 

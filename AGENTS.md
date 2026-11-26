@@ -22,6 +22,8 @@ Use the `openspec` skill for the loop. The CLI comes from the flake —
 `nix run .#openspec -- <command>` — so the version is the one in `flake.lock` and
 nothing is installed into a profile.
 
+The full loop, and the testing contract that makes it real, is `docs/sdd.md`.
+
 ### Done means archived
 
 - A change with every task ticked is finished. Archive it in the same commit as the
