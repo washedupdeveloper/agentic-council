@@ -413,6 +413,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--shard", metavar="I/N", default=None,
         help="score the I-th of N interleaved slices; CI runs one job per slice")
+    parser.add_argument(
+        "--jobs", type=int, default=0, metavar="N",
+        help="score this many mutants at once (0 = one per core)")
     args = parser.parse_args(argv) if argv is not None else None
 
     if args is not None and args.list:
@@ -445,12 +448,17 @@ def main(argv: list[str] | None = None) -> int:
     survivors: list[str] = []
     falsified: dict[str, set[str]] = {}
 
-    # One worker per core by default; `MUTATION_WORKERS` overrides. A pool decides
+    # One worker per core by default, `--jobs N` to say otherwise. A pool decides
     # scheduling only. The suite is the same, the mutants are the same, and every
     # mutant must still be caught -- so the campaign proves exactly what it did
     # serially, in a fraction of the wall clock.
+    #
+    # This read `MUTATION_WORKERS` from the environment while the claim registry read
+    # `--jobs`: one policy value, two mechanisms, and nothing on the command line said
+    # what the pool size would be. A policy value is a flag.
     default_workers = os.cpu_count() or 2
-    workers = max(1, min(len(selected), int(os.environ.get("MUTATION_WORKERS", "0")) or default_workers))
+    requested = args.jobs if args is not None else 0
+    workers = max(1, min(len(selected), requested or default_workers))
     print(f"scoring {len(selected)} mutant(s) across {workers} worker(s)", flush=True)
     with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as pool:
         futures = {pool.submit(_score, m, by_node): m for m in selected}

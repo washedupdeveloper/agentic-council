@@ -505,6 +505,10 @@ nix develop -c python tools/mutation_check.py
 nix flake check
 ```
 
+The mutation campaign scores every mutant against the suite: `--only NAME` narrows it to
+one, `--shard I/N` takes the I-th of N interleaved slices (CI runs four), and `--jobs N`
+says how many to score at once, where 0 means one per core.
+
 The full gate is `nix flake check`: tests, types, claims, mutations, the
 differential corpus, and the Nix sources. A green test suite alone is not a
 release.

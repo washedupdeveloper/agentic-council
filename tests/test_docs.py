@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import argparse
+import re
 from pathlib import Path
 
 from council.cli import build_parser
 
 README = Path(__file__).resolve().parent.parent / "README.md"
+MUTATION_TOOL = Path(__file__).resolve().parent.parent / "tools" / "mutation_check.py"
 
 
 def options(parser: argparse.ArgumentParser) -> list[str]:
@@ -45,3 +47,24 @@ def test_the_repository_configuration_is_documented() -> None:
     assert "## Configuration" in text
     assert "council.toml" in text
     assert "[proofs]" in text
+
+
+def test_every_mutation_flag_is_documented() -> None:
+    """The campaign's flags are a surface too, and the CLI walk never reaches them.
+
+    `options(build_parser())` walks `council.cli`; `tools/mutation_check.py` builds its
+    own parser, so `--shard` and `--jobs` could be added, printed in `--help`, and absent
+    from every page a user reads. A flag a user can type but cannot look up is a trap.
+    """
+    # Declarations only. The tool also hands pytest its own arguments, and a quoted
+    # `--no-header` inside that argv is not a flag this tool offers anyone.
+    flags = set(
+        re.findall(
+            r'add_argument\(\s*"(--[a-z][a-z-]*)"',
+            MUTATION_TOOL.read_text(encoding="utf-8"),
+            re.S,
+        )
+    )
+    text = README.read_text(encoding="utf-8")
+    missing = sorted(flag for flag in flags if flag not in text)
+    assert not missing, f"undocumented mutation flag(s): {', '.join(missing)}"
