@@ -10,6 +10,7 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -30,11 +31,23 @@ def sandbox_ctx(repo: Path) -> ProofContext:
 
 
 def _userns_ok() -> bool:
+    """Can this environment run the sandbox at all?
+
+    The probe names an executable that exists in the devshell AND in the Nix build
+    sandbox. `/bin/true` exists on the host and in no sandbox, so the old probe answered
+    "no user namespaces" inside the gate and the three proofs below skipped there -- for
+    every gate run since they were written -- while passing on a developer's machine.
+    """
     bwrap = shutil.which("bwrap")
     if bwrap is None:
         return False
-    return subprocess.run([bwrap, "--unshare-all", "--ro-bind", "/", "/", "/bin/true"],
-                          capture_output=True).returncode == 0
+    probe = sys.executable or shutil.which("sh")
+    if probe is None:
+        return False
+    return subprocess.run(
+        [bwrap, "--unshare-all", "--ro-bind", "/", "/", probe, "-c", "pass"],
+        capture_output=True,
+    ).returncode == 0
 
 
 def write(repo: Path, name: str, text: str) -> Path:

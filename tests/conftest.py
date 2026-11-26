@@ -90,3 +90,28 @@ def child_env() -> dict[str, str]:
         os.pathsep + env["PYTHONPATH"] if env.get("PYTHONPATH") else ""
     )
     return env
+
+def pytest_sessionfinish(session, exitstatus):  # noqa: ANN001, ARG001 - pytest hook
+    """Fail the gate when a test skipped, if the caller asked for proof.
+
+    A skip exits 0, so a platform guard that quietly disables a test reduces what the
+    suite proves without turning anything red. The gate runs with
+    ``COUNCIL_STRICT_SKIPS=1``; a developer running pytest by hand is unaffected.
+
+    The three sandbox proofs are the reason this exists: they assert that bwrap actually
+    isolates a proof, and if user namespaces are unavailable they skip -- leaving green
+    over a sandbox nobody demonstrated.
+    """
+    if os.environ.get("COUNCIL_STRICT_SKIPS") != "1":
+        return
+    reporter = session.config.pluginmanager.getplugin("terminalreporter")
+    skipped = list(getattr(reporter, "stats", {}).get("skipped", [])) if reporter else []
+    if not skipped:
+        return
+    print(f"\n{len(skipped)} test(s) skipped; a skip is not a pass:")
+    for report in skipped:
+        reason = report.longrepr
+        if isinstance(reason, tuple) and len(reason) == 3:
+            reason = reason[2]
+        print(f"  {report.nodeid}: {reason}")
+    session.exitstatus = 1

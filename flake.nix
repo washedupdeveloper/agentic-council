@@ -316,9 +316,12 @@
               '';
         in
         {
+          # `COUNCIL_STRICT_SKIPS=1` makes a skipped test fail this check: the gate
+          # asks for proof, and a skip proves nothing. A developer running pytest by
+          # hand still gets the platform guards.
           tests =
             mkCheck "council-tests" testScope
-              "python -m pytest -q -p no:cacheprovider --basetemp=$TMPDIR/pytest-base";
+              "COUNCIL_STRICT_SKIPS=1 python -m pytest -q -p no:cacheprovider --basetemp=$TMPDIR/pytest-base";
 
           types = mkCheck "council-types" codeScope "mypy src";
 
