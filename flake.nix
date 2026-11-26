@@ -398,6 +398,14 @@
       });
 
       apps = each (pkgs: {
+        # The spec CLI, resolved through `flake.lock`: `nix run .#openspec -- …`.
+        # `npx` resolves outside the lock and leaves a second version on PATH that the
+        # lockfile does not describe, which is the drift the pin exists to prevent.
+        openspec = {
+          type = "app";
+          program = "${pkgs.openspec}/bin/openspec";
+        };
+
         # Everything except the campaign, for CI: the shard jobs own that. Local
         # `nix flake check` remains the one full gate, so nothing here weakens what
         # a contributor runs before a push.

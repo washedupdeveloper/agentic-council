@@ -104,8 +104,10 @@ jobs:
       - name: the gate
         run: nix run .#gate-ci
 
+      # Through the flake, so the validator is the version `flake.lock` pins rather
+      # than whatever `npx` resolves at run time.
       - name: validate OpenSpec changes
-        run: nix shell nixpkgs#nodejs_22 -c npx -y @fission-ai/openspec@1.15.0 validate --all --strict
+        run: nix run .#openspec -- validate --all --strict
 
   # Four runners instead of one: 72 mutants split by index, each still scored
   # against the whole suite. `needs: gate` so a lint failure never spends sixteen

@@ -18,9 +18,23 @@ OpenSpec change:
 - Pure refactors and dependency bumps use `skip_specs: true` when behavior does
   not change.
 
-Use the `openspec` skill for the loop: `openspec instructions`, `openspec
-validate --strict`, and `openspec archive`. The `openspec` CLI is pinned to
-1.15.0 in the gate workflow.
+Use the `openspec` skill for the loop. The CLI comes from the flake —
+`nix run .#openspec -- <command>` — so the version is the one in `flake.lock` and
+nothing is installed into a profile.
+
+### Done means archived
+
+- A change with every task ticked is finished. Archive it in the same commit as the
+  last task: `nix run .#openspec -- archive <name> --yes`.
+  `tests/test_openspec_state.py` fails the gate on a finished change left open.
+- A **decision** is a row in the change's `design.md`: the option taken, the options
+  rejected, and what would falsify the choice. A decision that exists only in chat did
+  not happen.
+- A **verdict** on the work is a row in `tasks.md`: the claim, the command that settles
+  it, and the result. "Done" without an evidence command is unproven.
+- A **presentation** to the owner is rendered from the change — proposal, design, spec
+  delta, tasks, evidence — not restated in chat. Chat carries the decision table and a
+  pointer to the artifact.
 
 ## Dependency maintenance
 
