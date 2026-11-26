@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
 
 import pytest
@@ -119,7 +118,6 @@ def test_a_manifest_cannot_point_outside_artifacts(tmp_path: Path) -> None:
         artifacts.read(run)
 
 
-@pytest.mark.skipif(os.name == "nt", reason="symlinks are not always permitted on Windows")
 def test_a_symlinked_source_is_refused(tmp_path: Path) -> None:
     _, run = make_run(tmp_path)
     source = tmp_path / "real.png"

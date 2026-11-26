@@ -134,8 +134,8 @@ print(json.dumps({"type": "result", "exit_code": 0, "text": ""}))
 
 
 def test_a_sandboxed_reviewer_cannot_write_to_the_host(tmp_path: Path) -> None:
-    if shutil.which("bwrap") is None:
-        pytest.skip("bwrap is not available")
+    assert shutil.which("bwrap") is not None, (
+        "this proof needs bwrap; it is a build input of the gate and must be on PATH")
     marker_home = Path.home() / "council-sandbox-leak"
     marker_tmp = Path("/tmp/council-sandbox-leak")
     for marker in (marker_home, marker_tmp):
@@ -153,8 +153,8 @@ print(json.dumps({"sections": {}}))
 
 
 def test_a_symlinked_reviewer_runs_in_the_sandbox(tmp_path: Path) -> None:
-    if shutil.which("bwrap") is None:
-        pytest.skip("bwrap is not available")
+    assert shutil.which("bwrap") is not None, (
+        "this proof needs bwrap; it is a build input of the gate and must be on PATH")
     binary = py_script(tmp_path, 'print(json.dumps({"sections": {}}))')
     linked = tmp_path / "reviewer"
     linked.symlink_to(binary)
@@ -164,8 +164,8 @@ def test_a_symlinked_reviewer_runs_in_the_sandbox(tmp_path: Path) -> None:
 
 def test_a_symlinked_reviewer_is_resolved_for_bwrap(
         tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    if shutil.which("bwrap") is None:
-        pytest.skip("bwrap is not available")
+    assert shutil.which("bwrap") is not None, (
+        "this proof needs bwrap; it is a build input of the gate and must be on PATH")
     binary = py_script(tmp_path, 'print(json.dumps({"sections": {}}))')
     linked = tmp_path / "reviewer"
     linked.symlink_to(binary)

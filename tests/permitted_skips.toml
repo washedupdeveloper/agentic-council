@@ -1,0 +1,14 @@
+# Skips the owner has permitted, and nothing else.
+#
+# Empty by default, because a skipped test is a pass that measured nothing. The gate
+# (`COUNCIL_STRICT_SKIPS=1`) fails on any skip that is not listed here, printing the
+# node id and the reason pytest gave.
+#
+# To permit one, name it and say why it is acceptable:
+#
+#   [skip]
+#   "tests/test_x.py::test_y" = "Windows-only; the gate runs Linux, which proves it"
+#
+# Nothing permits a skip implicitly: no marker, no platform, no timeout.
+[skip]
+

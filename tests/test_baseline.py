@@ -237,8 +237,8 @@ def test_write_is_atomic_and_canonical(tmp_path: Path) -> None:
 
 
 def test_a_fifo_baseline_is_refused(tmp_path: Path) -> None:
-    if not hasattr(__import__("os"), "mkfifo"):
-        pytest.skip("no FIFO on this host")
+    assert hasattr(__import__("os"), "mkfifo"), (
+        "this proof needs a POSIX host with mkfifo; without one it proves nothing")
     path = tmp_path / "fifo.json"
     __import__("os").mkfifo(path)
     with pytest.raises(BaselineError, match="regular file"):

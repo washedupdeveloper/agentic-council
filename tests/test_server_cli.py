@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-import os
 import subprocess
 import sys
 from pathlib import Path
@@ -84,7 +83,6 @@ def test_missing_council_is_a_clean_error(tmp_path: Path) -> None:
         asyncio.run(run_plan(server, ReviewOptions()))
 
 
-@pytest.mark.skipif(os.name == "nt", reason="WSL path translation")
 def test_a_windows_workspace_path_is_translated_for_wsl() -> None:
     assert local_path(r"C:\Users\you\repo") == Path("/mnt/c/Users/you/repo")
 

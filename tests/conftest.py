@@ -7,6 +7,7 @@ reviewer. They do not call a model and they do not use the Hermes skill.
 from __future__ import annotations
 
 import os
+import tomllib
 import stat
 import subprocess
 import sys
@@ -91,27 +92,38 @@ def child_env() -> dict[str, str]:
     )
     return env
 
-def pytest_sessionfinish(session, exitstatus):  # noqa: ANN001, ARG001 - pytest hook
-    """Fail the gate when a test skipped, if the caller asked for proof.
+PERMITS = Path(__file__).with_name("permitted_skips.toml")
+
+
+def _permitted() -> dict[str, str]:
+    if not PERMITS.is_file():
+        return {}
+    with PERMITS.open("rb") as handle:
+        return tomllib.load(handle).get("skip", {})
+
+
+def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
+    """Fail the gate when a test skipped without the owner's explicit permission.
 
     A skip exits 0, so a platform guard that quietly disables a test reduces what the
     suite proves without turning anything red. The gate runs with
-    ``COUNCIL_STRICT_SKIPS=1``; a developer running pytest by hand is unaffected.
-
-    The three sandbox proofs are the reason this exists: they assert that bwrap actually
-    isolates a proof, and if user namespaces are unavailable they skip -- leaving green
-    over a sandbox nobody demonstrated.
+    ``COUNCIL_STRICT_SKIPS=1``; a skip is accepted only when it names itself in
+    ``tests/permitted_skips.toml``. A developer running pytest by hand is unaffected.
     """
     if os.environ.get("COUNCIL_STRICT_SKIPS") != "1":
         return
     reporter = session.config.pluginmanager.getplugin("terminalreporter")
     skipped = list(getattr(reporter, "stats", {}).get("skipped", [])) if reporter else []
-    if not skipped:
+    permitted = _permitted()
+    unpermitted = [report for report in skipped if report.nodeid not in permitted]
+    if not unpermitted:
         return
-    print(f"\n{len(skipped)} test(s) skipped; a skip is not a pass:")
-    for report in skipped:
+    print(f"\n{len(unpermitted)} test(s) skipped without permission:")
+    for report in unpermitted:
         reason = report.longrepr
         if isinstance(reason, tuple) and len(reason) == 3:
             reason = reason[2]
         print(f"  {report.nodeid}: {reason}")
+    print("A test that cannot run is a failure, not a skip. Either make it run, or")
+    print("name it in tests/permitted_skips.toml with the owner's reason.")
     session.exitstatus = 1

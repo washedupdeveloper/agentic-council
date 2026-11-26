@@ -30,6 +30,19 @@ def sandbox_ctx(repo: Path) -> ProofContext:
     return ProofContext(repo=repo, allow=ALLOW, timeout=20, sandbox=True)
 
 
+def _require_userns() -> None:
+    """These proofs need user namespaces. A host without them cannot run the gate.
+
+    No `skipif`: a skipped test is a pass that measured nothing, and this repository
+    treats that as a failure. The gate runs these inside the Nix sandbox, where bwrap
+    can unshare; a host that cannot is a host that cannot prove the sandbox.
+    """
+    assert _userns_ok(), (
+        "the sandbox proofs need user namespaces (bwrap --unshare-all); this host "
+        "cannot run them, so it cannot prove the sandbox"
+    )
+
+
 def _userns_ok() -> bool:
     """Can this environment run the sandbox at all?
 
@@ -148,7 +161,6 @@ def test_present_cannot_read_a_missing_file(tmp_path: Path) -> None:
     assert outcome.state is State.UNRUNNABLE
 
 
-@pytest.mark.skipif(not hasattr(os, "mkfifo"), reason="FIFOs are POSIX-only")
 def test_present_refuses_a_fifo_without_opening_it(tmp_path: Path) -> None:
     os.mkfifo(tmp_path / "pipe")
     outcome = run_proof("present", {"path": "pipe", "line": 1, "text": "x"},
@@ -211,8 +223,8 @@ def test_without_bwrap_a_command_proof_does_not_run(tmp_path: Path,
     assert "bwrap" in outcome.detail
 
 
-@pytest.mark.skipif(not _userns_ok(), reason="user namespaces are unavailable here")
 def test_the_sandbox_blocks_the_network(tmp_path: Path) -> None:
+    _require_userns()
     outcome = run_proof("command",
                         {"argv": ["python3", "-c", NETWORK_PROBE],
                          "expect": {"exit": "nonzero"}},
@@ -220,8 +232,8 @@ def test_the_sandbox_blocks_the_network(tmp_path: Path) -> None:
     assert outcome.state is State.PROVEN, outcome.detail
 
 
-@pytest.mark.skipif(not _userns_ok(), reason="user namespaces are unavailable here")
 def test_the_sandbox_discards_writes_to_the_repository(tmp_path: Path) -> None:
+    _require_userns()
     """A tool may write; the tree it judges is unchanged when the proof exits."""
     (tmp_path / "a.txt").write_text("x\n", encoding="utf-8")
     outcome = run_proof("command", {"argv": ["sh", "-c", "echo y > a.txt"]},
@@ -230,8 +242,8 @@ def test_the_sandbox_discards_writes_to_the_repository(tmp_path: Path) -> None:
     assert (tmp_path / "a.txt").read_text(encoding="utf-8") == "x\n"
 
 
-@pytest.mark.skipif(not _userns_ok(), reason="user namespaces are unavailable here")
 def test_a_write_outside_the_repository_is_unrunnable(tmp_path: Path) -> None:
+    _require_userns()
     outcome = run_proof("command", {"argv": ["sh", "-c", "echo y > /etc/zz-sandbox"]},
                         sandbox_ctx(tmp_path))
     assert outcome.state is State.UNRUNNABLE

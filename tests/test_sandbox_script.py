@@ -10,8 +10,8 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_the_sandbox_wrapper_leaves_no_writes() -> None:
-    if shutil.which("bwrap") is None:
-        pytest.skip("bwrap is not available")
+    assert shutil.which("bwrap") is not None, (
+        "this proof needs bwrap; it is a build input of the gate and must be on PATH")
     home_marker = Path.home() / "sandbox-wrapper-leak"
     tmp_marker = Path("/tmp/sandbox-wrapper-leak")
     for marker in (home_marker, tmp_marker):
@@ -38,8 +38,8 @@ def test_a_repo_under_tmp_binds_only_the_repo(
         encoding="utf-8",
     )
     fake.chmod(0o755)
-    if not os.path.isdir("/tmp") or not os.access("/tmp", os.W_OK):
-        pytest.skip("no writable /tmp here")
+    assert os.path.isdir("/tmp") and os.access("/tmp", os.W_OK), (
+        "this test needs a writable /tmp; the gate provides one")
     under_tmp = Path(tempfile.mkdtemp(dir="/tmp"))
     # The workspace must live under the real /tmp for this test, so it cannot
     # use tmp_path; remove it so a run leaves nothing behind.
