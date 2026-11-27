@@ -315,6 +315,11 @@ text = "Every flag the CLI accepts appears in the README."
 check = "python3 -m pytest tests/test_docs.py::test_every_flag_is_documented -q"
 
 [[claim]]
+id = "a-mutation-flag-is-documented"
+text = "Every flag the mutation tool accepts appears in the README."
+check = "python3 -m pytest tests/test_docs.py::test_every_mutation_flag_is_documented -q"
+
+[[claim]]
 id = "a-file-the-diff-cannot-carry-is-named"
 text = "A binary untracked file is named as skipped, not silently dropped."
 check = "python3 -m pytest tests/test_repo.py::test_a_binary_untracked_file_is_named_not_dropped -q"
