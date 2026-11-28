@@ -510,7 +510,7 @@ one, `--shard I/N` takes the I-th of N interleaved slices (CI runs eight), and `
 says how many to score at once, where 0 means one per core. `--cache PATH` reuses verdicts
 already recorded for a byte-identical tree -- the key covers `src/`, `tests/`, the clock
 registry, this tool and the interpreter, so a hit is the same experiment, not a guess --
-and `--no-cache` scores everything from scratch. Each mutant is decided by the tests of the claims that name it as falsifier -- 1.11 nodes on average, measured -- and falls back to the whole suite whenever those pass, so a subset can prove a catch but only the full suite can prove a miss; `--no-fast` runs the whole suite for every mutant.
+and `--no-cache` scores everything from scratch. Each mutant is decided by the tests of the claims that name it as falsifier -- 1.11 nodes on average, measured -- and falls back to the whole suite whenever those pass, so a subset can prove a catch but only the full suite can prove a miss; `--no-fast` runs the whole suite for every mutant. `--no-baseline` skips the unmutated run the campaign does first, and is only sound when the caller has already proved the suite green on this exact tree -- the flake makes the three test partitions build inputs of the campaign, so it does.
 
 The full gate is `nix flake check`: tests, types, claims, mutations, the
 differential corpus, and the Nix sources. A green test suite alone is not a

@@ -490,6 +490,9 @@ def main(argv: list[str] | None = None) -> int:
         "--shard", metavar="I/N", default=None,
         help="score the I-th of N interleaved slices; CI runs one job per slice")
     parser.add_argument(
+        "--no-baseline", action="store_true",
+        help="assume the unmutated suite already passed on this tree (the caller ran it)")
+    parser.add_argument(
         "--no-fast", action="store_true",
         help="run the whole suite for every mutant instead of its declared falsifier first")
     parser.add_argument(
@@ -545,12 +548,18 @@ def main(argv: list[str] | None = None) -> int:
     # The baseline proves the unmutated suite passes *now*. A tree identical to the one
     # that already produced these verdicts cannot have changed that, so with nothing left
     # to score it is not paid for again.
-    if to_score:
+    assume_green = args is not None and args.no_baseline
+    if to_score and not assume_green:
         with tempfile.TemporaryDirectory(prefix="council-baseline-") as raw:
             baseline_src = _copy_src(raw)
             baseline_code, baseline_broken = run_suite(baseline_src)
     else:
         baseline_code, baseline_broken = 0, set()
+    if assume_green and to_score:
+        # The caller asserts the suite passed on this exact tree -- in the flake, the
+        # partition checks are build inputs of this one, so a failing suite stops the
+        # build before this line. Said out loud so a standalone run is visibly assuming it.
+        print("baseline: assumed green (--no-baseline); the caller proved it", flush=True)
     if baseline_code != 0:
         print("BASELINE RED: the unmodified suite must pass before mutations are scored")
         for node in sorted(baseline_broken):

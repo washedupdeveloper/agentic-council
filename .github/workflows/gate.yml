@@ -117,8 +117,10 @@ jobs:
       - name: validate OpenSpec changes
         run: nix run .#openspec -- validate --all --strict
 
-  # Eight runners instead of four: 72 mutants split by index, each still scored
-  # against the whole suite. The union of the shards is the registry, so more of them
+  # Eight runners instead of four: 72 mutants split by index, each decided by the
+  # tests of the claims that name it and falling back to the whole suite when those pass.
+  # `--no-baseline` is sound here because this job needs `fast`, which builds the
+  # `tests` check on the same commit -- the suite is proven once, not nine times. The union of the shards is the registry, so more of them
   # changes the wall clock and nothing about the proof -- 9 mutants on a 4-core runner
   # instead of 18. Measured: the campaign is 258s of the gate's ~310s, and it is the
   # only step whose cost is per-mutant rather than per-tree.
@@ -151,4 +153,4 @@ jobs:
       # by index, so the union of these jobs is exactly the registry, and each job
       # verifies only the claims whose falsifier it owns.
       - name: score this shard
-        run: nix develop -c python tools/mutation_check.py --shard ${{ matrix.shard }}/8
+        run: nix develop -c python tools/mutation_check.py --shard ${{ matrix.shard }}/8 --no-baseline

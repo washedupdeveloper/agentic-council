@@ -17,6 +17,8 @@
       nix-best-practices,
     }:
     let
+      inherit (nixpkgs) lib;
+
       # bubblewrap is Linux-only. Darwin has no sandbox here, so it must not be
       # advertised as a supported system.
       #
@@ -259,8 +261,8 @@
 
       # The cheap half of the gate, ordered by how fast a failure is found and how
       # likely it is. `nix run .#gate-fast` builds exactly this list and stops there:
-      # a typo costs 22 ms, a type error 3.6 s, a broken test 31 s -- and the
-      # mutation campaign, which is the whole cost of the gate, never starts.
+      # a typo costs 22 ms, a type error 3.6 s, a broken suite ~10 s (it is three
+      # partitions, built in parallel) -- and the mutation campaign never starts.
       # `tests/test_governance.py` holds the workflow to this list.
       fastChecks = [
         "lint"
@@ -314,14 +316,137 @@
                 ( ${command} )
                 touch $out
               '';
+          # The suite, split three ways and balanced by measured cost: 9.48s each, from
+          # the junit timings of the whole suite. Nix runs the three as independent
+          # derivations, so the wall clock is one part rather than three.
+          #
+          # The lists are data, and `partitionsCover` below is why they can be trusted:
+          # every test file exactly once, or the flake refuses to evaluate. A split that
+          # silently dropped a file would be a weaker gate wearing a faster number.
+          testPartitions = [
+            # part 1: 9.32s measured
+            [
+              "tests/test_acp_agent.py"
+              "tests/test_adjudicate.py"
+              "tests/test_architecture.py"
+              "tests/test_baseline.py"
+              "tests/test_changes.py"
+              "tests/test_direct_adapter.py"
+              "tests/test_evidence.py"
+              "tests/test_files.py"
+              "tests/test_image_tools.py"
+              "tests/test_mutation_check.py"
+              "tests/test_pr.py"
+              "tests/test_repo.py"
+              "tests/test_rules.py"
+              "tests/test_sample.py"
+              "tests/test_server_cli.py"
+              "tests/test_strength.py"
+              "tests/test_temp_roots.py"
+              "tests/test_verdict.py"
+            ]
+            # part 2: 9.32s measured
+            [
+              "tests/test_agents.py"
+              "tests/test_base.py"
+              "tests/test_build_scope.py"
+              "tests/test_claims.py"
+              "tests/test_context.py"
+              "tests/test_differential.py"
+              "tests/test_docs_index.py"
+              "tests/test_mcp_server.py"
+              "tests/test_milestone.py"
+              "tests/test_mutation_fastpath.py"
+              "tests/test_packaging.py"
+              "tests/test_paths.py"
+              "tests/test_pipeline.py"
+              "tests/test_proof_params.py"
+              "tests/test_sandbox_script.py"
+              "tests/test_scope.py"
+              "tests/test_shell_scripts.py"
+              "tests/test_skill.py"
+              "tests/test_windows.py"
+            ]
+            # part 3: 9.32s measured
+            [
+              "tests/test_cli.py"
+              "tests/test_cli_scope.py"
+              "tests/test_config.py"
+              "tests/test_doc_citations.py"
+              "tests/test_docs.py"
+              "tests/test_doctor.py"
+              "tests/test_domain_kernel.py"
+              "tests/test_governance.py"
+              "tests/test_location.py"
+              "tests/test_merge.py"
+              "tests/test_mutation_cache.py"
+              "tests/test_openspec_state.py"
+              "tests/test_profile.py"
+              "tests/test_prompt.py"
+              "tests/test_proofs.py"
+              "tests/test_reference.py"
+              "tests/test_release.py"
+              "tests/test_run.py"
+              "tests/test_runner.py"
+              "tests/test_sarif.py"
+              "tests/test_schema.py"
+              "tests/test_size.py"
+              "tests/test_skill_install.py"
+            ]
+          ];
+
+          testsTree =
+            let
+              walk =
+                dir:
+                lib.concatMap (
+                  name:
+                  let
+                    path = dir + "/${name}";
+                  in
+                  if builtins.readFileType path == "directory" then
+                    walk path
+                  else
+                    [ (lib.removePrefix "${toString ./.}/" (toString path)) ]
+                ) (builtins.attrNames (builtins.readDir dir));
+            in
+            builtins.filter (p: lib.hasSuffix ".py" p && lib.hasPrefix "test_" (baseNameOf p)) (walk ./tests);
+
+          declaredTests = lib.concatLists testPartitions;
+
+          missingTests = lib.filter (f: !(builtins.elem f declaredTests)) testsTree;
+          extraTests = lib.filter (f: !(builtins.elem f testsTree)) declaredTests;
+
+          partitionsCover =
+            missingTests == [ ]
+            && extraTests == [ ]
+            && lib.length declaredTests == lib.length (lib.unique declaredTests);
+
+          suiteFor =
+            files:
+            "COUNCIL_STRICT_SKIPS=1 python -m pytest -q -p no:cacheprovider "
+            + "--basetemp=$TMPDIR/pytest-base ${lib.concatStringsSep " " files}";
+
+          testCheckList =
+            assert lib.assertMsg partitionsCover
+              "test partitions must name every test file exactly once (missing: ${toString missingTests}; unknown: ${toString extraTests})";
+            lib.imap0 (
+              i: files: mkCheck "council-tests-${toString (i + 1)}" testScope (suiteFor files)
+            ) testPartitions;
+
+          # `checks.tests` keeps meaning "the whole suite passed": the aggregate has no
+          # tests of its own, it exists so one name still names all of them.
+          testsAggregate = pkgs.runCommand "council-tests" {
+            nativeBuildInputs = testCheckList;
+          } "touch $out";
+
         in
         {
           # `COUNCIL_STRICT_SKIPS=1` makes a skipped test fail this check: the gate
           # asks for proof, and a skip proves nothing. A developer running pytest by
           # hand still gets the platform guards.
-          tests =
-            mkCheck "council-tests" testScope
-              "COUNCIL_STRICT_SKIPS=1 python -m pytest -q -p no:cacheprovider --basetemp=$TMPDIR/pytest-base";
+          # One derivation per partition, built in parallel; see `testPartitions`.
+          tests = testsAggregate;
 
           types = mkCheck "council-types" codeScope "mypy src";
 
@@ -349,9 +474,17 @@
               "PYTHONPATH=src python -m council_acp --help > /dev/null";
 
           # The suite, broken on purpose eighteen ways. It must notice each one.
-          mutations = mkCheck "council-mutations" (
-            testScope ++ [ "tools" ]
-          ) "python tools/mutation_check.py --no-cache";
+          # `--no-baseline` is justified by the dependency below: the partition checks
+          # already ran this suite on this tree, so the campaign does not re-prove it.
+          # Nix refuses to build this check when one of them fails -- the same guarantee
+          # in a stronger place, and 27s cheaper.
+          mutations =
+            (mkCheck "council-mutations" (
+              testScope ++ [ "tools" ]
+            ) "python tools/mutation_check.py --no-cache --no-baseline").overrideAttrs
+              (old: {
+                nativeBuildInputs = old.nativeBuildInputs ++ testCheckList;
+              });
 
           # v1.9.0's pinned verdicts beside this rule, on the same fixtures.
           differential = mkCheck "council-differential" testScope "python tools/differential.py";

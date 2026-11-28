@@ -9,10 +9,14 @@ One mutant = one run of the **whole** suite against a mutated tree. That is the 
 everything follows from it:
 
 ```
-campaign  ≈  (mutants × falsifier-subset) / workers  +  one baseline suite
-          =  (72 × 1.10s) / 12                      +  27s      (fast path, default)
-          =  (72 × 26.7s) / 12                      +  27s      (--no-fast)
+campaign  ≈  (mutants × falsifier-subset) / workers      + baseline (only if asked)
+          =  (72 × 1.10s) / 12                           + 0        (in the flake)
+          =  7s ideal, 15.3s measured (startup is most of it now)
 ```
+
+The baseline is not paid in the flake at all: the three test partitions are build inputs
+of the campaign, so Nix refuses to build it when one of them fails. The proof is the same
+and it happens once per tree instead of twice.
 
 Each mutant is decided by the pytest nodes of the claims that **name it as their
 falsifier** — 1.11 nodes on average, 1.10 s median, measured across all 72. A failure there
@@ -31,10 +35,11 @@ Workstation: 12 cores, warm store, `devshell` unless noted. 2026-11-28.
 | ruff | 0.17 s | devshell |
 | mypy | 0.6 s | devshell |
 | pyright | 2.8 s | devshell |
-| pytest (full suite) | 27.0 s | devshell |
+| pytest, one partition | 9.5 s | devshell (three run in parallel) |
 | claims (265, batched per file) | 14.8 s | devshell |
 | differential | 0.2 s | devshell |
-| **mutations (72), falsifier-first** | **44.2 s** | devshell, 12 workers |
+| **mutations (72), falsifier-first, no baseline** | **15.3 s** | devshell, 12 workers |
+| mutations (72), with its own baseline | 44.2 s | devshell, 12 workers |
 | mutations (72), `--no-fast` | 257.8 s | devshell, 12 workers |
 | mutations, identical tree (cached) | **1.2 s** | devshell |
 | `nix flake check`, warm | 4.3 s | nix build sandbox |
@@ -53,7 +58,10 @@ is 700 of them.
 | mutation shards 4 → 8 in CI | 247–252 s → 160–214 s per job |
 | bwrap probe through the devshell | −30 s per CI job |
 | falsifier-first scoring (fresh tree) | 326 s → **44.2 s** |
+| suite split into three partitions (built in parallel) | 28.5 s → **9.5 s** wall |
+| campaign without its own baseline (the partitions prove the suite) | 44.2 s → **15.3 s** |
 | mutation cache, identical tree | 44 s → **1.2 s** |
+| **`nix flake check`, all of the above** | **~300 s → 35 s** |
 | local binary cache, cold store, same tree | 245 s → 23 s |
 
 ## What does **not** help, measured
@@ -89,3 +97,12 @@ nix flake check                                                  # the whole gat
 
 Timing a step: `/usr/bin/time` is not installed here; use
 `s=$(date +%s%N); … ; echo $(( ($(date +%s%N)-s)/1000000 ))ms`.
+
+## Why the split is safe
+
+Three partitions, each a separate Nix check, all of which must pass. Splitting can only
+turn a green gate red -- never the other way -- because a test that passes alone but needs
+another file's side effect becomes a failure, not a quieter proof. The partitions are data
+in `flake.nix`, and an evaluation-time assertion proves they name every `tests/**/test_*.py`
+exactly once; a file dropped from all three would stop the flake from evaluating rather
+than from running.
