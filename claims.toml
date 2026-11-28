@@ -315,6 +315,11 @@ text = "Every flag the CLI accepts appears in the README."
 check = "python3 -m pytest tests/test_docs.py::test_every_flag_is_documented -q"
 
 [[claim]]
+id = "a-cached-verdict-is-keyed-to-the-tree"
+text = "A recorded mutation verdict is reused only for a byte-identical tree, and never for a changed one."
+check = "python3 -m pytest tests/test_mutation_cache.py -q"
+
+[[claim]]
 id = "a-mutation-flag-is-documented"
 text = "Every flag the mutation tool accepts appears in the README."
 check = "python3 -m pytest tests/test_docs.py::test_every_mutation_flag_is_documented -q"

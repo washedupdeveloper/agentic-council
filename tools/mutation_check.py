@@ -20,6 +20,8 @@ from __future__ import annotations
 
 import argparse
 import concurrent.futures
+import hashlib
+import json
 import os
 import re
 import shutil
@@ -376,6 +378,44 @@ def _shard(mutations: tuple[Mutation, ...], index: int, count: int) -> tuple[Mut
     return tuple(m for i, m in enumerate(mutations) if i % count == index)
 
 
+def tree_digest() -> str:
+    """Every input that can change a verdict, hashed into one string.
+
+    The campaign's unit is "run the whole suite under this mutation", so a change
+    anywhere in `src/` or `tests/` can change any verdict -- not only the file a mutant
+    touches. The digest covers both trees, the registry, this tool and the interpreter,
+    and claims nothing broader: an identical digest means an identical experiment.
+    """
+    h = hashlib.sha256()
+    h.update(sys.version.encode())
+    for base in (ROOT / "src", ROOT / "tests"):
+        for path in sorted(base.rglob("*")):
+            if not path.is_file() or "__pycache__" in path.parts:
+                continue
+            h.update(str(path.relative_to(ROOT)).encode())
+            h.update(hashlib.sha256(path.read_bytes()).digest())
+    for extra in (ROOT / "claims.toml", Path(__file__).resolve()):
+        h.update(extra.name.encode())
+        h.update(hashlib.sha256(extra.read_bytes()).digest())
+    return h.hexdigest()
+
+
+def load_cache(path: Path) -> dict[str, dict[str, list[object]]]:
+    """The recorded verdicts, keyed by tree digest. An unreadable cache is an empty one."""
+    try:
+        loaded = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return loaded if isinstance(loaded, dict) else {}
+
+
+def save_cache(path: Path, cache: dict[str, dict[str, list[object]]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(json.dumps(cache, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    tmp.replace(path)
+
+
 def _score(mutation: Mutation, by_node: dict[str, list[str]]
            ) -> tuple[str, bool, set[str], str | None]:
     """Run one mutant against the full suite.
@@ -414,6 +454,12 @@ def main(argv: list[str] | None = None) -> int:
         "--shard", metavar="I/N", default=None,
         help="score the I-th of N interleaved slices; CI runs one job per slice")
     parser.add_argument(
+        "--cache", type=Path, default=ROOT / ".council" / "mutation-cache.json",
+        help="reuse verdicts recorded for a byte-identical tree (default: .council/)")
+    parser.add_argument(
+        "--no-cache", action="store_true",
+        help="score every mutant, ignoring and not writing the cache")
+    parser.add_argument(
         "--jobs", type=int, default=0, metavar="N",
         help="score this many mutants at once (0 = one per core)")
     args = parser.parse_args(argv) if argv is not None else None
@@ -436,9 +482,35 @@ def main(argv: list[str] | None = None) -> int:
         if node is not None:
             by_node.setdefault(node, []).append(claim.id)
 
-    with tempfile.TemporaryDirectory(prefix="council-baseline-") as raw:
-        baseline_src = _copy_src(raw)
-        baseline_code, baseline_broken = run_suite(baseline_src)
+    cache_path = None if args is None or args.no_cache else args.cache
+    digest = tree_digest() if cache_path is not None else ""
+    cache = load_cache(cache_path) if cache_path is not None else {}
+    recorded = cache.get(digest, {})
+    selected_names = {mutation.name for mutation in selected}
+    cached: dict[str, tuple[bool, set[str], str | None]] = {}
+    for name, value in recorded.items():
+        if name not in selected_names or not isinstance(value, list) or len(value) != 3:
+            continue
+        caught, broken, problem = value
+        cached[name] = (
+            caught if isinstance(caught, bool) else False,
+            {str(node) for node in broken} if isinstance(broken, list) else set(),
+            problem if isinstance(problem, str) else None,
+        )
+    to_score = [m for m in selected if m.name not in cached]
+    if cached:
+        print(f"{len(cached)} of {len(selected)} mutant(s) answered by the cache for this tree",
+              flush=True)
+
+    # The baseline proves the unmutated suite passes *now*. A tree identical to the one
+    # that already produced these verdicts cannot have changed that, so with nothing left
+    # to score it is not paid for again.
+    if to_score:
+        with tempfile.TemporaryDirectory(prefix="council-baseline-") as raw:
+            baseline_src = _copy_src(raw)
+            baseline_code, baseline_broken = run_suite(baseline_src)
+    else:
+        baseline_code, baseline_broken = 0, set()
     if baseline_code != 0:
         print("BASELINE RED: the unmodified suite must pass before mutations are scored")
         for node in sorted(baseline_broken):
@@ -458,23 +530,47 @@ def main(argv: list[str] | None = None) -> int:
     # what the pool size would be. A policy value is a flag.
     default_workers = os.cpu_count() or 2
     requested = args.jobs if args is not None else 0
-    workers = max(1, min(len(selected), requested or default_workers))
-    print(f"scoring {len(selected)} mutant(s) across {workers} worker(s)", flush=True)
-    with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as pool:
-        futures = {pool.submit(_score, m, by_node): m for m in selected}
-        for future in concurrent.futures.as_completed(futures):
-            name, caught, hit, problem = future.result()
-            if problem is not None:
-                print(f"  STALE  {name}: {problem}", flush=True)
-                survivors.append(name)
-                falsified[name] = set()
-                continue
-            print(f"  {'caught' if caught else 'SURVIVED'}  {name}", flush=True)
-            if not caught:
-                survivors.append(name)
-            falsified[name] = hit
-            if hit:
-                print(f"            falsifies {', '.join(sorted(hit))}", flush=True)
+    workers = max(1, min(len(to_score), requested or default_workers)) if to_score else 1
+    scored: dict[str, tuple[bool, set[str], str | None]] = {}
+    if to_score:
+        print(f"scoring {len(to_score)} mutant(s) across {workers} worker(s)", flush=True)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as pool:
+            futures = {pool.submit(_score, m, by_node): m for m in to_score}
+            for future in concurrent.futures.as_completed(futures):
+                name, caught, hit, problem = future.result()
+                scored[name] = (caught, hit, problem)
+                if problem is not None:
+                    print(f"  STALE  {name}: {problem}", flush=True)
+                    continue
+                print(f"  {'caught' if caught else 'SURVIVED'}  {name}", flush=True)
+                if hit:
+                    print(f"            falsifies {', '.join(sorted(hit))}", flush=True)
+
+    results = {**cached, **scored}
+    for mutation in selected:
+        name = mutation.name
+        caught, hit, problem = results[name]
+        if problem is not None:
+            survivors.append(name)
+            falsified[name] = set()
+            continue
+        if not caught:
+            survivors.append(name)
+        falsified[name] = hit
+
+    # Only the mutants scored in this run are recorded, merged into what the digest
+    # already holds -- a shard must not erase its siblings' work.
+    if cache_path is not None and scored:
+        merged = dict(cache.get(digest, {}))
+        for name, (caught, hit, problem) in scored.items():
+            merged[name] = [caught, sorted(hit), problem]
+        cache[digest] = merged
+        try:
+            save_cache(cache_path, cache)
+        except OSError:
+            # A read-only source tree (the Nix sandbox) is not a reason to fail a run:
+            # the cache is an optimisation, and Nix already caches the whole derivation.
+            print("cache: not writable here; verdicts not recorded", flush=True)
 
     problems: list[str] = []
     known = set(mutation_names())

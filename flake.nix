@@ -349,7 +349,9 @@
               "PYTHONPATH=src python -m council_acp --help > /dev/null";
 
           # The suite, broken on purpose eighteen ways. It must notice each one.
-          mutations = mkCheck "council-mutations" (testScope ++ [ "tools" ]) "python tools/mutation_check.py";
+          mutations = mkCheck "council-mutations" (
+            testScope ++ [ "tools" ]
+          ) "python tools/mutation_check.py --no-cache";
 
           # v1.9.0's pinned verdicts beside this rule, on the same fixtures.
           differential = mkCheck "council-differential" testScope "python tools/differential.py";

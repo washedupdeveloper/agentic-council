@@ -506,8 +506,11 @@ nix flake check
 ```
 
 The mutation campaign scores every mutant against the suite: `--only NAME` narrows it to
-one, `--shard I/N` takes the I-th of N interleaved slices (CI runs four), and `--jobs N`
-says how many to score at once, where 0 means one per core.
+one, `--shard I/N` takes the I-th of N interleaved slices (CI runs eight), and `--jobs N`
+says how many to score at once, where 0 means one per core. `--cache PATH` reuses verdicts
+already recorded for a byte-identical tree -- the key covers `src/`, `tests/`, the clock
+registry, this tool and the interpreter, so a hit is the same experiment, not a guess --
+and `--no-cache` scores everything from scratch.
 
 The full gate is `nix flake check`: tests, types, claims, mutations, the
 differential corpus, and the Nix sources. A green test suite alone is not a
