@@ -9,14 +9,17 @@ One mutant = one run of the **whole** suite against a mutated tree. That is the 
 everything follows from it:
 
 ```
-campaign  ≈  (mutants × suite) / workers  +  one baseline suite
-          =  (72 × 26.7s) / 12           +  27s
-          =  160s + 27s  (measured 258s: the pool runs at ~73%, not 100%)
+campaign  ≈  (mutants × falsifier-subset) / workers  +  one baseline suite
+          =  (72 × 1.10s) / 12                      +  27s      (fast path, default)
+          =  (72 × 26.7s) / 12                      +  27s      (--no-fast)
 ```
 
-The suite is paid **72 times**. Nothing else in the gate is multiplied like that, which is
-why the campaign is 84% of the total and why every optimisation question is a question
-about that product.
+Each mutant is decided by the pytest nodes of the claims that **name it as their
+falsifier** — 1.11 nodes on average, 1.10 s median, measured across all 72. A failure there
+is a real failure, so the catch needs no inference. A pass proves nothing, so the full
+suite runs and decides: **a subset may prove a catch, only the whole suite may prove a
+miss.** At the time of writing all 72 were decided by their falsifier and none fell back;
+if one ever does, the log says so and it costs what it always did.
 
 ## Measured steps
 
@@ -31,7 +34,8 @@ Workstation: 12 cores, warm store, `devshell` unless noted. 2026-11-28.
 | pytest (full suite) | 27.0 s | devshell |
 | claims (265, batched per file) | 14.8 s | devshell |
 | differential | 0.2 s | devshell |
-| **mutations (72)** | **257.8 s** | devshell, 12 workers |
+| **mutations (72), falsifier-first** | **44.2 s** | devshell, 12 workers |
+| mutations (72), `--no-fast` | 257.8 s | devshell, 12 workers |
 | mutations, identical tree (cached) | **1.2 s** | devshell |
 | `nix flake check`, warm | 4.3 s | nix build sandbox |
 | `nix flake check`, full | ~245 s | nix build sandbox |
@@ -48,14 +52,15 @@ is 700 of them.
 | claims batched per file (251 → 45 processes) | 21.4 s → 14.8 s |
 | mutation shards 4 → 8 in CI | 247–252 s → 160–214 s per job |
 | bwrap probe through the devshell | −30 s per CI job |
-| mutation cache, identical tree | 326 s → **1.2 s** |
+| falsifier-first scoring (fresh tree) | 326 s → **44.2 s** |
+| mutation cache, identical tree | 44 s → **1.2 s** |
 | local binary cache, cold store, same tree | 245 s → 23 s |
 
 ## What does **not** help, measured
 
-- **Test selection per mutant.** Two designs, 138.9 s and 90.0 s, both rejected: they
-  changed which claims a mutant was reported to break. A subset may prove a catch; only
-  the whole suite may prove a miss.
+- **Test selection by import graph or coverage.** Rejected: it decides what a mutant broke
+  from a guess. Selection is only sound when the subset is *declared* (the falsifier's own
+  nodes) and a pass always falls back — which is what the fast path does.
 - **Faster imports.** `import council.cli` is ~1 ms over interpreter startup. The idea
   that lazy imports would cut the suite was wrong by two orders of magnitude.
 - **A binary cache for a new commit.** Every check is a new derivation, so nothing is

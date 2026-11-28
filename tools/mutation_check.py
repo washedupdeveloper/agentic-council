@@ -35,7 +35,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
-from council.claims import load as load_claims  # noqa: E402
+from council.claims import Claim, load as load_claims  # noqa: E402
 
 NODE = re.compile(r"(tests/[\w./-]+\.py::[\w\[\]-]+)")
 
@@ -305,6 +305,22 @@ def claim_node(check: str) -> str | None:
     return match.group(1) if match else None
 
 
+def falsifier_nodes(claims: list[Claim]) -> dict[str, list[str]]:
+    """Map each mutation to the pytest nodes of the claims that name it as falsifier.
+
+    Those claims are the only ones a mutant's verdict can settle, so their nodes are the
+    smallest run that can still prove a catch -- 1.11 nodes on average for this registry.
+    """
+    mapping: dict[str, list[str]] = {}
+    for claim in claims:
+        if claim.falsifier is None:
+            continue
+        node = claim_node(claim.check)
+        if node is not None and node not in mapping.setdefault(claim.falsifier, []):
+            mapping[claim.falsifier].append(node)
+    return mapping
+
+
 def failing_tests(report: Path) -> set[str]:
     broken: set[str] = set()
     for case in ET.parse(report).iter("testcase"):
@@ -317,8 +333,15 @@ def failing_tests(report: Path) -> set[str]:
     return broken
 
 
-def run_suite(src: Path) -> tuple[int, set[str]]:
-    """Run the suite against a mutated tree; return the exit code and failing node ids."""
+def run_suite(src: Path, nodes: list[str] | None = None,
+              failfast: bool = False) -> tuple[int, set[str]]:
+    """Run the suite against a mutated tree; return the exit code and failing node ids.
+
+    `nodes` restricts the run and `failfast` stops at the first failure. Both exist for
+    one reason: the campaign asks whether a mutant was noticed, and the mutant's own
+    declared falsifier answers that in about a second against the suite's twenty-seven.
+    A pass here proves nothing -- the caller falls back to the full suite for that.
+    """
     with tempfile.TemporaryDirectory() as raw:
         report = Path(raw) / "junit.xml"
         # A private temp root and basetemp per suite: twelve of these run at once,
@@ -331,6 +354,7 @@ def run_suite(src: Path) -> tuple[int, set[str]]:
         code = subprocess.run(
             [sys.executable, "-m", "pytest", "-o", f"pythonpath={src}", "-q", "--no-header",
              "-p", "no:cacheprovider", f"--basetemp={Path(raw) / 'base'}",
+             *(["-x", "--tb=no"] if failfast else []), *(nodes or []),
              f"--junitxml={report}"],
             cwd=ROOT, capture_output=True, text=True, env=env,
         ).returncode
@@ -416,26 +440,38 @@ def save_cache(path: Path, cache: dict[str, dict[str, list[object]]]) -> None:
     tmp.replace(path)
 
 
-def _score(mutation: Mutation, by_node: dict[str, list[str]]
-           ) -> tuple[str, bool, set[str], str | None]:
-    """Run one mutant against the full suite.
+def _score(mutation: Mutation, by_node: dict[str, list[str]],
+           falsifier_nodes: list[str], fast: bool = True
+           ) -> tuple[str, bool, set[str], str | None, bool]:
+    """Score one mutant: its own falsifier first, the whole suite only to prove a miss.
 
-    Returns (name, caught, claims-broken, problem). The body is the serial loop's
-    body moved into a function: the mutant is applied to a private copy, the whole
-    suite runs, and `caught` is whether it noticed. A pool only decides *when*
-    this runs, never what it does, so the guarantee is identical to the serial
-    campaign -- unlike test-selection, which silently narrows what can be noticed.
+    Returns (name, caught, claims-broken, problem, decided_by_falsifier). The subset is
+    the pytest nodes of the claims that name this mutant as their falsifier -- the only
+    claims its verdict can settle, and the smallest run that can still prove a catch. A
+    failure there is a real failure, so `caught` needs no inference; a pass proves
+    nothing, so the full suite runs and decides. That asymmetry is the whole guarantee:
+    a subset may prove a catch, only the whole suite may prove a miss.
     """
     with tempfile.TemporaryDirectory(prefix="council-mut-") as raw:
         src = _copy_src(raw)
         target = src / "council" / mutation.file
         body = target.read_text(encoding="utf-8")
         if mutation.old not in body:
-            return mutation.name, False, set(), f"pattern not found in {mutation.file}"
+            return mutation.name, False, set(), f"pattern not found in {mutation.file}", False
         target.write_text(body.replace(mutation.old, mutation.new, 1), encoding="utf-8")
+        if fast and falsifier_nodes:
+            # Every falsifier node runs: a mutant can be named by two or three claims, and
+            # stopping at the first failure would report only that one as broken -- the
+            # others would look like claims their own falsifier failed to break.
+            subset_code, subset_broken = run_suite(src, nodes=falsifier_nodes)
+            if subset_code != 0:
+                broken = subset_broken
+                hit = {claim_id for node in broken for claim_id in by_node.get(node, [])}
+                return mutation.name, True, hit, None, True
+            print(f"  fallback  {mutation.name}: its declared falsifier did not fire", flush=True)
         code, broken = run_suite(src)
     hit = {claim_id for node in broken for claim_id in by_node.get(node, [])}
-    return mutation.name, code != 0, hit, None
+    return mutation.name, code != 0, hit, None, False
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -453,6 +489,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--shard", metavar="I/N", default=None,
         help="score the I-th of N interleaved slices; CI runs one job per slice")
+    parser.add_argument(
+        "--no-fast", action="store_true",
+        help="run the whole suite for every mutant instead of its declared falsifier first")
     parser.add_argument(
         "--cache", type=Path, default=ROOT / ".council" / "mutation-cache.json",
         help="reuse verdicts recorded for a byte-identical tree (default: .council/)")
@@ -476,6 +515,7 @@ def main(argv: list[str] | None = None) -> int:
         selected = _shard(selected, *shard)
         print(f"shard {shard[0]}/{shard[1]}: {len(selected)} of {whole} mutant(s)", flush=True)
     claims = load_claims(ROOT / "claims.toml")
+    nodes_by_mutant = falsifier_nodes(claims)
     by_node: dict[str, list[str]] = {}
     for claim in claims:
         node = claim_node(claim.check)
@@ -532,12 +572,20 @@ def main(argv: list[str] | None = None) -> int:
     requested = args.jobs if args is not None else 0
     workers = max(1, min(len(to_score), requested or default_workers)) if to_score else 1
     scored: dict[str, tuple[bool, set[str], str | None]] = {}
+    fast_count: list[str] = []
+    slow_count: list[str] = []
     if to_score:
         print(f"scoring {len(to_score)} mutant(s) across {workers} worker(s)", flush=True)
         with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as pool:
-            futures = {pool.submit(_score, m, by_node): m for m in to_score}
+            futures = {pool.submit(_score, m, by_node, nodes_by_mutant.get(m.name, []),
+                                   not (args is not None and args.no_fast)): m
+                       for m in to_score}
             for future in concurrent.futures.as_completed(futures):
-                name, caught, hit, problem = future.result()
+                name, caught, hit, problem, by_falsifier = future.result()
+                if by_falsifier:
+                    fast_count.append(name)
+                else:
+                    slow_count.append(name)
                 scored[name] = (caught, hit, problem)
                 if problem is not None:
                     print(f"  STALE  {name}: {problem}", flush=True)
@@ -557,6 +605,10 @@ def main(argv: list[str] | None = None) -> int:
         if not caught:
             survivors.append(name)
         falsified[name] = hit
+
+    if to_score:
+        print(f"{len(fast_count)} decided by the declared falsifier, "
+              f"{len(slow_count)} by the full suite", flush=True)
 
     # Only the mutants scored in this run are recorded, merged into what the digest
     # already holds -- a shard must not erase its siblings' work.

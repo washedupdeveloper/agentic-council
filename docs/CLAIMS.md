@@ -67,6 +67,7 @@ registry, so it cannot describe a claim that has no check.
 | `an-incomplete-review-is-announced` | An INCOMPLETE verdict says on stderr that a merge is blocked. | `python3 -m pytest tests/test_cli.py::test_incomplete_is_announced_explicitly -q` |
 | `the-decision-path-is-pure` | The modules from parsed sample to verdict import and call nothing that acts. | `python3 -m pytest tests/test_architecture.py -q` |
 | `every-flag-is-documented` | Every flag the CLI accepts appears in the README. | `python3 -m pytest tests/test_docs.py::test_every_flag_is_documented -q` |
+| `a-mutant-is-decided-by-its-declared-falsifier` | A mutant is decided by the tests of the claims that name it as falsifier, and by the whole suite whenever those pass. | `python3 -m pytest tests/test_mutation_fastpath.py -q` |
 | `a-cached-verdict-is-keyed-to-the-tree` | A recorded mutation verdict is reused only for a byte-identical tree, and never for a changed one. | `python3 -m pytest tests/test_mutation_cache.py -q` |
 | `a-mutation-flag-is-documented` | Every flag the mutation tool accepts appears in the README. | `python3 -m pytest tests/test_docs.py::test_every_mutation_flag_is_documented -q` |
 | `a-file-the-diff-cannot-carry-is-named` | A binary untracked file is named as skipped, not silently dropped. | `python3 -m pytest tests/test_repo.py::test_a_binary_untracked_file_is_named_not_dropped -q` |
