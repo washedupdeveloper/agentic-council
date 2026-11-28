@@ -21,7 +21,9 @@ SOURCE = Path(__file__).resolve().parent.parent / "src" / "council"
 #: fixes add the proof-cause, rule-trust and sandbox guards.
 #: The claim registry's skip guard: a pytest node that skips exits 0, so a skip used to
 #: count as a holding claim. The verdict, its reason line and `re` add 31 lines.
-SOURCE_LIMIT = 7017
+# 7125 as of the claim batching: 108 lines that turn 251 pytest processes into 45.
+# The ratchet moves only when the line count moves, and this is the line that says so.
+SOURCE_LIMIT = 7125
 MODULE_LIMIT = 50
 
 

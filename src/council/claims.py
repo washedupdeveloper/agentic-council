@@ -11,6 +11,7 @@ import subprocess
 import sys
 import tempfile
 import tomllib
+import xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
@@ -187,21 +188,128 @@ def run_one(claim: Claim, cwd: Path, timeout: int = DEFAULT_TIMEOUT) -> ClaimRes
     return ClaimResult(claim, False, f"exit {proc.returncode}: {tail[-1] if tail else ''}".rstrip())
 
 
+_NODE_ID = re.compile(r"(?P<node>tests/[A-Za-z0-9_./-]+\.py::[A-Za-z0-9_\[\]-]+)")
+
+
+def _pytest_node(argv: list[str]) -> str | None:
+    """The node id this check runs, when it runs exactly one."""
+    if not _is_pytest(argv):
+        return None
+    for arg in argv:
+        match = _NODE_ID.fullmatch(arg)
+        if match is not None:
+            return match.group("node")
+    return None
+
+
+def _batch_key(claim: Claim) -> tuple[str, tuple[str, ...]] | None:
+    """The file this claim runs in, plus every other argument of its command.
+
+    Two claims share a process only when their commands differ in nothing but the
+    node id, so batching can never drop a flag one of them passed.
+    """
+    argv = shlex.split(claim.check)
+    node = _pytest_node(argv)
+    if node is None:
+        return None
+    return node.split("::")[0], tuple(arg for arg in argv if arg != node)
+
+
+def _junit(path: Path) -> dict[str, tuple[bool, str]]:
+    """Per-node outcomes from a junit report, keyed the way pytest names a node."""
+    outcomes: dict[str, tuple[bool, str]] = {}
+    if not path.exists():
+        return outcomes
+    for case in ET.parse(path).iter("testcase"):
+        module = case.get("classname", "").replace(".", "/")
+        if module and not module.endswith(".py"):
+            module = f"{module}.py"
+        node = f"{module}::{case.get('name', '')}"
+        skipped = case.find("skipped")
+        if case.find("failure") is not None or case.find("error") is not None:
+            outcomes[node] = (False, "failed")
+        elif skipped is not None:
+            outcomes[node] = (False, f"skipped, not proven: {skipped.get('message', '')}".rstrip(": "))
+        else:
+            outcomes[node] = (True, "")
+    return outcomes
+
+
+def _run_batch(batch: list[Claim], cwd: Path, timeout: int) -> dict[str, ClaimResult]:
+    """Run claims that share a file, and nothing else, in one pytest process.
+
+    Same nodes, same flags, same assertions: only the number of interpreters changes.
+    A batch is given the per-claim timeout times its size, so it cannot time out where
+    each member would have passed on its own; and any node the report does not mention
+    falls back to `run_one`, so an unreadable report can only cost time, never a claim.
+    """
+    argv = shlex.split(batch[0].check)
+    nodes = [_pytest_node(shlex.split(claim.check)) for claim in batch]
+    if any(node is None for node in nodes) or len(batch) == 1:
+        return {claim.id: run_one(claim, cwd, timeout) for claim in batch}
+
+    env = dict(os.environ)
+    env["PYTEST_ADDOPTS"] = (env.get("PYTEST_ADDOPTS", "") + " -p no:cacheprovider").strip()
+    with tempfile.TemporaryDirectory(prefix="council-batch-") as tmp:
+        env["TMPDIR"] = tmp
+        report = Path(tmp) / "junit.xml"
+        command = [*argv_without_nodes(argv), *[n for n in nodes if n], f"--junitxml={report}"]
+        try:
+            subprocess.run(_with_basetemp(command, Path(tmp)), cwd=cwd,
+                           capture_output=True, text=True,
+                           timeout=timeout * len(batch), env=env)
+        except (FileNotFoundError, subprocess.TimeoutExpired) as exc:
+            reason = ("check command not found: " + str(exc) if isinstance(exc, FileNotFoundError)
+                      else f"check timed out after {timeout * len(batch)}s")
+            return {claim.id: ClaimResult(claim, False, reason) for claim in batch}
+        outcomes = _junit(report)
+
+    results: dict[str, ClaimResult] = {}
+    for claim, node in zip(batch, nodes):
+        if node is not None and node in outcomes:
+            ok, detail = outcomes[node]
+            results[claim.id] = ClaimResult(claim, ok, detail)
+        else:
+            results[claim.id] = run_one(claim, cwd, timeout)
+    return results
+
+
+def argv_without_nodes(argv: list[str]) -> list[str]:
+    """The command with its node ids removed: the shape every member shares."""
+    return [arg for arg in argv if _NODE_ID.fullmatch(arg) is None]
+
+
 def run_all(claims: list[Claim],
             cwd: Path,
             timeout: int = DEFAULT_TIMEOUT,
             jobs: int = 0) -> list[ClaimResult]:
     """Run every claim and keep going after a failure; report in registry order.
 
-    Each check is an independent process, so the pool decides only when a claim
-    runs. Two hundred and sixty-three claims at roughly a second of interpreter
-    startup each is the entire cost of this check; it is not the work.
+    Claims that run one pytest node each are grouped by file and by every other
+    argument, so 251 claims become 45 processes instead of 251. That is the entire
+    cost of this check -- a second of interpreter startup per claim, not the work --
+    and a batch proves exactly what its members proved one at a time.
     """
-    if jobs <= 1 or len(claims) <= 1:
-        return [run_one(claim, cwd, timeout) for claim in claims]
-    with ThreadPoolExecutor(max_workers=jobs) as pool:
-        # `map` preserves input order, so the report is registry order either way.
-        return list(pool.map(lambda c: run_one(c, cwd, timeout), claims))
+    workers = jobs if jobs > 0 else (os.cpu_count() or 2)
+    groups: dict[tuple[str, tuple[str, ...]], list[Claim]] = {}
+    singles: list[Claim] = []
+    for claim in claims:
+        key = _batch_key(claim)
+        if key is None:
+            singles.append(claim)
+        else:
+            groups.setdefault(key, []).append(claim)
+    batches = list(groups.values()) + [[claim] for claim in singles]
+    if workers <= 1 or len(batches) <= 1:
+        merged: dict[str, ClaimResult] = {}
+        for batch in batches:
+            merged.update(_run_batch(batch, cwd, timeout))
+        return [merged[claim.id] for claim in claims]
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        merged = {}
+        for outcome in pool.map(lambda batch: _run_batch(batch, cwd, timeout), batches):
+            merged.update(outcome)
+    return [merged[claim.id] for claim in claims]
 
 
 def main(argv: list[str] | None = None) -> int:
