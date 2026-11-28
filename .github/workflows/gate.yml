@@ -52,7 +52,11 @@ jobs:
         run: |
           sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
           sudo sysctl -w kernel.unprivileged_userns_clone=1 || true
-          nix shell nixpkgs#bubblewrap -c bwrap --unshare-user --dev-bind / / true \
+          # The devshell already carries bwrap, and every job realizes that devshell
+          # anyway. `nix shell nixpkgs#bubblewrap` evaluates the registry and fetches a
+          # second nixpkgs to run one binary that is already on PATH: measured at 14-17s
+          # of the job's setup, across ten jobs, for an answer that is the same either way.
+          nix develop -c bwrap --unshare-user --dev-bind / / true \
             && echo "bwrap: usable"
       - name: fast checks
         run: nix run .#gate-fast
@@ -96,7 +100,11 @@ jobs:
           sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
           sudo sysctl -w kernel.unprivileged_userns_clone=1 || true
           # `bwrap` is not on the runner's PATH: the tests take it from the Nix build.
-          nix shell nixpkgs#bubblewrap -c bwrap --unshare-user --dev-bind / / true \
+          # The devshell already carries bwrap, and every job realizes that devshell
+          # anyway. `nix shell nixpkgs#bubblewrap` evaluates the registry and fetches a
+          # second nixpkgs to run one binary that is already on PATH: measured at 14-17s
+          # of the job's setup, across ten jobs, for an answer that is the same either way.
+          nix develop -c bwrap --unshare-user --dev-bind / / true \
             && echo "bwrap: usable"
       # Every check except the campaign, which the shard job owns. `nix flake
       # check` stays the one full gate locally; CI splits only the part that
@@ -133,7 +141,11 @@ jobs:
         run: |
           sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
           sudo sysctl -w kernel.unprivileged_userns_clone=1 || true
-          nix shell nixpkgs#bubblewrap -c bwrap --unshare-user --dev-bind / / true \
+          # The devshell already carries bwrap, and every job realizes that devshell
+          # anyway. `nix shell nixpkgs#bubblewrap` evaluates the registry and fetches a
+          # second nixpkgs to run one binary that is already on PATH: measured at 14-17s
+          # of the job's setup, across ten jobs, for an answer that is the same either way.
+          nix develop -c bwrap --unshare-user --dev-bind / / true \
             && echo "bwrap: usable"
       # The same tool the `mutations` check runs; `--shard` partitions the registry
       # by index, so the union of these jobs is exactly the registry, and each job
