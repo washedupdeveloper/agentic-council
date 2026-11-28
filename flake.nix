@@ -390,12 +390,17 @@
             nix-best-practices.packages.${pkgs.stdenv.hostPlatform.system}.check-nix
           ];
           shellHook = ''
-            echo "council devshell — $(python --version 2>&1)"
-            echo "  python -m pytest     the suite"
-            echo "  mypy src             strict types"
-            echo "  pyright               LSP diagnostics"
-            echo "  ./bin/council-verify every claim"
-            echo "  nix flake check       every check, including the Nix sources"
+            # To stderr: `nix develop -c council review --json > verdict.json` must write
+            # JSON and nothing else. On stdout this banner lands in front of the verdict
+            # and every consumer that parses it fails on line 1 column 1.
+            {
+              echo "council devshell — $(python --version 2>&1)"
+              echo "  python -m pytest     the suite"
+              echo "  mypy src             strict types"
+              echo "  pyright               LSP diagnostics"
+              echo "  ./bin/council-verify every claim"
+              echo "  nix flake check       every check, including the Nix sources"
+            } >&2
           '';
         };
       });
