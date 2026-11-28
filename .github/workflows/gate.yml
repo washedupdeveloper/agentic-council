@@ -109,17 +109,19 @@ jobs:
       - name: validate OpenSpec changes
         run: nix run .#openspec -- validate --all --strict
 
-  # Four runners instead of one: 72 mutants split by index, each still scored
-  # against the whole suite. `needs: gate` so a lint failure never spends sixteen
-  # cores on a campaign that cannot matter.
+  # Eight runners instead of one: 72 mutants split by index, each still scored
+  # against the whole suite. The union of the shards is the registry, so more of them
+  # changes the wall clock and nothing about the proof -- 9 mutants on a 4-core runner
+  # instead of 18. Measured: the campaign is 258s of the gate's ~310s, and it is the
+  # only step whose cost is per-mutant rather than per-tree.
   mutations:
-    name: mutations (shard ${{ matrix.shard }}/4)
+    name: mutations (shard ${{ matrix.shard }}/8)
     # Waits on the cheap tier only, so it runs beside `gate` rather than after it.
     needs: fast
     strategy:
       fail-fast: false
       matrix:
-        shard: [0, 1, 2, 3]
+        shard: [0, 1, 2, 3, 4, 5, 6, 7]
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
@@ -137,4 +139,4 @@ jobs:
       # by index, so the union of these jobs is exactly the registry, and each job
       # verifies only the claims whose falsifier it owns.
       - name: score this shard
-        run: nix develop -c python tools/mutation_check.py --shard ${{ matrix.shard }}/4
+        run: nix develop -c python tools/mutation_check.py --shard ${{ matrix.shard }}/8
